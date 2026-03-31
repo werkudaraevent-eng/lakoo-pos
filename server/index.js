@@ -32,6 +32,20 @@ function asyncHandler(handler) {
   };
 }
 
+function getRequestWorkspaceId(req, fallback = null) {
+  const queryWorkspaceId = typeof req.query.workspaceId === "string" ? req.query.workspaceId.trim() : "";
+  if (queryWorkspaceId) {
+    return queryWorkspaceId;
+  }
+
+  const bodyWorkspaceId = typeof req.body?.workspaceId === "string" ? req.body.workspaceId.trim() : "";
+  if (bodyWorkspaceId) {
+    return bodyWorkspaceId;
+  }
+
+  return fallback;
+}
+
 app.use(express.json());
 
 app.get("/api/health", (_req, res) => {
@@ -86,7 +100,10 @@ app.post(
   requireRole(["admin", "manager"]),
   asyncHandler(async (req, res) => {
     await createPromotionRecord(req.body, req.auth.user.id);
-    res.json({ ok: true, data: await getBootstrap() });
+    res.json({
+      ok: true,
+      data: await getBootstrap({ workspaceId: getRequestWorkspaceId(req) }),
+    });
   })
 );
 
@@ -102,7 +119,12 @@ app.post(
       return;
     }
 
-    res.json({ ok: true, data: await getBootstrap() });
+    res.json({
+      ok: true,
+      data: await getBootstrap({
+        workspaceId: getRequestWorkspaceId(req, result.workspaceId ?? null),
+      }),
+    });
   })
 );
 
@@ -117,7 +139,9 @@ app.post(
       return;
     }
 
-    const data = await getBootstrap();
+    const data = await getBootstrap({
+      workspaceId: getRequestWorkspaceId(req, result.workspaceId ?? null),
+    });
     const sale = data.sales.find((item) => item.id === result.saleId) ?? null;
     res.json({ ok: true, sale, data });
   })
@@ -129,7 +153,10 @@ app.put(
   requireRole(["admin"]),
   asyncHandler(async (req, res) => {
     await updateSettingsRecord(req.body);
-    res.json({ ok: true, data: await getBootstrap() });
+    res.json({
+      ok: true,
+      data: await getBootstrap({ workspaceId: getRequestWorkspaceId(req) }),
+    });
   })
 );
 
@@ -139,7 +166,10 @@ app.post(
   requireRole(["admin"]),
   asyncHandler(async (req, res) => {
     await createUserRecord(req.body);
-    res.json({ ok: true, data: await getBootstrap() });
+    res.json({
+      ok: true,
+      data: await getBootstrap({ workspaceId: getRequestWorkspaceId(req) }),
+    });
   })
 );
 
@@ -155,7 +185,10 @@ app.patch(
       return;
     }
 
-    res.json({ ok: true, data: await getBootstrap() });
+    res.json({
+      ok: true,
+      data: await getBootstrap({ workspaceId: getRequestWorkspaceId(req) }),
+    });
   })
 );
 
@@ -171,7 +204,10 @@ app.post(
       return;
     }
 
-    res.json({ ok: true, data: await getBootstrap() });
+    res.json({
+      ok: true,
+      data: await getBootstrap({ workspaceId: getRequestWorkspaceId(req) }),
+    });
   })
 );
 
@@ -187,7 +223,10 @@ app.patch(
       return;
     }
 
-    res.json({ ok: true, data: await getBootstrap() });
+    res.json({
+      ok: true,
+      data: await getBootstrap({ workspaceId: getRequestWorkspaceId(req) }),
+    });
   })
 );
 
@@ -203,7 +242,10 @@ app.post(
       return;
     }
 
-    res.json({ ok: true, data: await getBootstrap() });
+    res.json({
+      ok: true,
+      data: await getBootstrap({ workspaceId: getRequestWorkspaceId(req) }),
+    });
   })
 );
 
@@ -219,7 +261,10 @@ app.patch(
       return;
     }
 
-    res.json({ ok: true, data: await getBootstrap() });
+    res.json({
+      ok: true,
+      data: await getBootstrap({ workspaceId: getRequestWorkspaceId(req) }),
+    });
   })
 );
 

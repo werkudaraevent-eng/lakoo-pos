@@ -57,6 +57,10 @@ INSERT INTO workspace_variant_stocks (id, workspace_id, variant_id, quantity_on_
   ('wvs-2', 'event-gi', 'v4', 2, 'allocate', 2, '2026-03-31T01:00:00.000Z', '2026-03-31T01:00:00.000Z')
 ON CONFLICT (id) DO NOTHING;
 
+UPDATE sales
+SET workspace_id = 'store-main'
+WHERE workspace_id IS NULL;
+
 INSERT INTO sales (id, receipt_number, cashier_user_id, workspace_id, subtotal, discount_total, grand_total, payment_method, paid_amount, created_at) VALUES
   ('sale-1', 'POS-20260330-1', 'u3', 'store-main', 618000, 61800, 556200, 'card', 556200, '2026-03-30T08:12:00.000Z'),
   ('sale-2', 'POS-20260329-8', 'u3', 'event-gi', 459000, 0, 459000, 'cash', 459000, '2026-03-29T12:42:00.000Z')
@@ -71,6 +75,10 @@ ON CONFLICT (id) DO NOTHING;
 INSERT INTO sale_promotion_usages (id, sale_id, promotion_id, code_snapshot, discount_amount) VALUES
   ('spu-1', 'sale-1', 'promo-1', 'LUNA10', 61800)
 ON CONFLICT (id) DO NOTHING;
+
+UPDATE inventory_movements
+SET workspace_id = 'store-main'
+WHERE workspace_id IS NULL;
 
 INSERT INTO inventory_movements (id, variant_id, workspace_id, type, qty_delta, note, actor_user_id, reference_id, created_at) VALUES
   ('m1', 'v3', 'store-main', 'adjustment', -1, 'Display sample', 'u2', NULL, '2026-03-29T09:30:00.000Z'),

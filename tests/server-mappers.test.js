@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { mapProducts, mapSales, mapSettingsRows, mapWorkspaceRows } from "../server/mappers.js";
+import { filterRowsByWorkspace, mapProducts, mapSales, mapSettingsRows, mapWorkspaceRows } from "../server/mappers.js";
 
 test("mapSettingsRows parses JSON-backed settings values", () => {
   const result = mapSettingsRows([
@@ -150,4 +150,28 @@ test("mapWorkspaceRows groups assignments and stock metadata under each workspac
       assignedUserIds: ["u3", "u2"],
     },
   ]);
+});
+
+test("filterRowsByWorkspace keeps legacy null rows in the fallback store workspace only", () => {
+  const rows = [
+    { id: "sale-legacy", workspaceId: null },
+    { id: "sale-store", workspaceId: "store-main" },
+    { id: "sale-event", workspaceId: "event-gi" },
+  ];
+
+  assert.deepEqual(
+    filterRowsByWorkspace(rows, {
+      workspaceId: "store-main",
+      fallbackWorkspaceId: "store-main",
+    }).map((row) => row.id),
+    ["sale-legacy", "sale-store"]
+  );
+
+  assert.deepEqual(
+    filterRowsByWorkspace(rows, {
+      workspaceId: "event-gi",
+      fallbackWorkspaceId: "store-main",
+    }).map((row) => row.id),
+    ["sale-event"]
+  );
 });

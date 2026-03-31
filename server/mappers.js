@@ -103,6 +103,14 @@ export function mapWorkspaceRows(rows) {
   return workspaces;
 }
 
+export function filterRowsByWorkspace(rows, { workspaceId = null, fallbackWorkspaceId = null } = {}) {
+  if (!workspaceId) {
+    return rows;
+  }
+
+  return rows.filter((row) => (row.workspaceId ?? fallbackWorkspaceId ?? null) === workspaceId);
+}
+
 export function mapSales(sales, items, promotions) {
   const mappedSales = sales.map((sale) => ({
     ...sale,

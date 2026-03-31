@@ -2,7 +2,15 @@ import crypto from "node:crypto";
 
 import postgres from "postgres";
 
-import { mapProducts, mapPromotions, mapSales, mapSettingsRows, mapUsers, mapWorkspaceRows } from "./mappers.js";
+import {
+  filterRowsByWorkspace,
+  mapProducts,
+  mapPromotions,
+  mapSales,
+  mapSettingsRows,
+  mapUsers,
+  mapWorkspaceRows,
+} from "./mappers.js";
 
 const databaseUrl = process.env.SUPABASE_DB_URL || process.env.DATABASE_URL || "";
 const sql = databaseUrl
@@ -167,140 +175,93 @@ async function fetchWorkspaces(executor) {
   return mapWorkspaceRows(rows);
 }
 
-async function fetchSales(executor, workspaceId) {
-  const sales = workspaceId
-    ? await executor`
-        SELECT
-          s.id,
-          s.receipt_number AS "receiptNumber",
-          s.cashier_user_id AS "cashierUserId",
-          u.name AS "cashierUser",
-          s.subtotal,
-          s.discount_total AS "discountTotal",
-          s.grand_total AS "grandTotal",
-          s.payment_method AS "paymentMethod",
-          s.paid_amount AS "paidAmount",
-          s.created_at AS "createdAt"
-        FROM sales s
-        JOIN users u ON u.id = s.cashier_user_id
-        WHERE s.workspace_id = ${workspaceId}
-        ORDER BY s.created_at DESC
-      `
-    : await executor`
-        SELECT
-          s.id,
-          s.receipt_number AS "receiptNumber",
-          s.cashier_user_id AS "cashierUserId",
-          u.name AS "cashierUser",
-          s.subtotal,
-          s.discount_total AS "discountTotal",
-          s.grand_total AS "grandTotal",
-          s.payment_method AS "paymentMethod",
-          s.paid_amount AS "paidAmount",
-          s.created_at AS "createdAt"
-        FROM sales s
-        JOIN users u ON u.id = s.cashier_user_id
-        ORDER BY s.created_at DESC
-      `;
-  const items = workspaceId
-    ? await executor`
-        SELECT
-          si.id,
-          si.sale_id AS "saleId",
-          si.variant_id AS "variantId",
-          si.product_name_snapshot AS "productNameSnapshot",
-          si.sku_snapshot AS "skuSnapshot",
-          si.size_snapshot AS "sizeSnapshot",
-          si.color_snapshot AS "colorSnapshot",
-          si.unit_price_snapshot AS "unitPriceSnapshot",
-          si.qty,
-          si.line_total AS "lineTotal"
-        FROM sale_items si
-        JOIN sales s ON s.id = si.sale_id
-        WHERE s.workspace_id = ${workspaceId}
-        ORDER BY si.id ASC
-      `
-    : await executor`
-        SELECT
-          id,
-          sale_id AS "saleId",
-          variant_id AS "variantId",
-          product_name_snapshot AS "productNameSnapshot",
-          sku_snapshot AS "skuSnapshot",
-          size_snapshot AS "sizeSnapshot",
-          color_snapshot AS "colorSnapshot",
-          unit_price_snapshot AS "unitPriceSnapshot",
-          qty,
-          line_total AS "lineTotal"
-        FROM sale_items
-        ORDER BY id ASC
-      `;
-  const promotions = workspaceId
-    ? await executor`
-        SELECT
-          spu.sale_id AS "saleId",
-          spu.promotion_id AS "promotionId",
-          spu.code_snapshot AS "codeSnapshot",
-          spu.discount_amount AS "discountAmount"
-        FROM sale_promotion_usages spu
-        JOIN sales s ON s.id = spu.sale_id
-        WHERE s.workspace_id = ${workspaceId}
-      `
-    : await executor`
-        SELECT
-          sale_id AS "saleId",
-          promotion_id AS "promotionId",
-          code_snapshot AS "codeSnapshot",
-          discount_amount AS "discountAmount"
-        FROM sale_promotion_usages
-      `;
+async function fetchSales(executor, { workspaceId, fallbackWorkspaceId }) {
+  const salesRows = await executor`
+    SELECT
+      s.id,
+      s.workspace_id AS "workspaceId",
+      s.receipt_number AS "receiptNumber",
+      s.cashier_user_id AS "cashierUserId",
+      u.name AS "cashierUser",
+      s.subtotal,
+      s.discount_total AS "discountTotal",
+      s.grand_total AS "grandTotal",
+      s.payment_method AS "paymentMethod",
+      s.paid_amount AS "paidAmount",
+      s.created_at AS "createdAt"
+    FROM sales s
+    JOIN users u ON u.id = s.cashier_user_id
+    ORDER BY s.created_at DESC
+  `;
+  const filteredSales = filterRowsByWorkspace(salesRows, { workspaceId, fallbackWorkspaceId });
+  const saleIds = new Set(filteredSales.map((sale) => sale.id));
+  const items = (await executor`
+    SELECT
+      id,
+      sale_id AS "saleId",
+      variant_id AS "variantId",
+      product_name_snapshot AS "productNameSnapshot",
+      sku_snapshot AS "skuSnapshot",
+      size_snapshot AS "sizeSnapshot",
+      color_snapshot AS "colorSnapshot",
+      unit_price_snapshot AS "unitPriceSnapshot",
+      qty,
+      line_total AS "lineTotal"
+    FROM sale_items
+    ORDER BY id ASC
+  `).filter((item) => saleIds.has(item.saleId));
+  const promotions = (await executor`
+    SELECT
+      sale_id AS "saleId",
+      promotion_id AS "promotionId",
+      code_snapshot AS "codeSnapshot",
+      discount_amount AS "discountAmount"
+    FROM sale_promotion_usages
+  `).filter((promotion) => saleIds.has(promotion.saleId));
 
-  return mapSales(sales, items, promotions);
+  return mapSales(filteredSales, items, promotions);
 }
 
-async function fetchInventoryMovements(executor, workspaceId) {
-  return workspaceId
-    ? executor`
-        SELECT
-          m.id,
-          m.variant_id AS "variantId",
-          pv.sku,
-          p.name AS "productName",
-          pv.size,
-          pv.color,
-          m.type,
-          m.qty_delta AS "qtyDelta",
-          m.note,
-          u.name AS "actorUser",
-          m.reference_id AS "referenceId",
-          m.created_at AS "createdAt"
-        FROM inventory_movements m
-        JOIN product_variants pv ON pv.id = m.variant_id
-        JOIN products p ON p.id = pv.product_id
-        JOIN users u ON u.id = m.actor_user_id
-        WHERE m.workspace_id = ${workspaceId}
-        ORDER BY m.created_at DESC
-      `
-    : executor`
-        SELECT
-          m.id,
-          m.variant_id AS "variantId",
-          pv.sku,
-          p.name AS "productName",
-          pv.size,
-          pv.color,
-          m.type,
-          m.qty_delta AS "qtyDelta",
-          m.note,
-          u.name AS "actorUser",
-          m.reference_id AS "referenceId",
-          m.created_at AS "createdAt"
-        FROM inventory_movements m
-        JOIN product_variants pv ON pv.id = m.variant_id
-        JOIN products p ON p.id = pv.product_id
-        JOIN users u ON u.id = m.actor_user_id
-        ORDER BY m.created_at DESC
-      `;
+async function fetchInventoryMovements(executor, { workspaceId, fallbackWorkspaceId }) {
+  const rows = await executor`
+    SELECT
+      m.id,
+      m.workspace_id AS "workspaceId",
+      m.variant_id AS "variantId",
+      pv.sku,
+      p.name AS "productName",
+      pv.size,
+      pv.color,
+      m.type,
+      m.qty_delta AS "qtyDelta",
+      m.note,
+      u.name AS "actorUser",
+      m.reference_id AS "referenceId",
+      m.created_at AS "createdAt"
+    FROM inventory_movements m
+    JOIN product_variants pv ON pv.id = m.variant_id
+    JOIN products p ON p.id = pv.product_id
+    JOIN users u ON u.id = m.actor_user_id
+    ORDER BY m.created_at DESC
+  `;
+
+  return filterRowsByWorkspace(rows, { workspaceId, fallbackWorkspaceId });
+}
+
+async function resolveWriteWorkspaceId(executor, workspaceId) {
+  if (workspaceId) {
+    return workspaceId;
+  }
+
+  const rows = await executor`
+    SELECT id
+    FROM workspaces
+    WHERE type = ${"store"}
+    ORDER BY created_at ASC
+    LIMIT 1
+  `;
+
+  return rows[0]?.id ?? null;
 }
 
 export async function initializeDatabase() {
@@ -316,8 +277,13 @@ export async function getBootstrap({ workspaceId } = {}) {
   const products = await fetchProducts(executor);
   const promotions = await fetchPromotions(executor);
   const workspaces = await fetchWorkspaces(executor);
-  const sales = await fetchSales(executor, workspaceId || null);
-  const inventoryMovements = await fetchInventoryMovements(executor, workspaceId || null);
+  const fallbackWorkspaceId = workspaces.find((workspace) => workspace.type === "store")?.id ?? null;
+  const scope = {
+    workspaceId: workspaceId || null,
+    fallbackWorkspaceId,
+  };
+  const sales = await fetchSales(executor, scope);
+  const inventoryMovements = await fetchInventoryMovements(executor, scope);
 
   return {
     settings,
@@ -389,6 +355,7 @@ export async function createPromotionRecord(payload, actorUserId) {
 export async function adjustInventoryRecord(payload, actorUserId) {
   const executor = ensureSql();
   const amount = Number(payload.quantity);
+  const workspaceId = await resolveWriteWorkspaceId(executor, payload.workspaceId || null);
 
   if (amount < 1) {
     return { ok: false, message: "Inventory request tidak valid." };
@@ -423,10 +390,11 @@ export async function adjustInventoryRecord(payload, actorUserId) {
 
       await tx`
         INSERT INTO inventory_movements
-        (id, variant_id, type, qty_delta, note, actor_user_id, reference_id, created_at)
+        (id, variant_id, workspace_id, type, qty_delta, note, actor_user_id, reference_id, created_at)
         VALUES (
           ${createId("mov")},
           ${payload.variantId},
+          ${workspaceId},
           ${payload.mode},
           ${delta},
           ${payload.note},
@@ -437,7 +405,7 @@ export async function adjustInventoryRecord(payload, actorUserId) {
       `;
     });
 
-    return { ok: true };
+    return { ok: true, workspaceId };
   } catch (error) {
     return { ok: false, message: error.message };
   }
@@ -446,6 +414,7 @@ export async function adjustInventoryRecord(payload, actorUserId) {
 export async function finalizeSaleRecord(payload, actorUserId) {
   const executor = ensureSql();
   const cart = payload.cart || [];
+  const workspaceId = await resolveWriteWorkspaceId(executor, payload.workspaceId || null);
 
   if (!cart.length) {
     return { ok: false, message: "Cart masih kosong." };
@@ -536,11 +505,12 @@ export async function finalizeSaleRecord(payload, actorUserId) {
 
       await tx`
         INSERT INTO sales
-        (id, receipt_number, cashier_user_id, subtotal, discount_total, grand_total, payment_method, paid_amount, created_at)
+        (id, receipt_number, cashier_user_id, workspace_id, subtotal, discount_total, grand_total, payment_method, paid_amount, created_at)
         VALUES (
           ${saleId},
           ${receiptNumber},
           ${actorUserId},
+          ${workspaceId},
           ${subtotal},
           ${discount},
           ${subtotal - discount},
@@ -580,10 +550,11 @@ export async function finalizeSaleRecord(payload, actorUserId) {
 
         await tx`
           INSERT INTO inventory_movements
-          (id, variant_id, type, qty_delta, note, actor_user_id, reference_id, created_at)
+          (id, variant_id, workspace_id, type, qty_delta, note, actor_user_id, reference_id, created_at)
           VALUES (
             ${createId("mov")},
             ${item.variantId},
+            ${workspaceId},
             ${"sale"},
             ${item.qty * -1},
             ${`Sale ${receiptNumber}`},
@@ -608,7 +579,7 @@ export async function finalizeSaleRecord(payload, actorUserId) {
         `;
       }
 
-      return { ok: true, saleId };
+      return { ok: true, saleId, workspaceId };
     });
 
     return result;
