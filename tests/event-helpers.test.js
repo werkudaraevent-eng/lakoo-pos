@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { buildDashboardSummary } from "../src/features/events/eventHelpers.js";
+import { buildDashboardSummary, buildEventProgress } from "../src/features/events/eventHelpers.js";
 
 test("buildDashboardSummary returns the headline dashboard metrics for the active day", () => {
   const result = buildDashboardSummary({
@@ -51,4 +51,54 @@ test("buildDashboardSummary tolerates missing arrays and invalid timestamps", ()
     lowStock: 0,
     discountTotal: 5000,
   });
+});
+
+test("buildEventProgress returns compact timeline indicators for an active event workspace", () => {
+  const result = buildEventProgress({
+    workspace: {
+      id: "event-gi",
+      type: "event",
+      status: "active",
+      startsAt: "2026-04-01T10:00:00.000Z",
+      endsAt: "2026-04-03T10:00:00.000Z",
+    },
+    now: "2026-04-02T10:00:00.000Z",
+  });
+
+  assert.deepEqual(result, {
+    phase: "Live now",
+    progressPercent: 50,
+    elapsedHours: 24,
+    remainingHours: 24,
+    totalHours: 48,
+    isComplete: false,
+  });
+});
+
+test("buildEventProgress returns null for non-event workspaces or invalid schedules", () => {
+  assert.equal(
+    buildEventProgress({
+      workspace: {
+        id: "store-main",
+        type: "store",
+        status: "active",
+      },
+      now: "2026-04-02T10:00:00.000Z",
+    }),
+    null
+  );
+
+  assert.equal(
+    buildEventProgress({
+      workspace: {
+        id: "event-gi",
+        type: "event",
+        status: "active",
+        startsAt: "bad-date",
+        endsAt: "2026-04-03T10:00:00.000Z",
+      },
+      now: "2026-04-02T10:00:00.000Z",
+    }),
+    null
+  );
 });

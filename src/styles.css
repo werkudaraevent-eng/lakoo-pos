@@ -644,6 +644,46 @@ p {
   background: rgba(247, 249, 251, 0.92);
 }
 
+.event-progress-card {
+  display: grid;
+  gap: 16px;
+}
+
+.event-progress-grid {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr 0.9fr;
+  gap: 16px;
+  align-items: start;
+}
+
+.event-progress-track {
+  position: relative;
+  min-height: 12px;
+  margin-top: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(23, 33, 43, 0.08);
+}
+
+.event-progress-fill {
+  display: block;
+  min-height: 12px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--accent) 0%, #29a398 100%);
+}
+
+.event-progress-meta,
+.event-progress-schedule {
+  display: grid;
+  gap: 10px;
+}
+
+.event-progress-schedule {
+  padding: 14px;
+  border-radius: 16px;
+  background: rgba(247, 249, 251, 0.96);
+}
+
 .receipt-link-button {
   display: inline-flex;
   align-items: center;
@@ -698,6 +738,10 @@ p {
   .catalog-admin-layout,
   .content-grid.two-column,
   .sales-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .event-progress-grid {
     grid-template-columns: 1fr;
   }
 

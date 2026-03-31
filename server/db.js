@@ -10,6 +10,7 @@ import {
   mapSettingsRows,
   mapUsers,
   mapWorkspaceRows,
+  overlayProductsWithWorkspaceStock,
 } from "./mappers.js";
 
 const databaseUrl = process.env.SUPABASE_DB_URL || process.env.DATABASE_URL || "";
@@ -131,6 +132,23 @@ async function fetchProducts(executor) {
   `;
 
   return mapProducts(rows);
+}
+
+async function fetchWorkspaceVariantStocks(executor, workspaceId) {
+  if (!workspaceId) {
+    return [];
+  }
+
+  return executor`
+    SELECT
+      variant_id AS "variantId",
+      quantity_on_hand AS "quantityOnHand",
+      source_mode AS "sourceMode",
+      allocated_from_main AS "allocatedFromMain"
+    FROM workspace_variant_stocks
+    WHERE workspace_id = ${workspaceId}
+    ORDER BY created_at ASC, variant_id ASC
+  `;
 }
 
 async function fetchPromotions(executor) {
@@ -274,9 +292,17 @@ export async function getBootstrap({ workspaceId } = {}) {
   const settings = await fetchSettings(executor);
   const categories = await fetchCategories(executor);
   const users = await fetchUsers(executor);
-  const products = await fetchProducts(executor);
-  const promotions = await fetchPromotions(executor);
   const workspaces = await fetchWorkspaces(executor);
+  const activeWorkspace = workspaces.find((workspace) => workspace.id === (workspaceId || null)) ?? null;
+  const baseProducts = await fetchProducts(executor);
+  const products =
+    activeWorkspace?.type === "event"
+      ? overlayProductsWithWorkspaceStock(
+          baseProducts,
+          await fetchWorkspaceVariantStocks(executor, activeWorkspace.id)
+        )
+      : baseProducts;
+  const promotions = await fetchPromotions(executor);
   const fallbackWorkspaceId = workspaces.find((workspace) => workspace.type === "store")?.id ?? null;
   const scope = {
     workspaceId: workspaceId || null,

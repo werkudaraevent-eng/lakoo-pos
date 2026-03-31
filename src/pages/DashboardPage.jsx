@@ -1,6 +1,6 @@
 import { usePosData } from "../context/PosDataContext";
 import { useWorkspace } from "../context/WorkspaceContext";
-import { buildDashboardSummary } from "../features/events/eventHelpers";
+import { buildDashboardSummary, buildEventProgress } from "../features/events/eventHelpers";
 import { formatCurrency, formatDate } from "../utils/formatters";
 
 function formatWorkspaceType(type) {
@@ -34,6 +34,10 @@ export function DashboardPage() {
   const summary = buildDashboardSummary({
     sales,
     variants,
+    now: new Date().toISOString(),
+  });
+  const eventProgress = buildEventProgress({
+    workspace: activeWorkspace,
     now: new Date().toISOString(),
   });
   const workspaceStatus = formatLabel(activeWorkspace?.eventStatus ?? activeWorkspace?.status);
@@ -102,6 +106,53 @@ export function DashboardPage() {
           </p>
         </article>
       </section>
+
+      {activeWorkspace?.type === "event" && eventProgress ? (
+        <section className="panel-card event-progress-card">
+          <div className="panel-head">
+            <div>
+              <p className="eyebrow">Event Progress</p>
+              <h2>{activeWorkspace.name}</h2>
+            </div>
+            <span className="badge-soft">{eventProgress.phase}</span>
+          </div>
+
+          <div className="event-progress-grid">
+            <div className="event-progress-track" aria-hidden="true">
+              <span
+                className="event-progress-fill"
+                style={{ width: `${eventProgress.progressPercent}%` }}
+              />
+            </div>
+
+            <div className="event-progress-meta">
+              <div className="summary-row">
+                <span className="muted-text">Timeline completion</span>
+                <strong>{eventProgress.progressPercent}%</strong>
+              </div>
+              <div className="summary-row">
+                <span className="muted-text">Elapsed</span>
+                <strong>{eventProgress.elapsedHours}h</strong>
+              </div>
+              <div className="summary-row">
+                <span className="muted-text">Remaining</span>
+                <strong>{eventProgress.remainingHours}h</strong>
+              </div>
+              <div className="summary-row total">
+                <span className="muted-text">Selling window</span>
+                <strong>{eventProgress.totalHours}h</strong>
+              </div>
+            </div>
+
+            <div className="event-progress-schedule">
+              <p className="muted-text">Start</p>
+              <strong>{formatDate(activeWorkspace.startsAt)}</strong>
+              <p className="muted-text">End</p>
+              <strong>{formatDate(activeWorkspace.endsAt)}</strong>
+            </div>
+          </div>
+        </section>
+      ) : null}
 
       <section className="content-grid two-column dashboard-split">
         <article className="panel-card">

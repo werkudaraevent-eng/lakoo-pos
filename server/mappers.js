@@ -65,6 +65,44 @@ export function mapProducts(rows) {
   return products;
 }
 
+export function overlayProductsWithWorkspaceStock(products, workspaceVariantStocks) {
+  const safeProducts = Array.isArray(products) ? products : [];
+  const safeWorkspaceVariantStocks = Array.isArray(workspaceVariantStocks) ? workspaceVariantStocks : [];
+  const stockByVariantId = new Map(
+    safeWorkspaceVariantStocks.map((stock) => [stock.variantId, stock])
+  );
+
+  return safeProducts.reduce((nextProducts, product) => {
+    const nextVariants = (Array.isArray(product?.variants) ? product.variants : []).flatMap((variant) => {
+      const workspaceStock = stockByVariantId.get(variant.id);
+
+      if (!workspaceStock) {
+        return [];
+      }
+
+      return [
+        {
+          ...variant,
+          quantityOnHand: workspaceStock.quantityOnHand,
+          sourceMode: workspaceStock.sourceMode,
+          allocatedFromMain: workspaceStock.allocatedFromMain,
+        },
+      ];
+    });
+
+    if (nextVariants.length === 0) {
+      return nextProducts;
+    }
+
+    nextProducts.push({
+      ...product,
+      variants: nextVariants,
+    });
+
+    return nextProducts;
+  }, []);
+}
+
 export function mapPromotions(rows) {
   return rows.map((promo) => ({
     ...promo,
