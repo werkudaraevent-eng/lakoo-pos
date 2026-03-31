@@ -12,11 +12,15 @@ import { ReceiptPage } from "../pages/ReceiptPage";
 import { SalesPage } from "../pages/SalesPage";
 import { SettingsPage } from "../pages/SettingsPage";
 import { UsersPage } from "../pages/UsersPage";
+import { WorkspacePickerPage } from "../pages/WorkspacePickerPage";
 
 export function App() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
+      <Route element={<ProtectedRoute requireWorkspace={false} renderShell={false} />}>
+        <Route path="/workspace/select" element={<WorkspacePickerPage />} />
+      </Route>
 
       <Route element={<ProtectedRoute />}>
         <Route path="/" element={<Navigate to="/dashboard" replace />} />

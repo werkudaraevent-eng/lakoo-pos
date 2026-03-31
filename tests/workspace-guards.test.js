@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import {
   filterAccessibleWorkspaces,
   getRoleLandingPath,
+  pickWorkspaceRedirect,
   shouldConfirmWorkspaceSwitch,
 } from "../src/features/workspaces/workspaceGuards.js";
 
@@ -121,4 +122,22 @@ test("shouldConfirmWorkspaceSwitch requires confirmation for checkout with cart 
     }),
     false
   );
+});
+
+test("pickWorkspaceRedirect sends users with one workspace to the auto-select route", () => {
+  assert.equal(pickWorkspaceRedirect([{ id: "ws-1" }]), "/workspace/select?auto=ws-1");
+});
+
+test("pickWorkspaceRedirect sends users with multiple workspaces to the picker without auto selection", () => {
+  assert.equal(
+    pickWorkspaceRedirect([
+      { id: "ws-1" },
+      { id: "ws-2" },
+    ]),
+    "/workspace/select"
+  );
+});
+
+test("pickWorkspaceRedirect falls back to the picker route when no workspaces are available", () => {
+  assert.equal(pickWorkspaceRedirect([]), "/workspace/select");
 });

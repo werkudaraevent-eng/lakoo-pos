@@ -1,13 +1,16 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 
-import { apiGet, apiPatch, apiPost, apiPut } from "../api/client";
+import { apiGet, apiPatch, apiPost, apiPut, withQuery } from "../api/client";
 import { useAuth } from "./AuthContext";
+import { useWorkspace } from "./WorkspaceContext";
 
 const PosDataContext = createContext(null);
 
 function flattenVariants(products) {
-  return products.flatMap((product) =>
-    product.variants.map((variant) => ({
+  const safeProducts = Array.isArray(products) ? products : [];
+
+  return safeProducts.flatMap((product) =>
+    (Array.isArray(product.variants) ? product.variants : []).map((variant) => ({
       ...variant,
       productId: product.id,
       productName: product.name,
@@ -19,9 +22,8 @@ function flattenVariants(products) {
   );
 }
 
-export function PosDataProvider({ children }) {
-  const { user } = useAuth();
-  const [state, setState] = useState({
+function createEmptyState() {
+  return {
     settings: {
       storeName: "",
       storeCode: "",
@@ -29,60 +31,125 @@ export function PosDataProvider({ children }) {
       paymentMethods: [],
       serviceChargeEnabled: false,
     },
+    workspaces: [],
     categories: [],
     users: [],
     products: [],
     promotions: [],
     sales: [],
     inventoryMovements: [],
-  });
+  };
+}
+
+function normalizeBootstrapState(data) {
+  const emptyState = createEmptyState();
+
+  return {
+    ...emptyState,
+    ...data,
+    settings: {
+      ...emptyState.settings,
+      ...(data?.settings ?? {}),
+    },
+    workspaces: Array.isArray(data?.workspaces) ? data.workspaces : emptyState.workspaces,
+    categories: Array.isArray(data?.categories) ? data.categories : emptyState.categories,
+    users: Array.isArray(data?.users) ? data.users : emptyState.users,
+    products: Array.isArray(data?.products) ? data.products : emptyState.products,
+    promotions: Array.isArray(data?.promotions) ? data.promotions : emptyState.promotions,
+    sales: Array.isArray(data?.sales) ? data.sales : emptyState.sales,
+    inventoryMovements: Array.isArray(data?.inventoryMovements)
+      ? data.inventoryMovements
+      : emptyState.inventoryMovements,
+  };
+}
+
+export function PosDataProvider({ children }) {
+  const { user } = useAuth();
+  const { activeWorkspaceId } = useWorkspace();
+  const [state, setState] = useState(() => createEmptyState());
   const [loading, setLoading] = useState(false);
+  const [hasLoaded, setHasLoaded] = useState(false);
   const [loadError, setLoadError] = useState("");
 
   const variants = useMemo(() => flattenVariants(state.products), [state.products]);
 
+  async function loadBootstrapData() {
+    const payload = await apiGet(
+      withQuery("/api/bootstrap", activeWorkspaceId ? { workspaceId: activeWorkspaceId } : undefined)
+    );
+
+    return normalizeBootstrapState(payload.data);
+  }
+
   async function reload() {
+    if (!user) {
+      setState(createEmptyState());
+      setLoading(false);
+      setHasLoaded(false);
+      setLoadError("");
+      return;
+    }
+
+    setHasLoaded(false);
     setLoading(true);
     setLoadError("");
 
     try {
-      const payload = await apiGet("/api/bootstrap");
-      setState(payload.data);
+      setState(await loadBootstrapData());
     } catch (error) {
       setLoadError(error.message);
     } finally {
       setLoading(false);
+      setHasLoaded(true);
     }
   }
 
   useEffect(() => {
     if (user) {
-      reload();
+      let cancelled = false;
+
+      async function bootstrap() {
+        setHasLoaded(false);
+        setLoading(true);
+        setLoadError("");
+
+        try {
+          const nextState = await loadBootstrapData();
+
+          if (!cancelled) {
+            setState(nextState);
+          }
+        } catch (error) {
+          if (!cancelled) {
+            setLoadError(error.message);
+          }
+        } finally {
+          if (!cancelled) {
+            setLoading(false);
+            setHasLoaded(true);
+          }
+        }
+      }
+
+      bootstrap();
+
+      return () => {
+        cancelled = true;
+      };
     } else {
-      setState({
-        settings: {
-          storeName: "",
-          storeCode: "",
-          address: "",
-        paymentMethods: [],
-        serviceChargeEnabled: false,
-      },
-      categories: [],
-      users: [],
-      products: [],
-      promotions: [],
-        sales: [],
-        inventoryMovements: [],
-      });
+      setState(createEmptyState());
+      setLoading(false);
+      setHasLoaded(false);
+      setLoadError("");
     }
-  }, [user]);
+  }, [activeWorkspaceId, user]);
 
   async function createPromotion(payload, actor) {
     const response = await apiPost("/api/promotions", {
       ...payload,
       actorUserId: actor.id,
     });
-    setState(response.data);
+    setState(normalizeBootstrapState(response.data));
     return { ok: true };
   }
 
@@ -95,7 +162,7 @@ export function PosDataProvider({ children }) {
         note,
         actorUserId: actor.id,
       });
-      setState(response.data);
+      setState(normalizeBootstrapState(response.data));
       return { ok: true };
     } catch (error) {
       return { ok: false, message: error.message };
@@ -110,7 +177,7 @@ export function PosDataProvider({ children }) {
         paymentMethod,
         actorUserId: actor.id,
       });
-      setState(response.data);
+      setState(normalizeBootstrapState(response.data));
       return { ok: true, sale: response.sale };
     } catch (error) {
       return { ok: false, message: error.message };
@@ -119,43 +186,43 @@ export function PosDataProvider({ children }) {
 
   async function updateSettings(nextSettings) {
     const response = await apiPut("/api/settings", nextSettings);
-    setState(response.data);
+    setState(normalizeBootstrapState(response.data));
     return { ok: true };
   }
 
   async function createUser(payload) {
     const response = await apiPost("/api/users", payload);
-    setState(response.data);
+    setState(normalizeBootstrapState(response.data));
     return { ok: true };
   }
 
   async function updateUser(userId, payload) {
     const response = await apiPatch(`/api/users/${userId}`, payload);
-    setState(response.data);
+    setState(normalizeBootstrapState(response.data));
     return { ok: true };
   }
 
   async function createProduct(payload) {
     const response = await apiPost("/api/products", payload);
-    setState(response.data);
+    setState(normalizeBootstrapState(response.data));
     return { ok: true };
   }
 
   async function updateProduct(productId, payload) {
     const response = await apiPatch(`/api/products/${productId}`, payload);
-    setState(response.data);
+    setState(normalizeBootstrapState(response.data));
     return { ok: true };
   }
 
   async function createVariant(productId, payload) {
     const response = await apiPost(`/api/products/${productId}/variants`, payload);
-    setState(response.data);
+    setState(normalizeBootstrapState(response.data));
     return { ok: true };
   }
 
   async function updateVariant(variantId, payload) {
     const response = await apiPatch(`/api/variants/${variantId}`, payload);
-    setState(response.data);
+    setState(normalizeBootstrapState(response.data));
     return { ok: true };
   }
 
@@ -165,6 +232,7 @@ export function PosDataProvider({ children }) {
         ...state,
         variants,
         loading,
+        hasLoaded,
         loadError,
         reload,
         createPromotion,

@@ -28,6 +28,24 @@ export function getAuthToken() {
   return authToken;
 }
 
+export function withQuery(path, params) {
+  const searchParams = new URLSearchParams();
+
+  Object.entries(params ?? {}).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== "") {
+      searchParams.set(key, String(value));
+    }
+  });
+
+  const query = searchParams.toString();
+
+  if (!query) {
+    return path;
+  }
+
+  return `${path}${path.includes("?") ? "&" : "?"}${query}`;
+}
+
 export async function apiGet(path) {
   const response = await fetch(path, {
     headers: buildHeaders(),

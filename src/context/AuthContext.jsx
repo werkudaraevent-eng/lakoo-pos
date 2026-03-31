@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState } from "react";
 
 import { apiGet, apiPost, setAuthToken } from "../api/client";
+import { clearStoredWorkspaceSelection } from "./WorkspaceContext";
 
 const AuthContext = createContext(null);
 
@@ -64,6 +65,7 @@ export function AuthProvider({ children }) {
         if (!cancelled) {
           setUser(null);
           setToken("");
+          clearStoredWorkspaceSelection();
         }
       } finally {
         if (!cancelled) {
@@ -98,6 +100,7 @@ export function AuthProvider({ children }) {
   function logout() {
     setToken("");
     setUser(null);
+    clearStoredWorkspaceSelection();
   }
 
   return (

@@ -48,6 +48,20 @@ export function filterAccessibleWorkspaces(workspaces, user) {
   });
 }
 
+export function pickWorkspaceRedirect(workspaces) {
+  const safeWorkspaces = Array.isArray(workspaces) ? workspaces : [];
+
+  if (safeWorkspaces.length === 1 && safeWorkspaces[0]?.id) {
+    const searchParams = new URLSearchParams({
+      auto: safeWorkspaces[0].id,
+    });
+
+    return `/workspace/select?${searchParams.toString()}`;
+  }
+
+  return "/workspace/select";
+}
+
 export function shouldConfirmWorkspaceSwitch({
   currentPath,
   cartCount,
