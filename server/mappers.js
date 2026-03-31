@@ -1,0 +1,95 @@
+function toBoolean(value) {
+  return value === true || value === 1 || value === "1" || value === "t";
+}
+
+export function mapSettingsRows(rows) {
+  const settings = {};
+
+  for (const row of rows) {
+    if (row.key === "paymentMethods" || row.key === "serviceChargeEnabled") {
+      settings[row.key] = JSON.parse(row.value);
+    } else {
+      settings[row.key] = row.value;
+    }
+  }
+
+  return settings;
+}
+
+export function mapUsers(rows) {
+  return rows.map((user) => ({
+    ...user,
+    isActive: toBoolean(user.isActive),
+  }));
+}
+
+export function mapProducts(rows) {
+  const products = [];
+  const byId = new Map();
+
+  for (const row of rows) {
+    if (!byId.has(row.id)) {
+      const product = {
+        id: row.id,
+        name: row.name,
+        category: row.category,
+        description: row.description,
+        basePrice: row.basePrice,
+        isActive: toBoolean(row.isActive),
+        createdAt: row.createdAt,
+        variants: [],
+      };
+
+      byId.set(row.id, product);
+      products.push(product);
+    }
+
+    if (!row.variantId) {
+      continue;
+    }
+
+    byId.get(row.id).variants.push({
+      id: row.variantId,
+      productId: row.id,
+      sku: row.sku,
+      size: row.size,
+      color: row.color,
+      priceOverride: row.priceOverride,
+      quantityOnHand: row.quantityOnHand,
+      lowStockThreshold: row.lowStockThreshold,
+      isActive: toBoolean(row.variantIsActive),
+      createdAt: row.variantCreatedAt,
+    });
+  }
+
+  return products;
+}
+
+export function mapPromotions(rows) {
+  return rows.map((promo) => ({
+    ...promo,
+    isActive: toBoolean(promo.isActive),
+  }));
+}
+
+export function mapSales(sales, items, promotions) {
+  const mappedSales = sales.map((sale) => ({
+    ...sale,
+    items: [],
+    promotion: null,
+  }));
+  const byId = new Map(mappedSales.map((sale) => [sale.id, sale]));
+
+  items.forEach((item) => {
+    byId.get(item.saleId)?.items.push(item);
+  });
+
+  promotions.forEach((promotion) => {
+    const sale = byId.get(promotion.saleId);
+    if (sale) {
+      sale.promotion = promotion;
+    }
+  });
+
+  return mappedSales;
+}
