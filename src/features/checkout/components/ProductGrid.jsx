@@ -6,6 +6,7 @@ export function ProductGrid({ variants, onAdd }) {
       {variants.map((variant) => (
         <button
           className="checkout-product-card"
+          disabled={variant.quantityOnHand <= 0}
           key={variant.id}
           onClick={() => onAdd(variant)}
           type="button"
@@ -20,6 +21,7 @@ export function ProductGrid({ variants, onAdd }) {
             {variant.size} / {variant.color} - {variant.sku}
           </p>
           <strong>{formatCurrency(variant.price)}</strong>
+          {variant.quantityOnHand <= 0 ? <span className="muted-text">Out of stock</span> : null}
         </button>
       ))}
     </div>

@@ -1,4 +1,4 @@
-import { startTransition, useDeferredValue, useMemo, useState } from "react";
+import { startTransition, useDeferredValue, useMemo, useRef, useState } from "react";
 
 import { useAuth } from "../context/AuthContext";
 import { usePosData } from "../context/PosDataContext";
@@ -6,6 +6,11 @@ import { ProductSearchPanel } from "../features/checkout/components/ProductSearc
 import { ProductGrid } from "../features/checkout/components/ProductGrid";
 import { CartSummary } from "../features/checkout/components/CartSummary";
 import { LatestReceipt } from "../features/checkout/components/LatestReceipt";
+import {
+  canFinalizeSale,
+  createFinalizeSaleLock,
+  evaluateCartAddition,
+} from "../features/checkout/checkoutGuards";
 import "../features/checkout/checkout.css";
 
 export function CheckoutPage() {
@@ -18,7 +23,12 @@ export function CheckoutPage() {
   const [message, setMessage] = useState("");
   const [receiptSale, setReceiptSale] = useState(null);
   const [submitting, setSubmitting] = useState(false);
+  const finalizeLockRef = useRef(null);
   const deferredQuery = useDeferredValue(query);
+
+  if (finalizeLockRef.current === null) {
+    finalizeLockRef.current = createFinalizeSaleLock();
+  }
 
   const visibleProducts = useMemo(() => {
     const keyword = deferredQuery.trim().toLowerCase();
@@ -43,50 +53,24 @@ export function CheckoutPage() {
         : Math.min(subtotal, matchedPromo.value);
   const grandTotal = Math.max(0, subtotal - discount);
 
-  function buildCartUpdate(current, variant) {
-    const existing = current.find((item) => item.variantId === variant.id);
-
-    if (existing) {
-      if (existing.qty >= variant.quantityOnHand) {
-        return { nextCart: current, atCapacity: true };
-      }
-
-      return {
-        nextCart: current.map((item) =>
-          item.variantId === variant.id ? { ...item, qty: item.qty + 1 } : item
-        ),
-        atCapacity: false,
-      };
-    }
-
-    return {
-      nextCart: [
-        ...current,
-        {
-          variantId: variant.id,
-          productName: variant.productName,
-          sku: variant.sku,
-          size: variant.size,
-          color: variant.color,
-          price: variant.price,
-          qty: 1,
-        },
-      ],
-      atCapacity: false,
-    };
-  }
-
   function addToCart(variant) {
     setMessage("");
 
-    const preview = buildCartUpdate(cart, variant);
-    if (preview.atCapacity) {
-      setMessage("Jumlah di cart sudah mencapai stock tersedia.");
+    const preview = evaluateCartAddition(cart, variant);
+    if (preview.blocked) {
+      setMessage(
+        preview.reason === "out-of-stock"
+          ? "Variant ini sedang habis stock."
+          : "Jumlah di cart sudah mencapai stock tersedia."
+      );
       return;
     }
 
     startTransition(() => {
-      setCart((current) => buildCartUpdate(current, variant).nextCart);
+      setCart((current) => {
+        const result = evaluateCartAddition(current, variant);
+        return result.blocked ? current : result.nextCart;
+      });
     });
   }
 
@@ -107,29 +91,45 @@ export function CheckoutPage() {
   }
 
   async function handleCheckout() {
-    if (cart.length === 0) {
-      setMessage("Tambahkan item ke cart sebelum finalisasi.");
+    const status = canFinalizeSale({
+      cartLength: cart.length,
+    });
+
+    if (!status.allowed) {
+      if (status.reason === "empty-cart") {
+        setMessage("Tambahkan item ke cart sebelum finalisasi.");
+      }
+      return;
+    }
+
+    const finalizeLock = finalizeLockRef.current;
+    if (!finalizeLock.tryBegin()) {
+      setMessage("Finalisasi sedang diproses.");
       return;
     }
 
     setSubmitting(true);
-    const result = await finalizeSale({
-      cart,
-      promoCode,
-      paymentMethod,
-      actor: user,
-    });
 
-    setMessage(result.message || (result.ok ? "Transaksi berhasil disimpan." : ""));
+    try {
+      const result = await finalizeSale({
+        cart,
+        promoCode,
+        paymentMethod,
+        actor: user,
+      });
 
-    if (result.ok) {
-      setReceiptSale(result.sale);
-      setCart([]);
-      setPromoCode("");
-      setPaymentMethod("cash");
+      setMessage(result.message || (result.ok ? "Transaksi berhasil disimpan." : ""));
+
+      if (result.ok) {
+        setReceiptSale(result.sale);
+        setCart([]);
+        setPromoCode("");
+        setPaymentMethod("cash");
+      }
+    } finally {
+      finalizeLock.release();
+      setSubmitting(false);
     }
-
-    setSubmitting(false);
   }
 
   return (
