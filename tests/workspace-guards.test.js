@@ -45,10 +45,16 @@ test("filterAccessibleWorkspaces lets admin see all visible workspaces regardles
 
 test("filterAccessibleWorkspaces blocks cashiers from draft closed and archived event workspaces", () => {
   const workspaces = [
-    { id: "ws-draft", isVisible: true, assignedUserIds: ["cashier-1"], eventStatus: "draft" },
-    { id: "ws-closed", isVisible: true, assignedUserIds: ["cashier-1"], eventStatus: "closed" },
-    { id: "ws-archived", isVisible: true, assignedUserIds: ["cashier-1"], eventStatus: "archived" },
-    { id: "ws-active", isVisible: true, assignedUserIds: ["cashier-1"], eventStatus: "active" },
+    { id: "ws-draft", type: "event", isVisible: true, assignedUserIds: ["cashier-1"], eventStatus: "draft" },
+    { id: "ws-closed", type: "event", isVisible: true, assignedUserIds: ["cashier-1"], eventStatus: "closed" },
+    {
+      id: "ws-archived",
+      type: "event",
+      isVisible: true,
+      assignedUserIds: ["cashier-1"],
+      eventStatus: "archived",
+    },
+    { id: "ws-active", type: "event", isVisible: true, assignedUserIds: ["cashier-1"], eventStatus: "active" },
   ];
 
   const result = filterAccessibleWorkspaces(workspaces, {
@@ -57,6 +63,35 @@ test("filterAccessibleWorkspaces blocks cashiers from draft closed and archived 
   });
 
   assert.deepEqual(result.map((workspace) => workspace.id), ["ws-active"]);
+});
+
+test("filterAccessibleWorkspaces does not block non-event workspaces with event statuses", () => {
+  const workspaces = [
+    { id: "ws-store", type: "store", isVisible: true, assignedUserIds: ["cashier-1"], eventStatus: "draft" },
+  ];
+
+  const result = filterAccessibleWorkspaces(workspaces, {
+    id: "cashier-1",
+    role: "cashier",
+  });
+
+  assert.deepEqual(result.map((workspace) => workspace.id), ["ws-store"]);
+});
+
+test("filterAccessibleWorkspaces normalizes nullish and non-array workspaces to an empty list", () => {
+  assert.deepEqual(filterAccessibleWorkspaces(null, { id: "user-1", role: "manager" }), []);
+  assert.deepEqual(filterAccessibleWorkspaces(undefined, { id: "user-1", role: "manager" }), []);
+  assert.deepEqual(filterAccessibleWorkspaces("not-an-array", { id: "user-1", role: "manager" }), []);
+});
+
+test("shouldConfirmWorkspaceSwitch returns a strict boolean when pending event closing is omitted", () => {
+  assert.equal(
+    shouldConfirmWorkspaceSwitch({
+      currentPath: "/dashboard",
+      cartCount: 0,
+    }),
+    false
+  );
 });
 
 test("shouldConfirmWorkspaceSwitch requires confirmation for checkout with cart items and pending event closing otherwise", () => {

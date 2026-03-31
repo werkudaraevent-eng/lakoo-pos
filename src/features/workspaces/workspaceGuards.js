@@ -4,6 +4,10 @@ function getWorkspaceStatus(workspace) {
   return workspace?.eventStatus ?? null;
 }
 
+function isEventWorkspace(workspace) {
+  return workspace?.type === "event";
+}
+
 function isAssignedToUser(workspace, userId) {
   if (!userId || !Array.isArray(workspace?.assignedUserIds)) {
     return false;
@@ -17,7 +21,9 @@ export function getRoleLandingPath(role) {
 }
 
 export function filterAccessibleWorkspaces(workspaces, user) {
-  return workspaces.filter((workspace) => {
+  const safeWorkspaces = Array.isArray(workspaces) ? workspaces : [];
+
+  return safeWorkspaces.filter((workspace) => {
     if (workspace?.isVisible === false) {
       return false;
     }
@@ -30,7 +36,11 @@ export function filterAccessibleWorkspaces(workspaces, user) {
       return false;
     }
 
-    if (user?.role === "cashier" && BLOCKED_CASHIER_EVENT_STATUSES.has(getWorkspaceStatus(workspace))) {
+    if (
+      user?.role === "cashier" &&
+      isEventWorkspace(workspace) &&
+      BLOCKED_CASHIER_EVENT_STATUSES.has(getWorkspaceStatus(workspace))
+    ) {
       return false;
     }
 
@@ -38,10 +48,10 @@ export function filterAccessibleWorkspaces(workspaces, user) {
   });
 }
 
-export function shouldConfirmWorkspaceSwitch({ currentPath, cartCount, hasPendingEventClosing }) {
-  if (currentPath?.startsWith("/checkout") && cartCount > 0) {
-    return true;
-  }
-
-  return hasPendingEventClosing;
+export function shouldConfirmWorkspaceSwitch({
+  currentPath,
+  cartCount,
+  hasPendingEventClosing = false,
+}) {
+  return (currentPath?.startsWith("/checkout") && cartCount > 0) || Boolean(hasPendingEventClosing);
 }
