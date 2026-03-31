@@ -1,110 +1,167 @@
-import { useMemo } from "react";
-
 import { usePosData } from "../context/PosDataContext";
+import { useWorkspace } from "../context/WorkspaceContext";
+import { buildDashboardSummary } from "../features/events/eventHelpers";
 import { formatCurrency, formatDate } from "../utils/formatters";
 
+function formatWorkspaceType(type) {
+  if (type === "event") {
+    return "Event workspace";
+  }
+
+  if (type === "store") {
+    return "Store workspace";
+  }
+
+  return "Workspace";
+}
+
+function formatLabel(value) {
+  if (!value) {
+    return "";
+  }
+
+  return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
+function sortByNewest(items) {
+  return [...items].sort((left, right) => new Date(right.createdAt) - new Date(left.createdAt));
+}
+
 export function DashboardPage() {
-  const { sales, variants, inventoryMovements, loading, loadError } = usePosData();
-
-  const metrics = useMemo(() => {
-    const todayKey = new Date().toDateString();
-    const todaySales = sales.filter((sale) => new Date(sale.createdAt).toDateString() === todayKey);
-    const todayRevenue = todaySales.reduce((sum, sale) => sum + sale.grandTotal, 0);
-    const discountTotal = sales.reduce((sum, sale) => sum + sale.discountTotal, 0);
-    const lowStock = variants.filter((item) => item.quantityOnHand <= item.lowStockThreshold).length;
-
-    return {
-      transactions: todaySales.length,
-      revenue: todayRevenue,
-      discountTotal,
-      lowStock,
-    };
-  }, [sales, variants]);
-
-  const topItems = useMemo(() => {
+  const { sales, variants, inventoryMovements, workspaces, loading, loadError } = usePosData();
+  const { activeWorkspaceId } = useWorkspace();
+  const activeWorkspace = workspaces.find((workspace) => workspace.id === activeWorkspaceId) ?? null;
+  const summary = buildDashboardSummary({
+    sales,
+    variants,
+    now: new Date().toISOString(),
+  });
+  const workspaceStatus = formatLabel(activeWorkspace?.eventStatus ?? activeWorkspace?.status);
+  const topItems = (() => {
     const tally = new Map();
 
     sales.forEach((sale) => {
-      sale.items.forEach((item) => {
+      (Array.isArray(sale.items) ? sale.items : []).forEach((item) => {
         tally.set(item.productNameSnapshot, (tally.get(item.productNameSnapshot) || 0) + item.qty);
       });
     });
 
-    return [...tally.entries()].sort((a, b) => b[1] - a[1]).slice(0, 4);
-  }, [sales]);
-
-  const lowStockItems = variants.filter((item) => item.quantityOnHand <= item.lowStockThreshold).slice(0, 5);
+    return [...tally.entries()].sort((left, right) => right[1] - left[1]).slice(0, 4);
+  })();
+  const lowStockItems = [...variants]
+    .filter((item) => item.quantityOnHand <= item.lowStockThreshold)
+    .sort((left, right) => left.quantityOnHand - right.quantityOnHand)
+    .slice(0, 5);
+  const recentSales = sortByNewest(sales).slice(0, 5);
+  const recentMovements = sortByNewest(inventoryMovements).slice(0, 5);
 
   return (
     <div className="page-stack">
-      <section className="page-header-card">
-        <div>
+      <section className="page-header-card dashboard-header">
+        <div className="dashboard-header-copy">
           <p className="eyebrow">Dashboard</p>
-          <h1>Store pulse for today's operation.</h1>
+          <h1>
+            {activeWorkspace?.name ? `${activeWorkspace.name} at a glance.` : "Workspace pulse at a glance."}
+          </h1>
           <p className="muted-text">
-            Monitor revenue, transaction flow, low-stock pressure, and recent inventory movement in one place.
+            Daily revenue, selling flow, and replenishment pressure for the active workspace in one compact view.
           </p>
+        </div>
+
+        <div className="dashboard-header-meta">
+          {activeWorkspace?.type ? (
+            <span className="badge-soft">{formatWorkspaceType(activeWorkspace.type)}</span>
+          ) : null}
+          {workspaceStatus ? <span className="badge-soft">{workspaceStatus}</span> : null}
         </div>
       </section>
 
       {loading ? <p className="info-text">Loading dashboard data...</p> : null}
       {loadError ? <p className="error-text">{loadError}</p> : null}
 
-      <section className="stats-grid">
-        <article className="stat-card">
-          <span className="stat-label">Today Revenue</span>
-          <strong>{formatCurrency(metrics.revenue)}</strong>
+      <section className="dashboard-summary-band">
+        <article className="stat-card summary-band-card">
+          <span className="stat-label">Revenue today</span>
+          <strong>{formatCurrency(summary.revenue)}</strong>
+          <p className="summary-band-meta">
+            Discounts recorded: {formatCurrency(summary.discountTotal)}
+          </p>
         </article>
-        <article className="stat-card">
+
+        <article className="stat-card summary-band-card">
           <span className="stat-label">Transactions</span>
-          <strong>{metrics.transactions}</strong>
+          <strong>{summary.transactions}</strong>
+          <p className="summary-band-meta">Completed sales for the current day.</p>
         </article>
-        <article className="stat-card">
-          <span className="stat-label">Discount Used</span>
-          <strong>{formatCurrency(metrics.discountTotal)}</strong>
-        </article>
-        <article className="stat-card">
-          <span className="stat-label">Low Stock Variants</span>
-          <strong>{metrics.lowStock}</strong>
+
+        <article className="stat-card summary-band-card">
+          <span className="stat-label">Low-stock variants</span>
+          <strong>{summary.lowStock}</strong>
+          <p className="summary-band-meta">
+            {summary.lowStock > 0 ? "Restock attention needed now." : "Stock position is stable."}
+          </p>
         </article>
       </section>
 
-      <section className="content-grid two-column">
+      <section className="content-grid two-column dashboard-split">
         <article className="panel-card">
           <div className="panel-head">
-            <h2>Top-selling items</h2>
-            <span className="badge-soft">Finalized sales only</span>
+            <h2>Alerts</h2>
+            <span className={`badge-soft${summary.lowStock > 0 ? " warning" : ""}`}>
+              {summary.lowStock > 0 ? "Needs action" : "Stable"}
+            </span>
           </div>
+
           <div className="stack-list">
-            {topItems.map(([name, qty]) => (
-              <div className="list-row" key={name}>
-                <div>
-                  <strong>{name}</strong>
-                  <p className="muted-text">Quantity sold</p>
+            {lowStockItems.length > 0 ? (
+              lowStockItems.map((item) => (
+                <div className="list-row" key={item.id}>
+                  <div>
+                    <strong>{item.productName}</strong>
+                    <p className="muted-text">
+                      {item.size} / {item.color} - {item.sku}
+                    </p>
+                  </div>
+                  <span className="pill-warning">{item.quantityOnHand} pcs</span>
                 </div>
-                <span className="pill-strong">{qty}</span>
-              </div>
-            ))}
+              ))
+            ) : (
+              <p className="stack-empty">No urgent stock alerts in this workspace.</p>
+            )}
           </div>
         </article>
 
         <article className="panel-card">
           <div className="panel-head">
-            <h2>Low-stock alerts</h2>
-            <span className="badge-soft warning">Needs restock</span>
+            <h2>Activity snapshot</h2>
+            <span className="badge-soft">{topItems.length} best sellers</span>
           </div>
+
+          <div className="summary-box">
+            <div className="summary-row">
+              <span className="muted-text">Discount total</span>
+              <strong>{formatCurrency(summary.discountTotal)}</strong>
+            </div>
+            <div className="summary-row total">
+              <span className="muted-text">Inventory updates</span>
+              <strong>{recentMovements.length}</strong>
+            </div>
+          </div>
+
           <div className="stack-list">
-            {lowStockItems.map((item) => (
-              <div className="list-row" key={item.id}>
-                <div>
-                  <strong>{item.productName}</strong>
-                  <p className="muted-text">
-                    {item.size} / {item.color} - {item.sku}
-                  </p>
+            {topItems.length > 0 ? (
+              topItems.map(([name, qty]) => (
+                <div className="list-row" key={name}>
+                  <div>
+                    <strong>{name}</strong>
+                    <p className="muted-text">Units sold across completed sales</p>
+                  </div>
+                  <span className="pill-strong">{qty}</span>
                 </div>
-                <span className="pill-warning">{item.quantityOnHand} pcs</span>
-              </div>
-            ))}
+              ))
+            ) : (
+              <p className="stack-empty">Sales activity will appear here after the first checkout.</p>
+            )}
           </div>
         </article>
       </section>
@@ -113,41 +170,53 @@ export function DashboardPage() {
         <article className="panel-card">
           <div className="panel-head">
             <h2>Recent sales</h2>
+            <span className="badge-soft">{recentSales.length} receipts</span>
           </div>
+
           <div className="table-list">
-            {sales.slice(0, 5).map((sale) => (
-              <div className="table-row" key={sale.id}>
-                <div>
-                  <strong>{sale.receiptNumber}</strong>
-                  <p className="muted-text">
-                    {sale.cashierUser} - {formatDate(sale.createdAt)}
-                  </p>
+            {recentSales.length > 0 ? (
+              recentSales.map((sale) => (
+                <div className="table-row" key={sale.id}>
+                  <div>
+                    <strong>{sale.receiptNumber}</strong>
+                    <p className="muted-text">
+                      {sale.cashierUser} - {formatDate(sale.createdAt)}
+                    </p>
+                  </div>
+                  <span>{formatCurrency(sale.grandTotal)}</span>
                 </div>
-                <span>{formatCurrency(sale.grandTotal)}</span>
-              </div>
-            ))}
+              ))
+            ) : (
+              <p className="stack-empty">No finalized sales yet for this workspace.</p>
+            )}
           </div>
         </article>
 
         <article className="panel-card">
           <div className="panel-head">
-            <h2>Inventory movements</h2>
+            <h2>Inventory movement</h2>
+            <span className="badge-soft">{recentMovements.length} updates</span>
           </div>
+
           <div className="table-list">
-            {inventoryMovements.slice(0, 5).map((movement) => (
-              <div className="table-row" key={movement.id}>
-                <div>
-                  <strong>{movement.type}</strong>
-                  <p className="muted-text">
-                    {movement.actorUser} - {formatDate(movement.createdAt)}
-                  </p>
+            {recentMovements.length > 0 ? (
+              recentMovements.map((movement) => (
+                <div className="table-row" key={movement.id}>
+                  <div>
+                    <strong>{movement.type}</strong>
+                    <p className="muted-text">
+                      {movement.actorUser} - {formatDate(movement.createdAt)}
+                    </p>
+                  </div>
+                  <span className={movement.qtyDelta < 0 ? "text-danger" : "text-success"}>
+                    {movement.qtyDelta > 0 ? "+" : ""}
+                    {movement.qtyDelta}
+                  </span>
                 </div>
-                <span className={movement.qtyDelta < 0 ? "text-danger" : "text-success"}>
-                  {movement.qtyDelta > 0 ? "+" : ""}
-                  {movement.qtyDelta}
-                </span>
-              </div>
-            ))}
+              ))
+            ) : (
+              <p className="stack-empty">Inventory adjustments will appear here once activity starts.</p>
+            )}
           </div>
         </article>
       </section>
