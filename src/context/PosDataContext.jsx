@@ -1,6 +1,13 @@
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 
-import { apiGet, apiPatch, apiPost, apiPut, withQuery } from "../api/client";
+import {
+  apiGet,
+  apiPatch,
+  apiPost,
+  apiPut,
+  withActiveWorkspace,
+  withQuery,
+} from "../api/client";
 import { useAuth } from "./AuthContext";
 import { useWorkspace } from "./WorkspaceContext";
 
@@ -70,8 +77,13 @@ export function PosDataProvider({ children }) {
   const [loading, setLoading] = useState(false);
   const [hasLoaded, setHasLoaded] = useState(false);
   const [loadError, setLoadError] = useState("");
+  const activeWorkspaceIdRef = useRef(activeWorkspaceId);
 
   const variants = useMemo(() => flattenVariants(state.products), [state.products]);
+
+  useEffect(() => {
+    activeWorkspaceIdRef.current = activeWorkspaceId;
+  }, [activeWorkspaceId]);
 
   async function loadBootstrapData() {
     const payload = await apiGet(
@@ -102,6 +114,14 @@ export function PosDataProvider({ children }) {
       setLoading(false);
       setHasLoaded(true);
     }
+  }
+
+  function applyMutationState(responseData, requestWorkspaceId) {
+    if (activeWorkspaceIdRef.current !== requestWorkspaceId) {
+      return;
+    }
+
+    setState(normalizeBootstrapState(responseData));
   }
 
   useEffect(() => {
@@ -155,14 +175,21 @@ export function PosDataProvider({ children }) {
 
   async function adjustInventory({ variantId, mode, quantity, note, actor }) {
     try {
-      const response = await apiPost("/api/inventory/movements", {
-        variantId,
-        mode,
-        quantity,
-        note,
-        actorUserId: actor.id,
-      });
-      setState(normalizeBootstrapState(response.data));
+      const requestWorkspaceId = activeWorkspaceIdRef.current || "";
+      const response = await apiPost(
+        "/api/inventory/movements",
+        withActiveWorkspace(
+          {
+            variantId,
+            mode,
+            quantity,
+            note,
+            actorUserId: actor.id,
+          },
+          requestWorkspaceId
+        )
+      );
+      applyMutationState(response.data, requestWorkspaceId);
       return { ok: true };
     } catch (error) {
       return { ok: false, message: error.message };
@@ -171,13 +198,20 @@ export function PosDataProvider({ children }) {
 
   async function finalizeSale({ cart, promoCode, paymentMethod, actor }) {
     try {
-      const response = await apiPost("/api/sales", {
-        cart,
-        promoCode,
-        paymentMethod,
-        actorUserId: actor.id,
-      });
-      setState(normalizeBootstrapState(response.data));
+      const requestWorkspaceId = activeWorkspaceIdRef.current || "";
+      const response = await apiPost(
+        "/api/sales",
+        withActiveWorkspace(
+          {
+            cart,
+            promoCode,
+            paymentMethod,
+            actorUserId: actor.id,
+          },
+          requestWorkspaceId
+        )
+      );
+      applyMutationState(response.data, requestWorkspaceId);
       return { ok: true, sale: response.sale };
     } catch (error) {
       return { ok: false, message: error.message };

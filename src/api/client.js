@@ -28,6 +28,17 @@ export function getAuthToken() {
   return authToken;
 }
 
+export function withActiveWorkspace(body, activeWorkspaceId) {
+  if (!activeWorkspaceId) {
+    return body;
+  }
+
+  return {
+    ...(body ?? {}),
+    workspaceId: activeWorkspaceId,
+  };
+}
+
 export function withQuery(path, params) {
   const searchParams = new URLSearchParams();
 

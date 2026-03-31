@@ -7,6 +7,7 @@ import { useWorkspace } from "../context/WorkspaceContext";
 import {
   filterAccessibleWorkspaces,
   getRoleLandingPath,
+  shouldClearWorkspaceSelection,
 } from "../features/workspaces/workspaceGuards";
 
 function getNextPath(locationState, user) {
@@ -24,21 +25,24 @@ export function WorkspacePickerPage() {
   const location = useLocation();
   const [searchParams] = useSearchParams();
   const { user } = useAuth();
-  const { workspaces, loading, loadError } = usePosData();
+  const { workspaces, loading, hasLoaded, loadError } = usePosData();
   const { activeWorkspaceId, selectWorkspace, clearWorkspace } = useWorkspace();
   const accessibleWorkspaces = filterAccessibleWorkspaces(workspaces, user);
   const autoWorkspaceId = searchParams.get("auto");
   const nextPath = getNextPath(location.state, user);
 
   useEffect(() => {
-    if (loading || !activeWorkspaceId) {
-      return;
-    }
-
-    if (!accessibleWorkspaces.some((workspace) => workspace.id === activeWorkspaceId)) {
+    if (
+      shouldClearWorkspaceSelection({
+        activeWorkspaceId,
+        accessibleWorkspaces,
+        hasLoaded,
+        loadError,
+      })
+    ) {
       clearWorkspace();
     }
-  }, [accessibleWorkspaces, activeWorkspaceId, clearWorkspace, loading]);
+  }, [accessibleWorkspaces, activeWorkspaceId, clearWorkspace, hasLoaded, loadError]);
 
   useEffect(() => {
     if (loading || !autoWorkspaceId || accessibleWorkspaces.length !== 1) {

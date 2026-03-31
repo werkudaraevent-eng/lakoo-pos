@@ -5,8 +5,10 @@ import {
   filterAccessibleWorkspaces,
   getRoleLandingPath,
   pickWorkspaceRedirect,
+  shouldClearWorkspaceSelection,
   shouldConfirmWorkspaceSwitch,
 } from "../src/features/workspaces/workspaceGuards.js";
+import { withActiveWorkspace } from "../src/api/client.js";
 
 test("getRoleLandingPath sends cashiers to checkout and everyone else to dashboard", () => {
   assert.equal(getRoleLandingPath("cashier"), "/checkout");
@@ -140,4 +142,44 @@ test("pickWorkspaceRedirect sends users with multiple workspaces to the picker w
 
 test("pickWorkspaceRedirect falls back to the picker route when no workspaces are available", () => {
   assert.equal(pickWorkspaceRedirect([]), "/workspace/select");
+});
+
+test("shouldClearWorkspaceSelection keeps the saved workspace on load errors", () => {
+  assert.equal(
+    shouldClearWorkspaceSelection({
+      activeWorkspaceId: "ws-1",
+      accessibleWorkspaces: [],
+      hasLoaded: true,
+      loadError: "Network error",
+    }),
+    false
+  );
+});
+
+test("shouldClearWorkspaceSelection clears the saved workspace only after a successful load proves it invalid", () => {
+  assert.equal(
+    shouldClearWorkspaceSelection({
+      activeWorkspaceId: "ws-missing",
+      accessibleWorkspaces: [{ id: "ws-1" }],
+      hasLoaded: true,
+      loadError: "",
+    }),
+    true
+  );
+});
+
+test("withActiveWorkspace forces the current workspace id into workspace-scoped mutation payloads", () => {
+  assert.deepEqual(
+    withActiveWorkspace(
+      {
+        cart: [{ variantId: "var-1", quantity: 2 }],
+        workspaceId: "stale-workspace",
+      },
+      "ws-active"
+    ),
+    {
+      cart: [{ variantId: "var-1", quantity: 2 }],
+      workspaceId: "ws-active",
+    }
+  );
 });

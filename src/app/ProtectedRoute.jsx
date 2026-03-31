@@ -8,6 +8,7 @@ import { AppShell } from "../components/AppShell";
 import {
   filterAccessibleWorkspaces,
   pickWorkspaceRedirect,
+  shouldClearWorkspaceSelection,
 } from "../features/workspaces/workspaceGuards";
 
 export function ProtectedRoute({ allow, renderShell = true, requireWorkspace = true }) {
@@ -21,10 +22,18 @@ export function ProtectedRoute({ allow, renderShell = true, requireWorkspace = t
   );
 
   useEffect(() => {
-    if (requireWorkspace && hasLoaded && activeWorkspaceId && !hasResolvedWorkspace) {
+    if (
+      requireWorkspace &&
+      shouldClearWorkspaceSelection({
+        activeWorkspaceId,
+        accessibleWorkspaces,
+        hasLoaded,
+        loadError,
+      })
+    ) {
       clearWorkspace();
     }
-  }, [activeWorkspaceId, clearWorkspace, hasLoaded, hasResolvedWorkspace, requireWorkspace]);
+  }, [accessibleWorkspaces, activeWorkspaceId, clearWorkspace, hasLoaded, loadError, requireWorkspace]);
 
   if (!user) {
     return <Navigate to="/login" replace state={{ from: location.pathname }} />;

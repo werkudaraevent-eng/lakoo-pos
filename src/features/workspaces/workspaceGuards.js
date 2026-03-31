@@ -62,6 +62,21 @@ export function pickWorkspaceRedirect(workspaces) {
   return "/workspace/select";
 }
 
+export function shouldClearWorkspaceSelection({
+  activeWorkspaceId,
+  accessibleWorkspaces,
+  hasLoaded,
+  loadError,
+}) {
+  if (!activeWorkspaceId || !hasLoaded || loadError) {
+    return false;
+  }
+
+  const safeWorkspaces = Array.isArray(accessibleWorkspaces) ? accessibleWorkspaces : [];
+
+  return !safeWorkspaces.some((workspace) => workspace?.id === activeWorkspaceId);
+}
+
 export function shouldConfirmWorkspaceSwitch({
   currentPath,
   cartCount,
