@@ -70,8 +70,13 @@ app.get(
 app.get(
   "/api/bootstrap",
   auth,
-  asyncHandler(async (_req, res) => {
-    res.json({ ok: true, data: await getBootstrap() });
+  asyncHandler(async (req, res) => {
+    res.json({
+      ok: true,
+      data: await getBootstrap({
+        workspaceId: req.query.workspaceId || null,
+      }),
+    });
   })
 );
 

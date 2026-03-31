@@ -72,6 +72,37 @@ export function mapPromotions(rows) {
   }));
 }
 
+export function mapWorkspaceRows(rows) {
+  const workspaces = [];
+  const byId = new Map();
+
+  for (const row of rows) {
+    if (!byId.has(row.id)) {
+      const workspace = {
+        id: row.id,
+        type: row.type,
+        name: row.name,
+        status: row.status,
+        stockMode: row.stockMode,
+        isVisible: toBoolean(row.isVisible),
+        locationLabel: row.locationLabel,
+        startsAt: row.startsAt,
+        endsAt: row.endsAt,
+        assignedUserIds: [],
+      };
+
+      byId.set(row.id, workspace);
+      workspaces.push(workspace);
+    }
+
+    if (row.assignedUserId) {
+      byId.get(row.id).assignedUserIds.push(row.assignedUserId);
+    }
+  }
+
+  return workspaces;
+}
+
 export function mapSales(sales, items, promotions) {
   const mappedSales = sales.map((sale) => ({
     ...sale,

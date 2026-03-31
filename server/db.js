@@ -2,7 +2,7 @@ import crypto from "node:crypto";
 
 import postgres from "postgres";
 
-import { mapProducts, mapPromotions, mapSales, mapSettingsRows, mapUsers } from "./mappers.js";
+import { mapProducts, mapPromotions, mapSales, mapSettingsRows, mapUsers, mapWorkspaceRows } from "./mappers.js";
 
 const databaseUrl = process.env.SUPABASE_DB_URL || process.env.DATABASE_URL || "";
 const sql = databaseUrl
@@ -146,71 +146,161 @@ async function fetchPromotions(executor) {
   return mapPromotions(rows);
 }
 
-async function fetchSales(executor) {
-  const sales = await executor`
+async function fetchWorkspaces(executor) {
+  const rows = await executor`
     SELECT
-      s.id,
-      s.receipt_number AS "receiptNumber",
-      s.cashier_user_id AS "cashierUserId",
-      u.name AS "cashierUser",
-      s.subtotal,
-      s.discount_total AS "discountTotal",
-      s.grand_total AS "grandTotal",
-      s.payment_method AS "paymentMethod",
-      s.paid_amount AS "paidAmount",
-      s.created_at AS "createdAt"
-    FROM sales s
-    JOIN users u ON u.id = s.cashier_user_id
-    ORDER BY s.created_at DESC
+      w.id,
+      w.type,
+      w.name,
+      w.status,
+      w.stock_mode AS "stockMode",
+      w.is_visible AS "isVisible",
+      w.location_label AS "locationLabel",
+      w.starts_at AS "startsAt",
+      w.ends_at AS "endsAt",
+      wa.user_id AS "assignedUserId"
+    FROM workspaces w
+    LEFT JOIN workspace_assignments wa ON wa.workspace_id = w.id
+    ORDER BY w.type ASC, w.created_at DESC, wa.assigned_at ASC
   `;
-  const items = await executor`
-    SELECT
-      id,
-      sale_id AS "saleId",
-      variant_id AS "variantId",
-      product_name_snapshot AS "productNameSnapshot",
-      sku_snapshot AS "skuSnapshot",
-      size_snapshot AS "sizeSnapshot",
-      color_snapshot AS "colorSnapshot",
-      unit_price_snapshot AS "unitPriceSnapshot",
-      qty,
-      line_total AS "lineTotal"
-    FROM sale_items
-    ORDER BY id ASC
-  `;
-  const promotions = await executor`
-    SELECT
-      sale_id AS "saleId",
-      promotion_id AS "promotionId",
-      code_snapshot AS "codeSnapshot",
-      discount_amount AS "discountAmount"
-    FROM sale_promotion_usages
-  `;
+
+  return mapWorkspaceRows(rows);
+}
+
+async function fetchSales(executor, workspaceId) {
+  const sales = workspaceId
+    ? await executor`
+        SELECT
+          s.id,
+          s.receipt_number AS "receiptNumber",
+          s.cashier_user_id AS "cashierUserId",
+          u.name AS "cashierUser",
+          s.subtotal,
+          s.discount_total AS "discountTotal",
+          s.grand_total AS "grandTotal",
+          s.payment_method AS "paymentMethod",
+          s.paid_amount AS "paidAmount",
+          s.created_at AS "createdAt"
+        FROM sales s
+        JOIN users u ON u.id = s.cashier_user_id
+        WHERE s.workspace_id = ${workspaceId}
+        ORDER BY s.created_at DESC
+      `
+    : await executor`
+        SELECT
+          s.id,
+          s.receipt_number AS "receiptNumber",
+          s.cashier_user_id AS "cashierUserId",
+          u.name AS "cashierUser",
+          s.subtotal,
+          s.discount_total AS "discountTotal",
+          s.grand_total AS "grandTotal",
+          s.payment_method AS "paymentMethod",
+          s.paid_amount AS "paidAmount",
+          s.created_at AS "createdAt"
+        FROM sales s
+        JOIN users u ON u.id = s.cashier_user_id
+        ORDER BY s.created_at DESC
+      `;
+  const items = workspaceId
+    ? await executor`
+        SELECT
+          si.id,
+          si.sale_id AS "saleId",
+          si.variant_id AS "variantId",
+          si.product_name_snapshot AS "productNameSnapshot",
+          si.sku_snapshot AS "skuSnapshot",
+          si.size_snapshot AS "sizeSnapshot",
+          si.color_snapshot AS "colorSnapshot",
+          si.unit_price_snapshot AS "unitPriceSnapshot",
+          si.qty,
+          si.line_total AS "lineTotal"
+        FROM sale_items si
+        JOIN sales s ON s.id = si.sale_id
+        WHERE s.workspace_id = ${workspaceId}
+        ORDER BY si.id ASC
+      `
+    : await executor`
+        SELECT
+          id,
+          sale_id AS "saleId",
+          variant_id AS "variantId",
+          product_name_snapshot AS "productNameSnapshot",
+          sku_snapshot AS "skuSnapshot",
+          size_snapshot AS "sizeSnapshot",
+          color_snapshot AS "colorSnapshot",
+          unit_price_snapshot AS "unitPriceSnapshot",
+          qty,
+          line_total AS "lineTotal"
+        FROM sale_items
+        ORDER BY id ASC
+      `;
+  const promotions = workspaceId
+    ? await executor`
+        SELECT
+          spu.sale_id AS "saleId",
+          spu.promotion_id AS "promotionId",
+          spu.code_snapshot AS "codeSnapshot",
+          spu.discount_amount AS "discountAmount"
+        FROM sale_promotion_usages spu
+        JOIN sales s ON s.id = spu.sale_id
+        WHERE s.workspace_id = ${workspaceId}
+      `
+    : await executor`
+        SELECT
+          sale_id AS "saleId",
+          promotion_id AS "promotionId",
+          code_snapshot AS "codeSnapshot",
+          discount_amount AS "discountAmount"
+        FROM sale_promotion_usages
+      `;
 
   return mapSales(sales, items, promotions);
 }
 
-async function fetchInventoryMovements(executor) {
-  return executor`
-    SELECT
-      m.id,
-      m.variant_id AS "variantId",
-      pv.sku,
-      p.name AS "productName",
-      pv.size,
-      pv.color,
-      m.type,
-      m.qty_delta AS "qtyDelta",
-      m.note,
-      u.name AS "actorUser",
-      m.reference_id AS "referenceId",
-      m.created_at AS "createdAt"
-    FROM inventory_movements m
-    JOIN product_variants pv ON pv.id = m.variant_id
-    JOIN products p ON p.id = pv.product_id
-    JOIN users u ON u.id = m.actor_user_id
-    ORDER BY m.created_at DESC
-  `;
+async function fetchInventoryMovements(executor, workspaceId) {
+  return workspaceId
+    ? executor`
+        SELECT
+          m.id,
+          m.variant_id AS "variantId",
+          pv.sku,
+          p.name AS "productName",
+          pv.size,
+          pv.color,
+          m.type,
+          m.qty_delta AS "qtyDelta",
+          m.note,
+          u.name AS "actorUser",
+          m.reference_id AS "referenceId",
+          m.created_at AS "createdAt"
+        FROM inventory_movements m
+        JOIN product_variants pv ON pv.id = m.variant_id
+        JOIN products p ON p.id = pv.product_id
+        JOIN users u ON u.id = m.actor_user_id
+        WHERE m.workspace_id = ${workspaceId}
+        ORDER BY m.created_at DESC
+      `
+    : executor`
+        SELECT
+          m.id,
+          m.variant_id AS "variantId",
+          pv.sku,
+          p.name AS "productName",
+          pv.size,
+          pv.color,
+          m.type,
+          m.qty_delta AS "qtyDelta",
+          m.note,
+          u.name AS "actorUser",
+          m.reference_id AS "referenceId",
+          m.created_at AS "createdAt"
+        FROM inventory_movements m
+        JOIN product_variants pv ON pv.id = m.variant_id
+        JOIN products p ON p.id = pv.product_id
+        JOIN users u ON u.id = m.actor_user_id
+        ORDER BY m.created_at DESC
+      `;
 }
 
 export async function initializeDatabase() {
@@ -218,15 +308,16 @@ export async function initializeDatabase() {
   await executor`SELECT 1`;
 }
 
-export async function getBootstrap() {
+export async function getBootstrap({ workspaceId } = {}) {
   const executor = ensureSql();
   const settings = await fetchSettings(executor);
   const categories = await fetchCategories(executor);
   const users = await fetchUsers(executor);
   const products = await fetchProducts(executor);
   const promotions = await fetchPromotions(executor);
-  const sales = await fetchSales(executor);
-  const inventoryMovements = await fetchInventoryMovements(executor);
+  const workspaces = await fetchWorkspaces(executor);
+  const sales = await fetchSales(executor, workspaceId || null);
+  const inventoryMovements = await fetchInventoryMovements(executor, workspaceId || null);
 
   return {
     settings,
@@ -234,6 +325,7 @@ export async function getBootstrap() {
     users,
     products,
     promotions,
+    workspaces,
     sales,
     inventoryMovements,
   };

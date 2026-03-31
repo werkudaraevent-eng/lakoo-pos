@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { mapProducts, mapSales, mapSettingsRows } from "../server/mappers.js";
+import { mapProducts, mapSales, mapSettingsRows, mapWorkspaceRows } from "../server/mappers.js";
 
 test("mapSettingsRows parses JSON-backed settings values", () => {
   const result = mapSettingsRows([
@@ -106,4 +106,48 @@ test("mapSales attaches items and optional promotion to each sale", () => {
   assert.equal(result.length, 1);
   assert.equal(result[0].items.length, 1);
   assert.equal(result[0].promotion.codeSnapshot, "LUNA10");
+});
+
+test("mapWorkspaceRows groups assignments and stock metadata under each workspace", () => {
+  const result = mapWorkspaceRows([
+    {
+      id: "event-gi",
+      type: "event",
+      name: "Bazar GI",
+      status: "active",
+      stockMode: "allocate",
+      isVisible: true,
+      locationLabel: "Grand Indonesia",
+      startsAt: "2026-04-01T10:00:00.000Z",
+      endsAt: "2026-04-03T21:00:00.000Z",
+      assignedUserId: "u3",
+    },
+    {
+      id: "event-gi",
+      type: "event",
+      name: "Bazar GI",
+      status: "active",
+      stockMode: "allocate",
+      isVisible: true,
+      locationLabel: "Grand Indonesia",
+      startsAt: "2026-04-01T10:00:00.000Z",
+      endsAt: "2026-04-03T21:00:00.000Z",
+      assignedUserId: "u2",
+    },
+  ]);
+
+  assert.deepEqual(result, [
+    {
+      id: "event-gi",
+      type: "event",
+      name: "Bazar GI",
+      status: "active",
+      stockMode: "allocate",
+      isVisible: true,
+      locationLabel: "Grand Indonesia",
+      startsAt: "2026-04-01T10:00:00.000Z",
+      endsAt: "2026-04-03T21:00:00.000Z",
+      assignedUserIds: ["u3", "u2"],
+    },
+  ]);
 });
