@@ -1289,6 +1289,159 @@ p {
   gap: 12px;
 }
 
+.reports-workspace .panel-card,
+.reports-workspace .page-header-card {
+  box-shadow: none;
+  background: rgba(255, 255, 255, 0.96);
+}
+
+.reports-header-bar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 16px;
+}
+
+.reports-header-copy {
+  max-width: 42rem;
+}
+
+.reports-header-meta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.reports-kpi-band {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.reports-layout {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+
+.reports-panel {
+  gap: 12px;
+}
+
+.reports-table-list {
+  gap: 8px;
+}
+
+.reports-table-row {
+  padding: 10px 12px;
+  background: rgba(247, 249, 251, 0.92);
+}
+
+.dashboard-workspace .panel-card,
+.dashboard-workspace .page-header-card {
+  box-shadow: none;
+  background: rgba(255, 255, 255, 0.96);
+}
+
+.dashboard-header-flat {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 16px;
+}
+
+.dashboard-command-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 14px 16px;
+}
+
+.dashboard-command {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 42px;
+  padding: 0 14px;
+  border: 1px solid rgba(23, 33, 43, 0.08);
+  border-radius: 999px;
+  background: rgba(247, 249, 251, 0.9);
+  color: var(--text);
+  font-weight: 700;
+}
+
+.dashboard-command-warning {
+  border-color: rgba(180, 106, 31, 0.16);
+  background: rgba(180, 106, 31, 0.08);
+  color: var(--warning);
+}
+
+.dashboard-kpi-band {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.dashboard-kpi-card {
+  display: grid;
+  gap: 6px;
+  padding: 14px 16px;
+  border: 1px solid rgba(23, 33, 43, 0.08);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.94);
+}
+
+.dashboard-kpi-card strong {
+  font-size: 1.35rem;
+}
+
+.dashboard-event-strip {
+  display: grid;
+  gap: 12px;
+  padding: 14px 16px;
+}
+
+.dashboard-event-track {
+  position: relative;
+  min-height: 12px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(23, 33, 43, 0.08);
+}
+
+.dashboard-event-meta {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.dashboard-layout {
+  grid-template-columns: minmax(0, 1.02fr) minmax(0, 0.98fr);
+  align-items: start;
+}
+
+.dashboard-layout-tight {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+
+.dashboard-panel {
+  gap: 12px;
+}
+
+.dashboard-summary-box {
+  background: rgba(247, 249, 251, 0.88);
+}
+
+.dashboard-stack-list,
+.dashboard-table-list {
+  gap: 8px;
+}
+
+.dashboard-list-row,
+.dashboard-table-row {
+  padding: 10px 12px;
+  background: rgba(247, 249, 251, 0.92);
+}
+
 .event-progress-card {
   display: grid;
   gap: 16px;
@@ -1462,9 +1615,15 @@ p {
   .catalog-page-grid,
   .sales-layout,
   .dashboard-summary-band,
+  .dashboard-kpi-band,
   .sales-toolbar-summary,
   .sales-layout-split,
-  .sales-toolbar-summary-flat {
+  .sales-toolbar-summary-flat,
+  .dashboard-event-meta,
+  .dashboard-layout,
+  .dashboard-layout-tight,
+  .reports-kpi-band,
+  .reports-layout {
     grid-template-columns: repeat(2, 1fr);
   }
 }
@@ -1474,6 +1633,9 @@ p {
   .catalog-admin-layout,
   .content-grid.two-column,
   .sales-layout,
+  .dashboard-layout,
+  .dashboard-layout-tight,
+  .reports-layout,
   .sales-toolbar-controls,
   .sales-toolbar-controls-flat,
   .sales-layout-split {
@@ -1526,12 +1688,16 @@ p {
   .catalog-page-grid,
   .dual-fields,
   .dashboard-summary-band,
+  .dashboard-kpi-band,
+  .reports-kpi-band,
   .sales-toolbar-summary,
   .sales-toolbar-summary-flat,
   .sale-row-button-refined,
   .sale-row-button-split,
   .sales-list-table-head,
-  .sales-list-table-head-split {
+  .sales-list-table-head-split,
+  .dashboard-event-meta,
+  .reports-layout {
     grid-template-columns: 1fr;
   }
 
@@ -1549,6 +1715,9 @@ p {
 
   .topbar-app,
   .dashboard-header,
+  .dashboard-header-flat,
+  .dashboard-command-strip,
+  .reports-header-bar,
   .sales-header-bar,
   .panel-head,
   .product-card-head,
@@ -1568,5 +1737,13 @@ p {
 
   .sales-header-meta {
     justify-content: flex-start;
+  }
+
+  .reports-header-meta {
+    justify-content: flex-start;
+  }
+
+  .dashboard-event-strip {
+    padding: 14px 0 0;
   }
 }
