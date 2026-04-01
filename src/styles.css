@@ -1397,7 +1397,7 @@ p {
 .dashboard-workspace .panel-card,
 .dashboard-workspace .page-header-card {
   box-shadow: none;
-  background: rgba(255, 255, 255, 0.96);
+  background: rgba(255, 253, 250, 0.96);
 }
 
 .dashboard-header-flat {
@@ -1408,11 +1408,24 @@ p {
   padding: 14px 16px;
 }
 
+.dashboard-header-executive {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 18px 20px;
+}
+
 .dashboard-command-strip {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
   padding: 14px 16px;
+}
+
+.dashboard-command-strip-executive {
+  padding: 12px 14px;
+  background: rgba(255, 253, 250, 0.9);
 }
 
 .dashboard-command {
@@ -1421,17 +1434,53 @@ p {
   justify-content: center;
   min-height: 42px;
   padding: 0 14px;
-  border: 1px solid rgba(23, 33, 43, 0.08);
+  border: 1px solid rgba(35, 31, 27, 0.08);
   border-radius: 999px;
-  background: rgba(247, 249, 251, 0.9);
+  background: rgba(255, 251, 246, 0.9);
   color: var(--text);
   font-weight: 700;
 }
 
 .dashboard-command-warning {
-  border-color: rgba(180, 106, 31, 0.16);
-  background: rgba(180, 106, 31, 0.08);
+  border-color: rgba(154, 100, 47, 0.16);
+  background: rgba(154, 100, 47, 0.08);
   color: var(--warning);
+}
+
+.dashboard-hero-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(320px, 0.95fr);
+  gap: 14px;
+}
+
+.dashboard-hero-primary,
+.dashboard-hero-stat {
+  border: 1px solid rgba(35, 31, 27, 0.08);
+  border-radius: 22px;
+  background: rgba(255, 253, 250, 0.96);
+}
+
+.dashboard-hero-primary {
+  display: grid;
+  gap: 10px;
+  padding: 24px;
+}
+
+.dashboard-hero-primary strong {
+  font-size: clamp(2rem, 4vw, 3.3rem);
+  line-height: 0.95;
+}
+
+.dashboard-hero-secondary {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 14px;
+}
+
+.dashboard-hero-stat {
+  display: grid;
+  gap: 6px;
+  padding: 18px;
 }
 
 .dashboard-kpi-band {
@@ -1478,12 +1527,24 @@ p {
   align-items: start;
 }
 
+.dashboard-layout-executive {
+  grid-template-columns: minmax(0, 1.06fr) minmax(320px, 0.94fr);
+}
+
 .dashboard-layout-tight {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+
+.dashboard-layout-executive-secondary {
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
 }
 
 .dashboard-panel {
   gap: 12px;
+}
+
+.dashboard-panel-feature {
+  min-height: 100%;
 }
 
 .dashboard-summary-box {
@@ -1498,7 +1559,12 @@ p {
 .dashboard-list-row,
 .dashboard-table-row {
   padding: 10px 12px;
-  background: rgba(247, 249, 251, 0.92);
+  background: rgba(251, 248, 243, 0.92);
+}
+
+.dashboard-event-strip-executive {
+  gap: 14px;
+  padding: 18px 20px;
 }
 
 .event-progress-card {
@@ -1674,13 +1740,16 @@ p {
   .catalog-page-grid,
   .sales-layout,
   .dashboard-summary-band,
+  .dashboard-hero-grid,
   .dashboard-kpi-band,
   .sales-toolbar-summary,
   .sales-layout-split,
   .sales-toolbar-summary-flat,
   .dashboard-event-meta,
   .dashboard-layout,
+  .dashboard-layout-executive,
   .dashboard-layout-tight,
+  .dashboard-layout-executive-secondary,
   .reports-kpi-band,
   .reports-layout {
     grid-template-columns: repeat(2, 1fr);
@@ -1693,7 +1762,9 @@ p {
   .content-grid.two-column,
   .sales-layout,
   .dashboard-layout,
+  .dashboard-layout-executive,
   .dashboard-layout-tight,
+  .dashboard-layout-executive-secondary,
   .reports-layout,
   .sales-toolbar-controls,
   .sales-toolbar-controls-flat,
@@ -1747,6 +1818,7 @@ p {
   .catalog-page-grid,
   .dual-fields,
   .dashboard-summary-band,
+  .dashboard-hero-grid,
   .dashboard-kpi-band,
   .reports-kpi-band,
   .sales-toolbar-summary,
@@ -1775,6 +1847,7 @@ p {
   .topbar-app,
   .dashboard-header,
   .dashboard-header-flat,
+  .dashboard-header-executive,
   .dashboard-command-strip,
   .reports-header-bar,
   .sales-header-bar,

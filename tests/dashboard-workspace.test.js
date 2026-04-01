@@ -63,3 +63,18 @@ test("buildDashboardHeroMetrics falls back to zero average order value when ther
 
   assert.equal(result.secondary[1].value, 0);
 });
+
+test("buildDashboardHeroMetrics keeps revenue primary even when discount total is zero", () => {
+  const result = buildDashboardHeroMetrics({
+    revenue: 250000,
+    transactions: 1,
+    discountTotal: 0,
+  });
+
+  assert.deepEqual(result.primary, {
+    label: "Revenue today",
+    value: 250000,
+    kind: "currency",
+    meta: "1 transactions today",
+  });
+});
