@@ -74,7 +74,7 @@ export function WorkspaceSwitcher() {
   }
 
   return (
-    <section className="workspace-switcher">
+    <section className="workspace-switcher workspace-switcher-compact">
       <div className="workspace-switcher-head">
         <div>
           <p className="eyebrow">Current Workspace</p>

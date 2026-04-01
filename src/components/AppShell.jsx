@@ -1,6 +1,7 @@
 import { NavLink, useLocation } from "react-router-dom";
 
 import { useAuth } from "../context/AuthContext";
+import { getShellRouteMeta, getShellTone } from "../features/shell/shellLayout";
 import { WorkspaceSwitcher } from "../features/workspaces/components/WorkspaceSwitcher";
 
 const navigationGroups = [
@@ -30,6 +31,12 @@ const navigationGroups = [
   {
     label: "Stock",
     items: [
+      {
+        label: "Events",
+        description: "Bazaar workspaces",
+        to: "/events",
+        roles: ["admin", "manager"],
+      },
       {
         label: "Catalog",
         description: "Products and variants",
@@ -75,73 +82,6 @@ const navigationGroups = [
   },
 ];
 
-const routeMeta = [
-  {
-    match: (pathname) => pathname.startsWith("/checkout"),
-    eyebrow: "Sell",
-    title: "Checkout workspace",
-    description: "Keep the current workspace moving with a fast sales flow.",
-  },
-  {
-    match: (pathname) => pathname.startsWith("/sales"),
-    eyebrow: "Sales",
-    title: "Transaction history",
-    description: "Review receipts, totals, and cashier activity.",
-  },
-  {
-    match: (pathname) => pathname.startsWith("/catalog"),
-    eyebrow: "Catalog",
-    title: "Product setup",
-    description: "Maintain assortments, variants, and base pricing.",
-  },
-  {
-    match: (pathname) => pathname.startsWith("/inventory"),
-    eyebrow: "Inventory",
-    title: "Stock control",
-    description: "Track movement, restocks, and current quantity on hand.",
-  },
-  {
-    match: (pathname) => pathname.startsWith("/promotions"),
-    eyebrow: "Promotions",
-    title: "Offer management",
-    description: "Publish retail offers without breaking the selling flow.",
-  },
-  {
-    match: (pathname) => pathname.startsWith("/reports"),
-    eyebrow: "Reports",
-    title: "Operational reporting",
-    description: "Read workspace performance and stock pressure clearly.",
-  },
-  {
-    match: (pathname) => pathname.startsWith("/settings"),
-    eyebrow: "Settings",
-    title: "Store configuration",
-    description: "Adjust store-level preferences and selling defaults.",
-  },
-  {
-    match: (pathname) => pathname.startsWith("/users"),
-    eyebrow: "Users",
-    title: "Team access",
-    description: "Manage team access and role coverage.",
-  },
-  {
-    match: (pathname) => pathname.startsWith("/dashboard"),
-    eyebrow: "Dashboard",
-    title: "Retail command view",
-    description: "Stay on top of revenue, alerts, and workspace activity.",
-  },
-];
-
-function getRouteMeta(pathname) {
-  return (
-    routeMeta.find((item) => item.match(pathname)) ?? {
-      eyebrow: "Workspace",
-      title: "Harness POS",
-      description: "Retail operations in one compact shell.",
-    }
-  );
-}
-
 export function AppShell({ children }) {
   const { user, logout } = useAuth();
   const location = useLocation();
@@ -151,17 +91,17 @@ export function AppShell({ children }) {
       items: group.items.filter((item) => item.roles.includes(user.role)),
     }))
     .filter((group) => group.items.length > 0);
-  const currentRoute = getRouteMeta(location.pathname);
+  const currentRoute = getShellRouteMeta(location.pathname);
+  const shellTone = getShellTone(location.pathname);
 
   return (
-    <div className="app-shell">
-      <aside className="sidebar">
+    <div className={`app-shell app-shell-${shellTone}`}>
+      <aside className="sidebar sidebar-compact-shell">
         <div className="brand-block brand-block-compact">
           <div className="brand-badge">H</div>
           <div className="brand-copy">
             <p className="eyebrow">Harness POS</p>
-            <h1>Retail workspace</h1>
-            <p className="muted-text">Tighter control for daily selling, stock, and reporting.</p>
+            <h1>Retail OS</h1>
           </div>
         </div>
 
@@ -203,7 +143,7 @@ export function AppShell({ children }) {
       </aside>
 
       <div className="main-shell">
-        <header className="topbar-app">
+        <header className="topbar-app topbar-app-compact">
           <div className="shell-heading">
             <p className="eyebrow">{currentRoute.eyebrow}</p>
             <h2>{currentRoute.title}</h2>
