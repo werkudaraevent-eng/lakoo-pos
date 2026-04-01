@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
+import { buildSalesWorkspaceSummary } from "../src/features/sales/salesWorkspace.js";
 import { buildReceiptTitle, filterSales, paginateSales } from "../src/features/sales/salesHelpers.js";
 
 const sales = [
@@ -58,4 +59,18 @@ test("paginateSales returns the current slice and page count", () => {
 
 test("buildReceiptTitle creates a stable printable title", () => {
   assert.equal(buildReceiptTitle({ receiptNumber: "POS-20260330-1" }), "Receipt POS-20260330-1");
+});
+
+test("buildSalesWorkspaceSummary returns matched count revenue and page label", () => {
+  const result = buildSalesWorkspaceSummary({
+    filteredSales: [{ grandTotal: 120000 }, { grandTotal: 80000 }],
+    page: 2,
+    totalPages: 4,
+  });
+
+  assert.deepEqual(result, {
+    matchedCount: 2,
+    matchedRevenue: 200000,
+    pageLabel: "2 / 4",
+  });
 });

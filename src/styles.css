@@ -716,58 +716,76 @@ p {
   gap: 12px;
 }
 
-.sales-hero-card {
-  align-items: flex-end;
+.sales-workspace .panel-card,
+.sales-workspace .page-header-card {
+  box-shadow: none;
+  background: rgba(255, 255, 255, 0.96);
 }
 
-.sales-toolbar {
-  display: grid;
-  gap: 16px;
-}
-
-.sales-toolbar-head {
+.sales-header-bar {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
+  padding: 14px 16px;
 }
 
-.sales-toolbar-summary {
+.sales-header-copy {
+  max-width: 42rem;
+}
+
+.sales-header-meta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.sales-toolbar-flat {
+  display: grid;
+  gap: 14px;
+}
+
+.sales-toolbar-controls-flat {
+  grid-template-columns: minmax(0, 1.3fr) minmax(220px, 0.75fr);
+  align-items: end;
+}
+
+.sales-toolbar-summary-flat {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
-  flex: 1;
 }
 
 .sales-kpi {
   display: grid;
   gap: 4px;
   padding: 12px 14px;
+  border: 1px solid rgba(23, 33, 43, 0.08);
   border-radius: 16px;
-  background: rgba(247, 249, 251, 0.96);
+  background: rgba(247, 249, 251, 0.9);
 }
 
 .sales-kpi strong {
-  font-size: 1.2rem;
+  font-size: 1.18rem;
 }
 
-.sales-toolbar-controls {
-  display: grid;
-  grid-template-columns: minmax(0, 1.5fr) minmax(220px, 0.7fr);
-  gap: 14px;
+.sales-kpi-actions {
+  align-content: start;
 }
 
-.sales-search-field input,
-.sales-payment-field select {
-  min-height: 48px;
+.sales-layout-split {
+  grid-template-columns: minmax(0, 1.02fr) minmax(370px, 0.98fr);
+  align-items: start;
 }
 
-.sales-list-panel {
+.sales-list-panel-split,
+.receipt-panel-split {
   gap: 12px;
 }
 
-.sales-list-head {
-  margin-bottom: 8px;
+.sales-list-head-split {
+  margin-bottom: 6px;
 }
 
 .sales-list-table {
@@ -775,16 +793,95 @@ p {
   gap: 4px;
 }
 
-.sales-list-table-head {
+.sales-list-table-head-split {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
-  gap: 16px;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.8fr) auto auto;
+  gap: 14px;
   padding: 0 12px 8px;
   color: var(--text-soft);
   font-size: 0.76rem;
   font-weight: 800;
   letter-spacing: 0.08em;
   text-transform: uppercase;
+}
+
+.sale-row-button-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.8fr) auto auto;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  padding: 12px 12px;
+  border: none;
+  border-bottom: 1px solid rgba(23, 33, 43, 0.08);
+  border-radius: 0;
+  text-align: left;
+  background: transparent;
+}
+
+.sale-row-button-split:hover,
+.sale-row-button-split.is-selected {
+  background: rgba(15, 118, 110, 0.06);
+}
+
+.sale-row-primary {
+  display: grid;
+  gap: 4px;
+}
+
+.sale-row-secondary {
+  color: var(--text);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.sale-row-total {
+  justify-self: end;
+}
+
+.sales-payment-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 30px;
+  padding: 0 10px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: capitalize;
+}
+
+.sales-payment-pill-cash {
+  color: var(--success);
+  background: var(--success-soft);
+}
+
+.sales-payment-pill-card {
+  color: var(--accent-deep);
+  background: var(--accent-soft);
+}
+
+.receipt-panel-split {
+  position: sticky;
+  top: 14px;
+}
+
+.receipt-head-split {
+  padding-bottom: 14px;
+  border-bottom: 1px solid rgba(23, 33, 43, 0.08);
+}
+
+.receipt-summary-box-flat {
+  background: rgba(247, 249, 251, 0.88);
+}
+
+.receipt-items-split {
+  gap: 8px;
+}
+
+.receipt-item-split {
+  padding: 10px 12px;
+  background: rgba(247, 249, 251, 0.92);
 }
 
 .stack-empty {
@@ -968,7 +1065,9 @@ p {
   .catalog-page-grid,
   .sales-layout,
   .dashboard-summary-band,
-  .sales-toolbar-summary {
+  .sales-toolbar-summary,
+  .sales-layout-split,
+  .sales-toolbar-summary-flat {
     grid-template-columns: repeat(2, 1fr);
   }
 }
@@ -978,7 +1077,9 @@ p {
   .catalog-admin-layout,
   .content-grid.two-column,
   .sales-layout,
-  .sales-toolbar-controls {
+  .sales-toolbar-controls,
+  .sales-toolbar-controls-flat,
+  .sales-layout-split {
     grid-template-columns: 1fr;
   }
 
@@ -1029,8 +1130,11 @@ p {
   .dual-fields,
   .dashboard-summary-band,
   .sales-toolbar-summary,
+  .sales-toolbar-summary-flat,
   .sale-row-button-refined,
-  .sales-list-table-head {
+  .sale-row-button-split,
+  .sales-list-table-head,
+  .sales-list-table-head-split {
     grid-template-columns: 1fr;
   }
 
@@ -1048,6 +1152,7 @@ p {
 
   .topbar-app,
   .dashboard-header,
+  .sales-header-bar,
   .panel-head,
   .product-card-head,
   .summary-row,
@@ -1057,9 +1162,14 @@ p {
   .receipt-head,
   .receipt-item,
   .sale-row-button,
+  .sale-row-button-split,
   .workspace-switcher-head,
   .sidebar-user-head {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .sales-header-meta {
+    justify-content: flex-start;
   }
 }
