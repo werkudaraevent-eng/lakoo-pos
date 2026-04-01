@@ -2,8 +2,9 @@ import { Link, useLocation } from "react-router-dom";
 
 import { useAuth } from "../../../context/AuthContext";
 import { usePosData } from "../../../context/PosDataContext";
+import { CHECKOUT_CART_COUNT_STORAGE_KEY } from "../../checkout/checkoutGuards";
 import { useWorkspace } from "../../../context/WorkspaceContext";
-import { filterAccessibleWorkspaces } from "../workspaceGuards";
+import { filterAccessibleWorkspaces, shouldConfirmWorkspaceSwitch } from "../workspaceGuards";
 
 function formatWorkspaceType(type) {
   if (type === "event") {
@@ -53,6 +54,25 @@ export function WorkspaceSwitcher() {
   const stockModeLabel = formatStockMode(activeWorkspace?.stockMode);
   const canSwitch = accessibleWorkspaces.length > 1;
 
+  function handleSwitchClick(event) {
+    const cartCount =
+      typeof window === "undefined"
+        ? 0
+        : Number(window.sessionStorage.getItem(CHECKOUT_CART_COUNT_STORAGE_KEY) || 0);
+    const requiresConfirm = shouldConfirmWorkspaceSwitch({
+      currentPath: location.pathname,
+      cartCount: Number.isFinite(cartCount) ? cartCount : 0,
+    });
+
+    if (
+      requiresConfirm &&
+      typeof window !== "undefined" &&
+      !window.confirm("The current checkout cart still has items. Switch workspace anyway?")
+    ) {
+      event.preventDefault();
+    }
+  }
+
   return (
     <section className="workspace-switcher">
       <div className="workspace-switcher-head">
@@ -65,6 +85,7 @@ export function WorkspaceSwitcher() {
 
         <Link
           className="secondary-button small-button workspace-switcher-button"
+          onClick={handleSwitchClick}
           to="/workspace/select"
           state={{ from: `${location.pathname}${location.search}` }}
         >

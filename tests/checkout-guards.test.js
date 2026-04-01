@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import { createFinalizeSaleLock, evaluateCartAddition } from "../src/features/checkout/checkoutGuards.js";
+import { shouldConfirmWorkspaceSwitch } from "../src/features/workspaces/workspaceGuards.js";
 
 test("evaluateCartAddition rejects variants with zero stock before first add", () => {
   const variant = {
@@ -87,4 +88,15 @@ test("createFinalizeSaleLock blocks a second finalize attempt until the first re
   lock.release();
 
   assert.equal(lock.tryBegin(), true);
+});
+
+test("shouldConfirmWorkspaceSwitch stays false on checkout when the cart is empty", () => {
+  assert.equal(
+    shouldConfirmWorkspaceSwitch({
+      currentPath: "/checkout",
+      cartCount: 0,
+      hasPendingEventClosing: false,
+    }),
+    false
+  );
 });

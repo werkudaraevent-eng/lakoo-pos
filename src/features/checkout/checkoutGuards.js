@@ -1,3 +1,5 @@
+export const CHECKOUT_CART_COUNT_STORAGE_KEY = "pos-checkout-cart-count";
+
 export function evaluateCartAddition(current, variant) {
   if (variant.quantityOnHand <= 0) {
     return {
