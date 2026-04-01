@@ -1,10 +1,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { buildDashboardCommandStrip, buildDashboardKpiBand } from "../src/features/dashboard/dashboardWorkspace.js";
+import {
+  buildDashboardCommandStrip,
+  buildDashboardHeroMetrics,
+} from "../src/features/dashboard/dashboardWorkspace.js";
 
 test("buildDashboardCommandStrip returns event-aware actions for active workspaces", () => {
-  const result = buildDashboardCommandStrip({ type: "event", status: "active" });
+  const result = buildDashboardCommandStrip({ id: "event-gi", type: "event", status: "active" });
 
   assert.deepEqual(result.map((item) => item.label), [
     "Open checkout",
@@ -14,17 +17,49 @@ test("buildDashboardCommandStrip returns event-aware actions for active workspac
   ]);
 });
 
-test("buildDashboardKpiBand formats compact dashboard metrics", () => {
-  const result = buildDashboardKpiBand({
-    revenue: 120000,
-    transactions: 4,
-    lowStock: 2,
-    discountTotal: 30000,
+test("buildDashboardHeroMetrics returns revenue-led executive metrics", () => {
+  const result = buildDashboardHeroMetrics({
+    revenue: 900000,
+    transactions: 3,
+    discountTotal: 60000,
   });
 
-  assert.deepEqual(result, [
-    { label: "Revenue today", value: 120000, kind: "currency", meta: "Discounts recorded: 30000" },
-    { label: "Transactions", value: 4, kind: "count", meta: "Completed sales for the current day." },
-    { label: "Low-stock variants", value: 2, kind: "count", meta: "Restock attention needed now." },
-  ]);
+  assert.deepEqual(result, {
+    primary: {
+      label: "Revenue today",
+      value: 900000,
+      kind: "currency",
+      meta: "3 transactions today",
+    },
+    secondary: [
+      {
+        label: "Transactions",
+        value: 3,
+        kind: "count",
+        meta: "Completed sales today.",
+      },
+      {
+        label: "Average order value",
+        value: 300000,
+        kind: "currency",
+        meta: "Average basket across finalized sales.",
+      },
+      {
+        label: "Discount total",
+        value: 60000,
+        kind: "currency",
+        meta: "Applied across finalized sales today.",
+      },
+    ],
+  });
+});
+
+test("buildDashboardHeroMetrics falls back to zero average order value when there are no transactions", () => {
+  const result = buildDashboardHeroMetrics({
+    revenue: 0,
+    transactions: 0,
+    discountTotal: 0,
+  });
+
+  assert.equal(result.secondary[1].value, 0);
 });
