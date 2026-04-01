@@ -7,7 +7,7 @@
   --sidebar-soft: #eef3f7;
   --text: #17212b;
   --text-soft: #667481;
-  --line: rgba(23, 33, 43, 0.08);
+  --line: rgba(23, 33, 43, 0.12);
   --accent: #0f766e;
   --accent-deep: #0b5f58;
   --accent-soft: rgba(15, 118, 110, 0.12);
@@ -17,7 +17,7 @@
   --warning-soft: rgba(180, 106, 31, 0.14);
   --danger: #c24f43;
   --danger-soft: rgba(194, 79, 67, 0.12);
-  --shadow: 0 14px 34px rgba(23, 33, 43, 0.08);
+  --shadow: 0 4px 12px rgba(23, 33, 43, 0.04);
   --radius-xl: 26px;
   --radius-lg: 20px;
   --radius-md: 16px;
@@ -39,20 +39,14 @@ body {
   min-width: 320px;
   font-family: "Manrope", "Segoe UI", sans-serif;
   color: var(--text);
-  background:
-    radial-gradient(circle at top left, rgba(15, 118, 110, 0.08), transparent 24%),
-    radial-gradient(circle at top right, rgba(23, 33, 43, 0.07), transparent 22%),
-    linear-gradient(180deg, #f7fafc 0%, var(--bg) 100%);
+  background: var(--bg);
 }
 
 body::before {
   content: "";
   position: fixed;
   inset: 0;
-  background-image:
-    linear-gradient(rgba(23, 33, 43, 0.025) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(23, 33, 43, 0.025) 1px, transparent 1px);
-  background-size: 36px 36px;
+  background: transparent;
   pointer-events: none;
 }
 
