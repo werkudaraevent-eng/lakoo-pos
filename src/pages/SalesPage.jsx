@@ -47,8 +47,8 @@ export function SalesPage() {
   );
 
   const selectedSale = useMemo(
-    () => filteredSales.find((sale) => sale.id === selectedId) ?? paginated.items[0] ?? null,
-    [filteredSales, paginated.items, selectedId]
+    () => paginated.items.find((sale) => sale.id === selectedId) ?? paginated.items[0] ?? null,
+    [paginated.items, selectedId]
   );
 
   useEffect(() => {
@@ -56,10 +56,18 @@ export function SalesPage() {
   }, [paymentMethod, query]);
 
   useEffect(() => {
-    if (!selectedSale && paginated.items[0]) {
+    if (paginated.items.length === 0) {
+      if (selectedId !== null) {
+        setSelectedId(null);
+      }
+      return;
+    }
+
+    const visibleSelected = paginated.items.some((sale) => sale.id === selectedId);
+    if (!visibleSelected) {
       setSelectedId(paginated.items[0].id);
     }
-  }, [paginated.items, selectedSale]);
+  }, [paginated.items, selectedId]);
 
   return (
     <div className="page-stack sales-page sales-workspace">
