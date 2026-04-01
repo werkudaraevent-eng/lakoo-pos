@@ -16,3 +16,11 @@ test("getShellRouteMeta returns concise route copy for the sales workspace", () 
     description: "Review finalized receipts, payment flow, and cashier activity in one split view.",
   });
 });
+
+test("getShellRouteMeta returns executive retail copy for the dashboard", () => {
+  assert.deepEqual(getShellRouteMeta("/dashboard"), {
+    eyebrow: "Dashboard",
+    title: "Executive retail overview",
+    description: "Track revenue, product momentum, and workspace health from one sales-first view.",
+  });
+});

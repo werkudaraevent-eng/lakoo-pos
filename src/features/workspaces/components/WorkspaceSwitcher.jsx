@@ -74,13 +74,16 @@ export function WorkspaceSwitcher() {
   }
 
   return (
-    <section className="workspace-switcher workspace-switcher-compact">
+    <section className="workspace-switcher workspace-switcher-compact workspace-switcher-executive">
       <div className="workspace-switcher-head">
         <div>
           <p className="eyebrow">Current Workspace</p>
           <strong className="workspace-switcher-title">
             {activeWorkspace?.name || (loading ? "Loading workspace..." : "No workspace selected")}
           </strong>
+          {activeWorkspace ? (
+            <p className="workspace-switcher-subtitle">Sales and stock context for the current session.</p>
+          ) : null}
         </div>
 
         <Link

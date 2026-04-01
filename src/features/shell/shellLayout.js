@@ -75,8 +75,8 @@ const ROUTE_META = [
     match: (pathname) => pathname.startsWith("/dashboard"),
     meta: {
       eyebrow: "Dashboard",
-      title: "Retail command view",
-      description: "Stay on top of revenue, alerts, and workspace activity.",
+      title: "Executive retail overview",
+      description: "Track revenue, product momentum, and workspace health from one sales-first view.",
     },
   },
 ];

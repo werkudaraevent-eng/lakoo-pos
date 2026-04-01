@@ -46,3 +46,26 @@ export function buildDashboardHeroMetrics({ revenue = 0, transactions = 0, disco
     ],
   };
 }
+
+export function buildDashboardKpiBand({ revenue = 0, transactions = 0, lowStock = 0, discountTotal = 0 } = {}) {
+  return [
+    {
+      label: "Revenue today",
+      value: revenue,
+      kind: "currency",
+      meta: `Discounts recorded: ${discountTotal}`,
+    },
+    {
+      label: "Transactions",
+      value: transactions,
+      kind: "count",
+      meta: "Completed sales for the current day.",
+    },
+    {
+      label: "Low-stock variants",
+      value: lowStock,
+      kind: "count",
+      meta: lowStock > 0 ? "Restock attention needed now." : "Stock position is stable.",
+    },
+  ];
+}

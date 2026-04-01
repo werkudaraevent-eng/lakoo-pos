@@ -96,9 +96,9 @@ export function AppShell({ children }) {
 
   return (
     <div className={`app-shell app-shell-${shellTone}`}>
-      <aside className="sidebar sidebar-compact-shell">
-        <div className="brand-block brand-block-compact">
-          <div className="brand-badge">H</div>
+      <aside className="sidebar sidebar-executive-shell">
+        <div className="brand-block brand-block-compact brand-block-executive">
+          <div className="brand-badge brand-badge-neutral">H</div>
           <div className="brand-copy">
             <p className="eyebrow">Harness POS</p>
             <h1>Retail OS</h1>
@@ -114,7 +114,7 @@ export function AppShell({ children }) {
               <div className="sidebar-group-links">
                 {group.items.map((item) => (
                   <NavLink
-                    className={({ isActive }) => `sidebar-link${isActive ? " is-active" : ""}`}
+                    className={({ isActive }) => `sidebar-link sidebar-link-executive${isActive ? " is-active" : ""}`}
                     key={item.to}
                     to={item.to}
                     end={item.to !== "/sales"}
@@ -128,7 +128,7 @@ export function AppShell({ children }) {
           ))}
         </nav>
 
-        <div className="sidebar-user sidebar-user-card">
+        <div className="sidebar-user sidebar-user-card sidebar-user-executive">
           <div className="sidebar-user-head">
             <div>
               <strong>{user.name}</strong>
@@ -143,13 +143,13 @@ export function AppShell({ children }) {
       </aside>
 
       <div className="main-shell">
-        <header className="topbar-app topbar-app-compact">
+        <header className="topbar-app topbar-app-executive">
           <div className="shell-heading">
             <p className="eyebrow">{currentRoute.eyebrow}</p>
             <h2>{currentRoute.title}</h2>
             <p className="shell-subtitle">{currentRoute.description}</p>
           </div>
-          <div className="topbar-context">
+          <div className="topbar-context topbar-context-executive">
             <span className="role-pill">{user.role}</span>
             <p className="muted-text">Signed in as {user.username}</p>
           </div>
