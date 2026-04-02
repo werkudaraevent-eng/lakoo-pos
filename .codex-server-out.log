@@ -1,0 +1,5 @@
+
+> harness-pos@0.1.0 dev:server
+> node server/index.js
+
+POS API listening on http://localhost:3001

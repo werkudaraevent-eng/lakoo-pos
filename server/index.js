@@ -7,6 +7,8 @@ import { requireAuth, requireRole, signJwt } from "./auth.js";
 import {
   adjustInventoryRecord,
   authenticateUser,
+  closeEventRecord,
+  createEventRecord,
   createProductRecord,
   createPromotionRecord,
   createUserRecord,
@@ -15,6 +17,7 @@ import {
   getBootstrap,
   getUserById,
   initializeDatabase,
+  updateEventStatusRecord,
   updateProductRecord,
   updateSettingsRecord,
   updateUserRecord,
@@ -57,6 +60,8 @@ function withRequestWorkspace(payload, workspaceId) {
 export function createApp({
   adjustInventoryRecordFn = adjustInventoryRecord,
   authenticateUserFn = authenticateUser,
+  closeEventRecordFn = closeEventRecord,
+  createEventRecordFn = createEventRecord,
   createProductRecordFn = createProductRecord,
   createPromotionRecordFn = createPromotionRecord,
   createUserRecordFn = createUserRecord,
@@ -67,6 +72,7 @@ export function createApp({
   requireAuthFn = requireAuth,
   requireRoleMiddleware = requireRole,
   signJwtFn = signJwt,
+  updateEventStatusRecordFn = updateEventStatusRecord,
   updateProductRecordFn = updateProductRecord,
   updateSettingsRecordFn = updateSettingsRecord,
   updateUserRecordFn = updateUserRecord,
@@ -120,6 +126,67 @@ export function createApp({
         data: await getBootstrapFn({
           workspaceId: req.query.workspaceId || null,
         }),
+      });
+    })
+  );
+
+  app.post(
+    "/api/events",
+    auth,
+    requireRoleMiddleware(["admin", "manager"]),
+    asyncHandler(async (req, res) => {
+      const result = await createEventRecordFn(req.body, req.auth.user.id);
+
+      if (!result.ok) {
+        res.status(400).json(result);
+        return;
+      }
+
+      res.json({
+        ok: true,
+        eventId: result.eventId,
+        data: await getBootstrapFn({ workspaceId: getRequestWorkspaceId(req) }),
+      });
+    })
+  );
+
+  app.patch(
+    "/api/events/:id/status",
+    auth,
+    requireRoleMiddleware(["admin", "manager"]),
+    asyncHandler(async (req, res) => {
+      const result = await updateEventStatusRecordFn(req.params.id, req.body, req.auth.user.id);
+
+      if (!result.ok) {
+        res.status(400).json(result);
+        return;
+      }
+
+      res.json({
+        ok: true,
+        eventId: result.eventId,
+        nextStatus: result.nextStatus,
+        data: await getBootstrapFn({ workspaceId: getRequestWorkspaceId(req) }),
+      });
+    })
+  );
+
+  app.post(
+    "/api/events/:id/close",
+    auth,
+    requireRoleMiddleware(["admin", "manager"]),
+    asyncHandler(async (req, res) => {
+      const result = await closeEventRecordFn(req.params.id, req.body, req.auth.user.id);
+
+      if (!result.ok) {
+        res.status(400).json(result);
+        return;
+      }
+
+      res.json({
+        ok: true,
+        eventId: result.eventId,
+        data: await getBootstrapFn({ workspaceId: getRequestWorkspaceId(req) }),
       });
     })
   );

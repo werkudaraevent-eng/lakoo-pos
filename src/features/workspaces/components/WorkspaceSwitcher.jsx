@@ -38,7 +38,7 @@ function formatStockMode(stockMode) {
   return "";
 }
 
-export function WorkspaceSwitcher() {
+export function WorkspaceSwitcher({ variant = "executive" }) {
   const location = useLocation();
   const { user } = useAuth();
   const { workspaces, loading } = usePosData();
@@ -73,21 +73,45 @@ export function WorkspaceSwitcher() {
     }
   }
 
-  return (
-    <section className="workspace-switcher workspace-switcher-compact workspace-switcher-executive">
-      <div className="workspace-switcher-head">
-        <div>
-          <p className="eyebrow">Current Workspace</p>
-          <strong className="workspace-switcher-title">
-            {activeWorkspace?.name || (loading ? "Loading workspace..." : "No workspace selected")}
-          </strong>
-          {activeWorkspace ? (
-            <p className="workspace-switcher-subtitle">Sales and stock context for the current session.</p>
-          ) : null}
+  if (variant === "banani") {
+    return (
+      <section className="workspace-card-compact">
+        <div className="workspace-header-compact">
+          <span className="ws-label">Current Workspace</span>
+          <Link
+            className="ws-switch"
+            onClick={handleSwitchClick}
+            to="/workspace/select"
+            state={{ from: `${location.pathname}${location.search}` }}
+          >
+            {canSwitch ? "Switch" : "Open"}
+          </Link>
         </div>
 
+        {activeWorkspace ? (
+          <>
+            <div className="ws-name">{activeWorkspace.name}</div>
+            <div className="ws-badges">
+              <span className="badge badge-muted">{formatWorkspaceType(activeWorkspace.type)}</span>
+              {statusLabel ? <span className="badge badge-success">{statusLabel}</span> : null}
+            </div>
+            {stockModeLabel ? <button className="btn-outline-full" type="button">{stockModeLabel}</button> : null}
+          </>
+        ) : (
+          <p className="muted-text workspace-switcher-empty">
+            {loading ? "Loading workspace..." : "Select a workspace to start."}
+          </p>
+        )}
+      </section>
+    );
+  }
+
+  return (
+    <section className="workspace-switcher workspace-switcher-compact workspace-switcher-executive">
+      <div className="workspace-switcher-head workspace-switcher-head-compact">
+        <p className="workspace-switcher-label">Current Workspace</p>
         <Link
-          className="secondary-button small-button workspace-switcher-button"
+          className="workspace-switcher-link"
           onClick={handleSwitchClick}
           to="/workspace/select"
           state={{ from: `${location.pathname}${location.search}` }}
@@ -97,11 +121,14 @@ export function WorkspaceSwitcher() {
       </div>
 
       {activeWorkspace ? (
-        <div className="workspace-switcher-meta">
-          <span className="badge-soft">{formatWorkspaceType(activeWorkspace.type)}</span>
-          {statusLabel ? <span className="badge-soft">{statusLabel}</span> : null}
-          {stockModeLabel ? <span className="badge-soft">{stockModeLabel}</span> : null}
-        </div>
+        <>
+          <strong className="workspace-switcher-name">{activeWorkspace.name}</strong>
+          <div className="workspace-switcher-meta">
+            <span className="badge-soft">{formatWorkspaceType(activeWorkspace.type)}</span>
+            {statusLabel ? <span className="badge-soft">{statusLabel}</span> : null}
+          </div>
+          {stockModeLabel ? <div className="workspace-switcher-stock-pill">{stockModeLabel}</div> : null}
+        </>
       ) : (
         <p className="muted-text workspace-switcher-empty">
           Select a workspace to scope dashboard, sales, and inventory data.

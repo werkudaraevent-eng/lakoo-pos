@@ -196,6 +196,45 @@ export function PosDataProvider({ children }) {
     }
   }
 
+  async function createEvent(payload) {
+    try {
+      const requestWorkspaceId = activeWorkspaceIdRef.current || "";
+      const response = await apiPost("/api/events", withActiveWorkspace(payload, requestWorkspaceId));
+      applyMutationState(response.data, requestWorkspaceId);
+      return { ok: true, eventId: response.eventId };
+    } catch (error) {
+      return { ok: false, message: error.message };
+    }
+  }
+
+  async function updateEventStatus(eventId, nextStatus) {
+    try {
+      const requestWorkspaceId = activeWorkspaceIdRef.current || "";
+      const response = await apiPatch(
+        `/api/events/${eventId}/status`,
+        withActiveWorkspace({ nextStatus }, requestWorkspaceId)
+      );
+      applyMutationState(response.data, requestWorkspaceId);
+      return { ok: true, eventId: response.eventId, nextStatus: response.nextStatus };
+    } catch (error) {
+      return { ok: false, message: error.message };
+    }
+  }
+
+  async function closeEvent(eventId, payload) {
+    try {
+      const requestWorkspaceId = activeWorkspaceIdRef.current || "";
+      const response = await apiPost(
+        `/api/events/${eventId}/close`,
+        withActiveWorkspace(payload, requestWorkspaceId)
+      );
+      applyMutationState(response.data, requestWorkspaceId);
+      return { ok: true, eventId: response.eventId };
+    } catch (error) {
+      return { ok: false, message: error.message };
+    }
+  }
+
   async function finalizeSale({ cart, promoCode, paymentMethod, actor }) {
     try {
       const requestWorkspaceId = activeWorkspaceIdRef.current || "";
@@ -269,6 +308,9 @@ export function PosDataProvider({ children }) {
         hasLoaded,
         loadError,
         reload,
+        createEvent,
+        updateEventStatus,
+        closeEvent,
         createPromotion,
         adjustInventory,
         finalizeSale,

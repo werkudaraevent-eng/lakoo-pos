@@ -4,6 +4,7 @@ import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { usePosData } from "../context/PosDataContext";
 import { useWorkspace } from "../context/WorkspaceContext";
+import { buildWorkspacePickerOptions } from "../features/workspaces/workspacePicker";
 import {
   filterAccessibleWorkspaces,
   getRoleLandingPath,
@@ -20,14 +21,20 @@ function getNextPath(locationState, user) {
   return getRoleLandingPath(user?.role);
 }
 
+function getUserInitial(user) {
+  const source = user?.name || user?.username || "U";
+  return source.charAt(0).toUpperCase();
+}
+
 export function WorkspacePickerPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams] = useSearchParams();
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const { workspaces, loading, hasLoaded, loadError } = usePosData();
   const { activeWorkspaceId, selectWorkspace, clearWorkspace } = useWorkspace();
   const accessibleWorkspaces = filterAccessibleWorkspaces(workspaces, user);
+  const pickerOptions = buildWorkspacePickerOptions(accessibleWorkspaces, activeWorkspaceId);
   const autoWorkspaceId = searchParams.get("auto");
   const nextPath = getNextPath(location.state, user);
 
@@ -65,41 +72,74 @@ export function WorkspacePickerPage() {
   }
 
   return (
-    <section style={{ maxWidth: "36rem", margin: "0 auto", padding: "2rem 1rem" }}>
-      <h1>Select workspace</h1>
-      <p>Choose the workspace you want to use for this session.</p>
+    <div className="workspace-picker-page">
+      <div className="workspace-picker-container">
+        <div className="workspace-picker-brand">
+          <div className="workspace-picker-brand-icon">H</div>
+          <div className="workspace-picker-brand-copy">
+            <p className="workspace-picker-brand-title">Harness POS</p>
+            <p className="workspace-picker-brand-subtitle">Retail OS</p>
+          </div>
+        </div>
 
-      {loading ? <p>Loading workspaces...</p> : null}
-      {!loading && loadError ? <p>{loadError}</p> : null}
-      {!loading && !loadError && accessibleWorkspaces.length === 0 ? (
-        <p>No workspaces are available for your account.</p>
-      ) : null}
+        <section className="workspace-picker-card">
+          <header className="workspace-picker-card-header">
+            <div className="workspace-picker-user-badge">
+              <div className="workspace-picker-user-avatar">{getUserInitial(user)}</div>
+              <div className="workspace-picker-user-text">
+                Signed in as <strong>{user?.role || "user"}</strong>
+              </div>
+            </div>
 
-      {!loading && !loadError && accessibleWorkspaces.length > 0 ? (
-        <ul style={{ listStyle: "none", padding: 0, margin: "1.5rem 0 0", display: "grid", gap: "0.75rem" }}>
-          {accessibleWorkspaces.map((workspace) => (
-            <li key={workspace.id}>
-              <button
-                type="button"
-                onClick={() => handleSelect(workspace)}
-                style={{
-                  width: "100%",
-                  textAlign: "left",
-                  padding: "0.9rem 1rem",
-                  border: "1px solid #d4d4d8",
-                  borderRadius: "0.75rem",
-                  background: "#fff",
-                  cursor: "pointer",
-                }}
-              >
-                <strong>{workspace.name || workspace.id}</strong>
-                <div>{workspace.type || "workspace"}</div>
-                {activeWorkspaceId === workspace.id ? <div>Current selection</div> : null}
-              </button>
-            </li>
-          ))}
-        </ul>
-      ) : null}
-    </section>
+            <h1>Select workspace</h1>
+            <p className="workspace-picker-subtitle">
+              Choose the workspace you want to use for this session. You can switch again later.
+            </p>
+          </header>
+
+          <div className="workspace-picker-card-body">
+            {loading ? <p className="workspace-picker-message">Loading workspaces...</p> : null}
+            {!loading && loadError ? <p className="workspace-picker-message error-text">{loadError}</p> : null}
+            {!loading && !loadError && pickerOptions.length === 0 ? (
+              <p className="workspace-picker-message">No workspaces are available for your account.</p>
+            ) : null}
+
+            {!loading && !loadError && pickerOptions.length > 0 ? (
+              <div className="workspace-picker-list">
+                {pickerOptions.map((workspace) => (
+                  <button
+                    className={`workspace-picker-item${workspace.isCurrent ? " is-current" : ""}`}
+                    key={workspace.id}
+                    onClick={() => handleSelect(workspace.id)}
+                    type="button"
+                  >
+                    <div className="workspace-picker-item-badge">{workspace.badgeLabel}</div>
+                    <div className="workspace-picker-item-copy">
+                      <div className="workspace-picker-item-head">
+                        <strong>{workspace.name}</strong>
+                        {workspace.isCurrent ? <span className="workspace-picker-current">Current</span> : null}
+                      </div>
+                      <div className="workspace-picker-item-meta">
+                        <span className="workspace-picker-chip">{workspace.typeLabel}</span>
+                        {workspace.statusLabel ? (
+                          <span className="workspace-picker-chip">{workspace.statusLabel}</span>
+                        ) : null}
+                      </div>
+                    </div>
+                    <span className="workspace-picker-chevron">/</span>
+                  </button>
+                ))}
+              </div>
+            ) : null}
+          </div>
+
+          <footer className="workspace-picker-card-footer">
+            <button className="workspace-picker-logout" onClick={logout} type="button">
+              Log out and return to sign in
+            </button>
+          </footer>
+        </section>
+      </div>
+    </div>
   );
 }

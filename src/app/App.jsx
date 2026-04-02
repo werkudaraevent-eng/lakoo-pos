@@ -5,6 +5,9 @@ import { LoginPage } from "../pages/LoginPage";
 import { DashboardPage } from "../pages/DashboardPage";
 import { CheckoutPage } from "../pages/CheckoutPage";
 import { CatalogPage } from "../pages/CatalogPage";
+import { EventClosingPage } from "../pages/EventClosingPage";
+import { EventDetailPage } from "../pages/EventDetailPage";
+import { EventsPage } from "../pages/EventsPage";
 import { InventoryPage } from "../pages/InventoryPage";
 import { PromotionsPage } from "../pages/PromotionsPage";
 import { ReportsPage } from "../pages/ReportsPage";
@@ -31,6 +34,9 @@ export function App() {
       </Route>
 
       <Route element={<ProtectedRoute allow={["admin", "manager"]} />}>
+        <Route path="/events" element={<EventsPage />} />
+        <Route path="/events/:eventId" element={<EventDetailPage />} />
+        <Route path="/events/:eventId/close" element={<EventClosingPage />} />
         <Route path="/catalog" element={<CatalogPage />} />
         <Route path="/inventory" element={<InventoryPage />} />
         <Route path="/promotions" element={<PromotionsPage />} />

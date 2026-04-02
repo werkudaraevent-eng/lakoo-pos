@@ -1,7 +1,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { buildDashboardSummary, buildEventProgress } from "../src/features/events/eventHelpers.js";
+import {
+  buildDashboardSummary,
+  buildEventProgress,
+  canCompleteClosingReview,
+  canTransitionEvent,
+  getEventActionLabel,
+} from "../src/features/events/eventHelpers.js";
 
 test("buildDashboardSummary returns the headline dashboard metrics for the active day", () => {
   const result = buildDashboardSummary({
@@ -10,16 +16,19 @@ test("buildDashboardSummary returns the headline dashboard metrics for the activ
         createdAt: "2026-03-31T08:00:00.000Z",
         grandTotal: 250000,
         discountTotal: 10000,
+        items: [{ qty: 2 }, { qty: 1 }],
       },
       {
         createdAt: "2026-03-31T09:00:00.000Z",
         grandTotal: 350000,
         discountTotal: 0,
+        items: [{ qty: 3 }],
       },
       {
         createdAt: "2026-03-30T00:30:00.000Z",
         grandTotal: 125000,
         discountTotal: 5000,
+        items: [{ qty: 4 }],
       },
     ],
     variants: [
@@ -33,6 +42,7 @@ test("buildDashboardSummary returns the headline dashboard metrics for the activ
   assert.deepEqual(result, {
     revenue: 600000,
     transactions: 2,
+    itemsSold: 6,
     lowStock: 2,
     discountTotal: 15000,
   });
@@ -48,6 +58,7 @@ test("buildDashboardSummary tolerates missing arrays and invalid timestamps", ()
   assert.deepEqual(result, {
     revenue: 0,
     transactions: 0,
+    itemsSold: 0,
     lowStock: 0,
     discountTotal: 5000,
   });
@@ -100,5 +111,35 @@ test("buildEventProgress returns null for non-event workspaces or invalid schedu
       now: "2026-04-02T10:00:00.000Z",
     }),
     null
+  );
+});
+
+test("canTransitionEvent allows draft events to move to active and blocks archived rollback", () => {
+  assert.equal(canTransitionEvent("draft", "active"), true);
+  assert.equal(canTransitionEvent("archived", "active"), false);
+});
+
+test("getEventActionLabel exposes stock-mode setup labels", () => {
+  assert.equal(getEventActionLabel("allocate"), "Allocate from main stock");
+  assert.equal(getEventActionLabel("manual"), "Manual event stock");
+});
+
+test("canCompleteClosingReview requires sales, stock, and payment review steps", () => {
+  assert.equal(
+    canCompleteClosingReview({
+      salesReviewed: true,
+      stockReviewed: true,
+      paymentReviewed: false,
+    }),
+    false
+  );
+
+  assert.equal(
+    canCompleteClosingReview({
+      salesReviewed: true,
+      stockReviewed: true,
+      paymentReviewed: true,
+    }),
+    true
   );
 });

@@ -13,6 +13,13 @@ function toDate(value) {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
+const EVENT_TRANSITIONS = {
+  draft: new Set(["active", "archived"]),
+  active: new Set(["closed"]),
+  closed: new Set(["archived"]),
+  archived: new Set(),
+};
+
 export function buildDashboardSummary({ sales = [], variants = [], now = new Date().toISOString() } = {}) {
   const safeSales = Array.isArray(sales) ? sales : [];
   const safeVariants = Array.isArray(variants) ? variants : [];
@@ -24,6 +31,14 @@ export function buildDashboardSummary({ sales = [], variants = [], now = new Dat
   return {
     revenue: todaySales.reduce((sum, sale) => sum + toNumber(sale?.grandTotal), 0),
     transactions: todaySales.length,
+    itemsSold: todaySales.reduce(
+      (sum, sale) =>
+        sum +
+        (Array.isArray(sale?.items)
+          ? sale.items.reduce((itemSum, item) => itemSum + toNumber(item?.qty), 0)
+          : 0),
+      0
+    ),
     lowStock: safeVariants.filter((variant) => {
       const quantityOnHand = Number(variant?.quantityOnHand);
       const lowStockThreshold = Number(variant?.lowStockThreshold);
@@ -83,4 +98,24 @@ export function buildEventProgress({ workspace, now = new Date().toISOString() }
     totalHours,
     isComplete,
   };
+}
+
+export function canTransitionEvent(currentStatus, nextStatus) {
+  return EVENT_TRANSITIONS[currentStatus]?.has(nextStatus) ?? false;
+}
+
+export function getEventActionLabel(stockMode) {
+  if (stockMode === "allocate") {
+    return "Allocate from main stock";
+  }
+
+  if (stockMode === "manual") {
+    return "Manual event stock";
+  }
+
+  return "Configure event stock";
+}
+
+export function canCompleteClosingReview({ salesReviewed, stockReviewed, paymentReviewed } = {}) {
+  return Boolean(salesReviewed && stockReviewed && paymentReviewed);
 }

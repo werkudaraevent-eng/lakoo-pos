@@ -1,60 +1,33 @@
 import { startTransition, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
 
 import { useAuth } from "../context/AuthContext";
 import { usePosData } from "../context/PosDataContext";
-import { useWorkspace } from "../context/WorkspaceContext";
-import { ProductSearchPanel } from "../features/checkout/components/ProductSearchPanel";
-import { ProductGrid } from "../features/checkout/components/ProductGrid";
-import { CartSummary } from "../features/checkout/components/CartSummary";
 import { LatestReceipt } from "../features/checkout/components/LatestReceipt";
+import { buildCheckoutCategories, filterCheckoutVariants } from "../features/checkout/checkoutData";
 import {
   CHECKOUT_CART_COUNT_STORAGE_KEY,
   canFinalizeSale,
   createFinalizeSaleLock,
   evaluateCartAddition,
 } from "../features/checkout/checkoutGuards";
-import { shouldConfirmWorkspaceSwitch } from "../features/workspaces/workspaceGuards";
+import { AppIcon } from "../features/ui/AppIcon";
+import { getCheckoutActionIconName } from "../features/ui/iconMaps";
+import { formatCurrency } from "../utils/formatters";
 import "../features/checkout/checkout.css";
 
-function formatWorkspaceType(type) {
-  if (type === "event") {
-    return "Event";
+function getStockLabel(variant) {
+  if (variant.quantityOnHand <= 0) {
+    return "Out of stock";
   }
 
-  if (type === "store") {
-    return "Store";
-  }
-
-  return "Workspace";
-}
-
-function formatStatus(status) {
-  if (!status) {
-    return "";
-  }
-
-  return status.charAt(0).toUpperCase() + status.slice(1);
-}
-
-function formatStockMode(stockMode) {
-  if (stockMode === "allocate") {
-    return "Allocated stock";
-  }
-
-  if (stockMode === "manual") {
-    return "Manual stock";
-  }
-
-  return "";
+  return `${variant.quantityOnHand} in stock`;
 }
 
 export function CheckoutPage() {
-  const navigate = useNavigate();
   const { user } = useAuth();
-  const { variants, promotions, finalizeSale, loading, loadError, workspaces } = usePosData();
-  const { activeWorkspaceId } = useWorkspace();
+  const { variants, promotions, finalizeSale, loading, loadError } = usePosData();
   const [query, setQuery] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("All Items");
   const [cart, setCart] = useState([]);
   const [promoCode, setPromoCode] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("cash");
@@ -68,25 +41,20 @@ export function CheckoutPage() {
     finalizeLockRef.current = createFinalizeSaleLock();
   }
 
-  const activeWorkspace = workspaces.find((workspace) => workspace.id === activeWorkspaceId) ?? null;
-  const workspaceStatus = formatStatus(activeWorkspace?.eventStatus ?? activeWorkspace?.status);
-  const stockModeLabel = formatStockMode(activeWorkspace?.stockMode);
   const browseableVariants = useMemo(
     () => variants.filter((item) => item.productActive && item.isActive),
     [variants]
   );
-  const visibleProducts = useMemo(() => {
-    const keyword = deferredQuery.trim().toLowerCase();
-
-    if (!keyword) {
-      return browseableVariants.slice(0, 12);
-    }
-
-    return browseableVariants.filter((item) => {
-      const haystack = `${item.productName} ${item.sku} ${item.color} ${item.size}`.toLowerCase();
-      return haystack.includes(keyword);
-    });
-  }, [browseableVariants, deferredQuery]);
+  const categories = useMemo(() => buildCheckoutCategories(browseableVariants), [browseableVariants]);
+  const visibleProducts = useMemo(
+    () =>
+      filterCheckoutVariants({
+        variants: browseableVariants,
+        category: selectedCategory,
+        query: deferredQuery,
+      }),
+    [browseableVariants, selectedCategory, deferredQuery]
+  );
 
   const cartCount = cart.reduce((sum, item) => sum + item.qty, 0);
   const subtotal = cart.reduce((sum, item) => sum + item.price * item.qty, 0);
@@ -97,6 +65,7 @@ export function CheckoutPage() {
       : matchedPromo.type === "percentage"
         ? Math.round((subtotal * matchedPromo.value) / 100)
         : Math.min(subtotal, matchedPromo.value);
+  const tax = 0;
   const grandTotal = Math.max(0, subtotal - discount);
 
   useEffect(() => {
@@ -155,6 +124,12 @@ export function CheckoutPage() {
     );
   }
 
+  function clearCart() {
+    setCart([]);
+    setPromoCode("");
+    setMessage("");
+  }
+
   async function handleCheckout() {
     const status = canFinalizeSale({
       cartLength: cart.length,
@@ -197,79 +172,178 @@ export function CheckoutPage() {
     }
   }
 
-  function handleWorkspaceSwitch() {
-    const requiresConfirm = shouldConfirmWorkspaceSwitch({
-      currentPath: "/checkout",
-      cartCount,
-    });
-
-    if (
-      requiresConfirm &&
-      typeof window !== "undefined" &&
-      !window.confirm("The current checkout cart still has items. Switch workspace anyway?")
-    ) {
-      return;
-    }
-
-    navigate("/workspace/select", {
-      state: { from: "/checkout" },
-    });
-  }
-
   return (
-    <div className="checkout-page">
-      <section className="checkout-context-strip">
-        <div className="checkout-context-copy">
-          <p className="eyebrow">Checkout</p>
-          <h1>{activeWorkspace?.name || "Workspace checkout"}</h1>
-          <p className="muted-text">
-            Search products fast, keep the cart in view, and finalize each sale without leaving the workspace flow.
-          </p>
-        </div>
-        <div className="checkout-context-actions">
-          <div className="checkout-context-meta">
-            {activeWorkspace?.type ? (
-              <span className="badge-soft">{formatWorkspaceType(activeWorkspace.type)}</span>
-            ) : null}
-            {workspaceStatus ? <span className="badge-soft">{workspaceStatus}</span> : null}
-            {stockModeLabel ? <span className="badge-soft">{stockModeLabel}</span> : null}
+    <div className="checkout-banani-page">
+      <div className="checkout-container">
+        <section className="catalog-section">
+          <div className="catalog-header">
+            <h1 className="page-title">Checkout</h1>
+
+            <div className="catalog-toolbar">
+              <div className="search-box">
+                <span className="search-icon" aria-hidden="true">
+                  <AppIcon name={getCheckoutActionIconName("search")} size={16} strokeWidth={1.9} />
+                </span>
+                <input
+                  className="search-input"
+                  onChange={(event) => setQuery(event.target.value)}
+                  placeholder="Search products, SKU or barcode"
+                  value={query}
+                />
+              </div>
+
+              <div className="category-tabs">
+                {categories.map((category) => (
+                  <button
+                    className={`category-pill${selectedCategory === category ? " active" : ""}`}
+                    key={category}
+                    onClick={() => setSelectedCategory(category)}
+                    type="button"
+                  >
+                    {category}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
-          <button className="secondary-button small-button" onClick={handleWorkspaceSwitch} type="button">
-            Switch workspace
-          </button>
-        </div>
-      </section>
 
-      {loading ? <p className="info-text">Loading catalog and promotions...</p> : null}
-      {loadError ? <p className="error-text">{loadError}</p> : null}
+          {loading ? <p className="info-text">Loading catalog and promotions...</p> : null}
+          {loadError ? <p className="error-text">{loadError}</p> : null}
 
-      <section className="checkout-layout">
-        <ProductSearchPanel
-          query={query}
-          resultCount={visibleProducts.length}
-          totalCount={browseableVariants.length}
-          onQueryChange={setQuery}
-        >
-          <ProductGrid variants={visibleProducts} onAdd={addToCart} />
-        </ProductSearchPanel>
+          <div className="product-grid">
+            {visibleProducts.length > 0 ? (
+              visibleProducts.map((variant) => (
+                <button
+                  className={`product-card${variant.quantityOnHand <= 0 ? " is-unavailable" : ""}`}
+                  disabled={variant.quantityOnHand <= 0}
+                  key={variant.id}
+                  onClick={() => addToCart(variant)}
+                  type="button"
+                >
+                  <div className="product-image">
+                    <span className="product-image-mark">{variant.productName.charAt(0).toUpperCase()}</span>
+                  </div>
+                  <div className="product-info">
+                    <span className="product-name">{variant.productName}</span>
+                    <span className="product-price">{formatCurrency(variant.price)}</span>
+                    <span className="product-stock">{getStockLabel(variant)}</span>
+                  </div>
+                </button>
+              ))
+            ) : (
+              <div className="checkout-empty-state">
+                <strong>No matching items</strong>
+                <span>Try another keyword or switch category.</span>
+              </div>
+            )}
+          </div>
+        </section>
 
-        <CartSummary
-          cart={cart}
-          cartCount={cartCount}
-          promoCode={promoCode}
-          paymentMethod={paymentMethod}
-          subtotal={subtotal}
-          discount={discount}
-          grandTotal={grandTotal}
-          message={message}
-          submitting={submitting}
-          finalizeDisabled={submitting || cart.length === 0}
-          onPromoChange={setPromoCode}
-          onPaymentMethodChange={setPaymentMethod}
-          onUpdateQty={updateQty}
-          onFinalize={handleCheckout}
-        />
-      </section>
+        <aside className="cart-section">
+          <div className="cart-header">
+            <span className="cart-title">Current Order</span>
+            <div className="cart-actions">
+              <button className="btn-icon-sm" title="Add note" type="button">
+                <AppIcon name={getCheckoutActionIconName("note")} size={14} strokeWidth={1.9} />
+              </button>
+              <button className="btn-icon-sm" title="Add customer" type="button">
+                <AppIcon name={getCheckoutActionIconName("customer")} size={14} strokeWidth={1.9} />
+              </button>
+              <button className="btn-icon-sm is-danger" onClick={clearCart} title="Clear cart" type="button">
+                <AppIcon name={getCheckoutActionIconName("clear")} size={14} strokeWidth={1.9} />
+              </button>
+            </div>
+          </div>
+
+          <div className="cart-customer">
+            <span className="cart-customer-icon" aria-hidden="true">
+              <AppIcon name={getCheckoutActionIconName("walkIn")} size={16} strokeWidth={1.9} />
+            </span>
+            <span className="customer-name">Walk-in Customer</span>
+            <button className="btn-text" type="button">
+              Edit
+            </button>
+          </div>
+
+          <div className="cart-items">
+            {cart.length > 0 ? (
+              cart.map((item) => (
+                <div className="cart-item" key={item.variantId}>
+                  <div className="cart-item-img">
+                    <span>{item.productName.charAt(0).toUpperCase()}</span>
+                  </div>
+                  <div className="cart-item-details">
+                    <span className="cart-item-name">{item.productName}</span>
+                    <span className="cart-item-price">{formatCurrency(item.price)}</span>
+                    <div className="cart-item-controls">
+                      <button className="qty-btn" onClick={() => updateQty(item.variantId, item.qty - 1)} type="button">
+                        <AppIcon name={getCheckoutActionIconName("minus")} size={12} strokeWidth={2.2} />
+                      </button>
+                      <span className="qty-value">{item.qty}</span>
+                      <button className="qty-btn" onClick={() => updateQty(item.variantId, item.qty + 1)} type="button">
+                        <AppIcon name={getCheckoutActionIconName("plus")} size={12} strokeWidth={2.2} />
+                      </button>
+                    </div>
+                  </div>
+                  <div className="cart-item-total">{formatCurrency(item.price * item.qty)}</div>
+                </div>
+              ))
+            ) : (
+              <div className="cart-empty-state">No items in cart yet.</div>
+            )}
+          </div>
+
+          <div className="cart-summary">
+            <label className="checkout-field">
+              <span>Promo code</span>
+              <input onChange={(event) => setPromoCode(event.target.value.toUpperCase())} value={promoCode} />
+            </label>
+
+            <div className="checkout-payment-group">
+              <span className="checkout-field-label">Payment method</span>
+              <div className="payment-toggle">
+                {["cash", "card"].map((method) => (
+                  <button
+                    className={`payment-chip${paymentMethod === method ? " active" : ""}`}
+                    key={method}
+                    onClick={() => setPaymentMethod(method)}
+                    type="button"
+                  >
+                    {method}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="summary-row">
+              <span>Subtotal</span>
+              <span>{formatCurrency(subtotal)}</span>
+            </div>
+            <div className="summary-row">
+              <span>Discount</span>
+              <span>{discount > 0 ? `- ${formatCurrency(discount)}` : "-"}</span>
+            </div>
+            <div className="summary-row">
+              <span>Tax (10%)</span>
+              <span>{formatCurrency(tax)}</span>
+            </div>
+            <div className="summary-row total">
+              <span>Total</span>
+              <span>{formatCurrency(grandTotal)}</span>
+            </div>
+
+            {message ? <p className="checkout-message">{message}</p> : null}
+
+            <button className="btn-charge" disabled={submitting || cart.length === 0} onClick={handleCheckout} type="button">
+              <span className="charge-label">
+                <AppIcon name={getCheckoutActionIconName("charge")} size={18} strokeWidth={1.9} />
+                <span>{submitting ? "Saving..." : "Charge"}</span>
+              </span>
+              <span>{formatCurrency(grandTotal)}</span>
+            </button>
+          </div>
+        </aside>
+      </div>
 
       <LatestReceipt sale={receiptSale} />
     </div>

@@ -14,58 +14,37 @@ export function buildDashboardCommandStrip(workspace) {
   return commands;
 }
 
-export function buildDashboardHeroMetrics({ revenue = 0, transactions = 0, discountTotal = 0 } = {}) {
+export function buildDashboardKpiCards({ revenue = 0, transactions = 0, itemsSold = 0 } = {}) {
   const averageOrderValue = transactions > 0 ? Math.round(revenue / transactions) : 0;
 
-  return {
-    primary: {
-      label: "Revenue today",
-      value: revenue,
-      kind: "currency",
-      meta: `${transactions} transactions today`,
-    },
-    secondary: [
-      {
-        label: "Transactions",
-        value: transactions,
-        kind: "count",
-        meta: "Completed sales today.",
-      },
-      {
-        label: "Average order value",
-        value: averageOrderValue,
-        kind: "currency",
-        meta: "Average basket across finalized sales.",
-      },
-      {
-        label: "Discount total",
-        value: discountTotal,
-        kind: "currency",
-        meta: "Applied across finalized sales today.",
-      },
-    ],
-  };
-}
-
-export function buildDashboardKpiBand({ revenue = 0, transactions = 0, lowStock = 0, discountTotal = 0 } = {}) {
   return [
     {
-      label: "Revenue today",
+      label: "Gross revenue",
       value: revenue,
       kind: "currency",
-      meta: `Discounts recorded: ${discountTotal}`,
+      tone: "up",
+      meta: `${transactions} transactions today`,
     },
     {
       label: "Transactions",
       value: transactions,
       kind: "count",
-      meta: "Completed sales for the current day.",
+      tone: "up",
+      meta: "Completed sales today.",
     },
     {
-      label: "Low-stock variants",
-      value: lowStock,
+      label: "Average order value",
+      value: averageOrderValue,
+      kind: "currency",
+      tone: "down",
+      meta: "Average basket size.",
+    },
+    {
+      label: "Items sold",
+      value: itemsSold,
       kind: "count",
-      meta: lowStock > 0 ? "Restock attention needed now." : "Stock position is stable.",
+      tone: "up",
+      meta: "Units sold today.",
     },
   ];
 }

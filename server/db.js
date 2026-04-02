@@ -51,6 +51,21 @@ function createId(prefix) {
   return `${prefix}-${crypto.randomUUID()}`;
 }
 
+const EVENT_TRANSITIONS = {
+  draft: new Set(["active", "archived"]),
+  active: new Set(["closed"]),
+  closed: new Set(["archived"]),
+  archived: new Set(),
+};
+
+function canTransitionEventRecord(currentStatus, nextStatus) {
+  return EVENT_TRANSITIONS[currentStatus]?.has(nextStatus) ?? false;
+}
+
+function canCompleteClosingReviewRecord(payload) {
+  return Boolean(payload?.salesReviewed && payload?.stockReviewed && payload?.paymentReviewed);
+}
+
 async function ensureCategory(executor, name) {
   const slug = slugify(name);
   const existing = await executor`
@@ -282,6 +297,53 @@ async function resolveWriteWorkspaceId(executor, workspaceId) {
   return rows[0]?.id ?? null;
 }
 
+async function resolveWriteWorkspace(executor, workspaceId) {
+  const resolvedWorkspaceId = await resolveWriteWorkspaceId(executor, workspaceId);
+
+  if (!resolvedWorkspaceId) {
+    return null;
+  }
+
+  const rows = await executor`
+    SELECT
+      id,
+      type,
+      status,
+      stock_mode AS "stockMode"
+    FROM workspaces
+    WHERE id = ${resolvedWorkspaceId}
+    LIMIT 1
+  `;
+
+  return rows[0] ?? null;
+}
+
+async function consumeMainStockForEvent(tx, workspace, variantId, amount) {
+  const rows = await tx`
+    SELECT id, quantity_on_hand AS "quantityOnHand"
+    FROM product_variants
+    WHERE id = ${variantId}
+    FOR UPDATE
+  `;
+  const variant = rows[0];
+
+  if (!variant) {
+    throw new Error("Variant event tidak ditemukan.");
+  }
+
+  if (workspace.stockMode === "allocate" && variant.quantityOnHand < amount) {
+    throw new Error("Stock pusat tidak cukup untuk alokasi event.");
+  }
+
+  if (workspace.stockMode === "allocate") {
+    await tx`
+      UPDATE product_variants
+      SET quantity_on_hand = quantity_on_hand - ${amount}
+      WHERE id = ${variantId}
+    `;
+  }
+}
+
 export async function initializeDatabase() {
   const executor = ensureSql();
   await executor`SELECT 1`;
@@ -357,6 +419,151 @@ export async function getUserById(userId) {
   return rows[0] || null;
 }
 
+export async function createEventRecord(payload) {
+  const executor = ensureSql();
+  const name = String(payload?.name || "").trim();
+  const code = String(payload?.code || "").trim().toUpperCase();
+  const locationLabel = String(payload?.locationLabel || "").trim();
+  const startsAt = payload?.startsAt ? new Date(payload.startsAt) : null;
+  const endsAt = payload?.endsAt ? new Date(payload.endsAt) : null;
+  const stockMode = payload?.stockMode;
+  const assignedUserIds = [...new Set((payload?.assignedUserIds || []).filter(Boolean))];
+
+  if (!name || !code || !locationLabel || !startsAt || !endsAt || Number.isNaN(startsAt.getTime()) || Number.isNaN(endsAt.getTime())) {
+    return { ok: false, message: "Data event belum lengkap." };
+  }
+
+  if (endsAt <= startsAt) {
+    return { ok: false, message: "Tanggal selesai event harus setelah tanggal mulai." };
+  }
+
+  if (!["allocate", "manual"].includes(stockMode)) {
+    return { ok: false, message: "Mode stock event tidak valid." };
+  }
+
+  try {
+    const eventId = createId("workspace");
+
+    await executor.begin(async (tx) => {
+      await tx`
+        INSERT INTO workspaces
+        (id, type, name, code, status, stock_mode, location_label, starts_at, ends_at, is_visible, created_at)
+        VALUES (
+          ${eventId},
+          ${"event"},
+          ${name},
+          ${code},
+          ${"draft"},
+          ${stockMode},
+          ${locationLabel},
+          ${startsAt.toISOString()},
+          ${endsAt.toISOString()},
+          ${true},
+          ${nowIso()}
+        )
+      `;
+
+      for (const userId of assignedUserIds) {
+        await tx`
+          INSERT INTO workspace_assignments (id, workspace_id, user_id, assigned_at)
+          VALUES (${createId("wa")}, ${eventId}, ${userId}, ${nowIso()})
+        `;
+      }
+    });
+
+    return { ok: true, eventId };
+  } catch (error) {
+    if (error?.code === "23505") {
+      return { ok: false, message: "Kode event sudah dipakai." };
+    }
+
+    return { ok: false, message: error.message };
+  }
+}
+
+export async function updateEventStatusRecord(eventId, payload) {
+  const executor = ensureSql();
+  const nextStatus = String(payload?.nextStatus || "").trim().toLowerCase();
+
+  if (!nextStatus) {
+    return { ok: false, message: "Status event tujuan wajib dipilih." };
+  }
+
+  if (nextStatus === "closed") {
+    return { ok: false, message: "Gunakan closing flow untuk menutup event." };
+  }
+
+  const rows = await executor`
+    SELECT id, type, status
+    FROM workspaces
+    WHERE id = ${eventId}
+    LIMIT 1
+  `;
+  const event = rows[0];
+
+  if (!event || event.type !== "event") {
+    return { ok: false, message: "Event tidak ditemukan." };
+  }
+
+  if (!canTransitionEventRecord(event.status, nextStatus)) {
+    return { ok: false, message: "Transisi status event tidak valid." };
+  }
+
+  const closedAt = nextStatus === "closed" ? nowIso() : null;
+  const archivedAt = nextStatus === "archived" ? nowIso() : null;
+
+  await executor`
+    UPDATE workspaces
+    SET
+      status = ${nextStatus},
+      closed_at = CASE
+        WHEN ${closedAt}::timestamptz IS NOT NULL THEN ${closedAt}
+        ELSE closed_at
+      END,
+      archived_at = CASE
+        WHEN ${archivedAt}::timestamptz IS NOT NULL THEN ${archivedAt}
+        ELSE archived_at
+      END
+    WHERE id = ${eventId}
+  `;
+
+  return { ok: true, eventId, nextStatus };
+}
+
+export async function closeEventRecord(eventId, payload) {
+  const executor = ensureSql();
+
+  if (!canCompleteClosingReviewRecord(payload)) {
+    return { ok: false, message: "Review penutupan event belum lengkap." };
+  }
+
+  const rows = await executor`
+    SELECT id, type, status
+    FROM workspaces
+    WHERE id = ${eventId}
+    LIMIT 1
+  `;
+  const event = rows[0];
+
+  if (!event || event.type !== "event") {
+    return { ok: false, message: "Event tidak ditemukan." };
+  }
+
+  if (event.status !== "active") {
+    return { ok: false, message: "Hanya event aktif yang bisa ditutup." };
+  }
+
+  await executor`
+    UPDATE workspaces
+    SET
+      status = ${"closed"},
+      closed_at = ${nowIso()}
+    WHERE id = ${eventId}
+  `;
+
+  return { ok: true, eventId };
+}
+
 export async function createPromotionRecord(payload, actorUserId) {
   const executor = ensureSql();
 
@@ -381,38 +588,98 @@ export async function createPromotionRecord(payload, actorUserId) {
 export async function adjustInventoryRecord(payload, actorUserId) {
   const executor = ensureSql();
   const amount = Number(payload.quantity);
-  const workspaceId = await resolveWriteWorkspaceId(executor, payload.workspaceId || null);
+  const workspace = await resolveWriteWorkspace(executor, payload.workspaceId || null);
 
-  if (amount < 1) {
+  if (amount < 1 || !workspace) {
     return { ok: false, message: "Inventory request tidak valid." };
+  }
+
+  if (workspace.type === "event" && !["draft", "active"].includes(workspace.status)) {
+    return { ok: false, message: "Event ini tidak bisa diubah stock-nya." };
   }
 
   try {
     await executor.begin(async (tx) => {
-      const rows = await tx`
-        SELECT id, quantity_on_hand AS "quantityOnHand"
-        FROM product_variants
-        WHERE id = ${payload.variantId}
-        FOR UPDATE
-      `;
-      const variant = rows[0];
-
-      if (!variant) {
-        throw new Error("Inventory request tidak valid.");
-      }
-
       const delta = payload.mode === "restock" ? amount : amount * -1;
-      const nextQty = variant.quantityOnHand + delta;
+      if (workspace.type === "event") {
+        const workspaceStockRows = await tx`
+          SELECT id, quantity_on_hand AS "quantityOnHand", allocated_from_main AS "allocatedFromMain"
+          FROM workspace_variant_stocks
+          WHERE workspace_id = ${workspace.id} AND variant_id = ${payload.variantId}
+          FOR UPDATE
+        `;
+        const workspaceStock = workspaceStockRows[0];
 
-      if (nextQty < 0) {
-        throw new Error("Stock tidak boleh kurang dari 0.");
+        if (!workspaceStock) {
+          if (delta < 0) {
+            throw new Error("Stock event belum tersedia untuk variant ini.");
+          }
+
+          await consumeMainStockForEvent(tx, workspace, payload.variantId, delta);
+
+          await tx`
+            INSERT INTO workspace_variant_stocks
+            (id, workspace_id, variant_id, quantity_on_hand, source_mode, allocated_from_main, created_at, updated_at)
+            VALUES (
+              ${createId("wvs")},
+              ${workspace.id},
+              ${payload.variantId},
+              ${delta},
+              ${workspace.stockMode || "manual"},
+              ${workspace.stockMode === "allocate" ? delta : 0},
+              ${nowIso()},
+              ${nowIso()}
+            )
+          `;
+        } else {
+          const nextQty = workspaceStock.quantityOnHand + delta;
+
+          if (nextQty < 0) {
+            throw new Error("Stock tidak boleh kurang dari 0.");
+          }
+
+          if (delta > 0) {
+            await consumeMainStockForEvent(tx, workspace, payload.variantId, delta);
+          }
+
+          await tx`
+            UPDATE workspace_variant_stocks
+            SET
+              quantity_on_hand = ${nextQty},
+              allocated_from_main = CASE
+                WHEN ${workspace.stockMode === "allocate" && delta > 0}
+                  THEN allocated_from_main + ${delta}
+                ELSE allocated_from_main
+              END,
+              updated_at = ${nowIso()}
+            WHERE id = ${workspaceStock.id}
+          `;
+        }
+      } else {
+        const rows = await tx`
+          SELECT id, quantity_on_hand AS "quantityOnHand"
+          FROM product_variants
+          WHERE id = ${payload.variantId}
+          FOR UPDATE
+        `;
+        const variant = rows[0];
+
+        if (!variant) {
+          throw new Error("Inventory request tidak valid.");
+        }
+
+        const nextQty = variant.quantityOnHand + delta;
+
+        if (nextQty < 0) {
+          throw new Error("Stock tidak boleh kurang dari 0.");
+        }
+
+        await tx`
+          UPDATE product_variants
+          SET quantity_on_hand = ${nextQty}
+          WHERE id = ${payload.variantId}
+        `;
       }
-
-      await tx`
-        UPDATE product_variants
-        SET quantity_on_hand = ${nextQty}
-        WHERE id = ${payload.variantId}
-      `;
 
       await tx`
         INSERT INTO inventory_movements
@@ -420,7 +687,7 @@ export async function adjustInventoryRecord(payload, actorUserId) {
         VALUES (
           ${createId("mov")},
           ${payload.variantId},
-          ${workspaceId},
+          ${workspace.id},
           ${payload.mode},
           ${delta},
           ${payload.note},
@@ -431,7 +698,7 @@ export async function adjustInventoryRecord(payload, actorUserId) {
       `;
     });
 
-    return { ok: true, workspaceId };
+    return { ok: true, workspaceId: workspace.id };
   } catch (error) {
     return { ok: false, message: error.message };
   }
@@ -440,10 +707,14 @@ export async function adjustInventoryRecord(payload, actorUserId) {
 export async function finalizeSaleRecord(payload, actorUserId) {
   const executor = ensureSql();
   const cart = payload.cart || [];
-  const workspaceId = await resolveWriteWorkspaceId(executor, payload.workspaceId || null);
+  const workspace = await resolveWriteWorkspace(executor, payload.workspaceId || null);
 
-  if (!cart.length) {
+  if (!cart.length || !workspace) {
     return { ok: false, message: "Cart masih kosong." };
+  }
+
+  if (workspace.type === "event" && workspace.status !== "active") {
+    return { ok: false, message: "Event harus aktif sebelum transaksi dimulai." };
   }
 
   try {
@@ -451,21 +722,39 @@ export async function finalizeSaleRecord(payload, actorUserId) {
       const dbVariants = [];
 
       for (const item of cart) {
-        const rows = await tx`
-          SELECT
-            pv.id,
-            pv.sku,
-            pv.size,
-            pv.color,
-            pv.quantity_on_hand AS "quantityOnHand",
-            pv.price_override AS "priceOverride",
-            p.name AS "productName",
-            p.base_price AS "basePrice"
-          FROM product_variants pv
-          JOIN products p ON p.id = pv.product_id
-          WHERE pv.id = ${item.variantId}
-          FOR UPDATE
-        `;
+        const rows =
+          workspace.type === "event"
+            ? await tx`
+                SELECT
+                  pv.id,
+                  pv.sku,
+                  pv.size,
+                  pv.color,
+                  wvs.quantity_on_hand AS "quantityOnHand",
+                  pv.price_override AS "priceOverride",
+                  p.name AS "productName",
+                  p.base_price AS "basePrice"
+                FROM workspace_variant_stocks wvs
+                JOIN product_variants pv ON pv.id = wvs.variant_id
+                JOIN products p ON p.id = pv.product_id
+                WHERE wvs.workspace_id = ${workspace.id} AND pv.id = ${item.variantId}
+                FOR UPDATE
+              `
+            : await tx`
+                SELECT
+                  pv.id,
+                  pv.sku,
+                  pv.size,
+                  pv.color,
+                  pv.quantity_on_hand AS "quantityOnHand",
+                  pv.price_override AS "priceOverride",
+                  p.name AS "productName",
+                  p.base_price AS "basePrice"
+                FROM product_variants pv
+                JOIN products p ON p.id = pv.product_id
+                WHERE pv.id = ${item.variantId}
+                FOR UPDATE
+              `;
 
         dbVariants.push(rows[0] || null);
       }
@@ -536,7 +825,7 @@ export async function finalizeSaleRecord(payload, actorUserId) {
           ${saleId},
           ${receiptNumber},
           ${actorUserId},
-          ${workspaceId},
+          ${workspace.id},
           ${subtotal},
           ${discount},
           ${subtotal - discount},
@@ -568,11 +857,21 @@ export async function finalizeSaleRecord(payload, actorUserId) {
           )
         `;
 
-        await tx`
-          UPDATE product_variants
-          SET quantity_on_hand = quantity_on_hand - ${item.qty}
-          WHERE id = ${item.variantId}
-        `;
+        if (workspace.type === "event") {
+          await tx`
+            UPDATE workspace_variant_stocks
+            SET
+              quantity_on_hand = quantity_on_hand - ${item.qty},
+              updated_at = ${createdAt}
+            WHERE workspace_id = ${workspace.id} AND variant_id = ${item.variantId}
+          `;
+        } else {
+          await tx`
+            UPDATE product_variants
+            SET quantity_on_hand = quantity_on_hand - ${item.qty}
+            WHERE id = ${item.variantId}
+          `;
+        }
 
         await tx`
           INSERT INTO inventory_movements
@@ -580,7 +879,7 @@ export async function finalizeSaleRecord(payload, actorUserId) {
           VALUES (
             ${createId("mov")},
             ${item.variantId},
-            ${workspaceId},
+            ${workspace.id},
             ${"sale"},
             ${item.qty * -1},
             ${`Sale ${receiptNumber}`},
@@ -605,7 +904,7 @@ export async function finalizeSaleRecord(payload, actorUserId) {
         `;
       }
 
-      return { ok: true, saleId, workspaceId };
+      return { ok: true, saleId, workspaceId: workspace.id };
     });
 
     return result;

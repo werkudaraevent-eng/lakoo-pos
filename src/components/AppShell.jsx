@@ -2,6 +2,8 @@ import { NavLink, useLocation } from "react-router-dom";
 
 import { useAuth } from "../context/AuthContext";
 import { getShellRouteMeta, getShellTone } from "../features/shell/shellLayout";
+import { AppIcon } from "../features/ui/AppIcon";
+import { getNavigationIconName } from "../features/ui/iconMaps";
 import { WorkspaceSwitcher } from "../features/workspaces/components/WorkspaceSwitcher";
 
 const navigationGroups = [
@@ -82,9 +84,32 @@ const navigationGroups = [
   },
 ];
 
+function matchesPath(pathname, target) {
+  return pathname === target || pathname.startsWith(`${target}/`);
+}
+
+function getNavigationContext(pathname, groups) {
+  for (const group of groups) {
+    const item = group.items.find((entry) => matchesPath(pathname, entry.to));
+
+    if (item) {
+      return {
+        groupLabel: group.label,
+        itemLabel: item.label,
+      };
+    }
+  }
+
+  return {
+    groupLabel: "Workspace",
+    itemLabel: "Overview",
+  };
+}
+
 export function AppShell({ children }) {
   const { user, logout } = useAuth();
   const location = useLocation();
+  const isDashboardRoute = location.pathname.startsWith("/dashboard");
   const allowedGroups = navigationGroups
     .map((group) => ({
       ...group,
@@ -93,69 +118,69 @@ export function AppShell({ children }) {
     .filter((group) => group.items.length > 0);
   const currentRoute = getShellRouteMeta(location.pathname);
   const shellTone = getShellTone(location.pathname);
+  const navigationContext = getNavigationContext(location.pathname, allowedGroups);
 
   return (
-    <div className={`app-shell app-shell-${shellTone}`}>
-      <aside className="sidebar sidebar-executive-shell">
-        <div className="brand-block brand-block-compact brand-block-executive">
-          <div className="brand-badge brand-badge-neutral">H</div>
-          <div className="brand-copy">
-            <p className="eyebrow">Harness POS</p>
-            <h1>Retail OS</h1>
+    <div className={`app-shell app-shell-${shellTone} dashboard-shell`}>
+      <aside className="sidebar dashboard-sidebar">
+        <div className="sidebar-top">
+          <div className="brand">
+            <div className="brand-logo" aria-hidden="true">
+              <AppIcon name="ShoppingBag" size={18} strokeWidth={2} />
+            </div>
+            <div className="brand-text">
+              <span className="brand-subtitle">Harness POS</span>
+              <span className="brand-title">Retail OS</span>
+            </div>
           </div>
-        </div>
 
-        <WorkspaceSwitcher />
-
-        <nav className="sidebar-nav sidebar-nav-grouped" aria-label="Primary">
-          {allowedGroups.map((group) => (
-            <section className="sidebar-group" key={group.label}>
-              <p className="sidebar-section-title">{group.label}</p>
-              <div className="sidebar-group-links">
+          <nav aria-label="Primary">
+            {allowedGroups.map((group) => (
+              <section className="nav-section" key={group.label}>
+                <h3 className="nav-heading">{group.label}</h3>
                 {group.items.map((item) => (
                   <NavLink
-                    className={({ isActive }) => `sidebar-link sidebar-link-executive${isActive ? " is-active" : ""}`}
+                    className={({ isActive }) => `nav-item${isActive ? " active" : ""}`}
                     key={item.to}
                     to={item.to}
                     end={item.to !== "/sales"}
                   >
-                    <span className="sidebar-link-label">{item.label}</span>
-                    <span className="sidebar-link-support">{item.description}</span>
+                    <span className="nav-icon" aria-hidden="true">
+                      <AppIcon name={getNavigationIconName(item.label)} size={18} strokeWidth={1.9} />
+                    </span>
+                    <span className="nav-label">{item.label}</span>
                   </NavLink>
                 ))}
-              </div>
-            </section>
-          ))}
-        </nav>
+              </section>
+            ))}
+          </nav>
+        </div>
 
-        <div className="sidebar-user sidebar-user-card sidebar-user-executive">
-          <div className="sidebar-user-head">
-            <div>
-              <strong>{user.name}</strong>
-              <p className="muted-text">@{user.username}</p>
-            </div>
-            <span className="role-pill">{user.role}</span>
-          </div>
-          <button className="ghost-button" onClick={logout} type="button">
+        <div className="sidebar-footer">
+          <WorkspaceSwitcher variant="banani" />
+          <button className="sidebar-logout-link" onClick={logout} type="button">
             Logout
           </button>
         </div>
       </aside>
 
-      <div className="main-shell">
-        <header className="topbar-app topbar-app-executive">
-          <div className="shell-heading">
-            <p className="eyebrow">{currentRoute.eyebrow}</p>
-            <h2>{currentRoute.title}</h2>
-            <p className="shell-subtitle">{currentRoute.description}</p>
+      <div className="main-content">
+        <header className="topbar">
+          <div className="breadcrumb">
+            <span className="bc-link">{navigationContext.groupLabel}</span>
+            <span className="bc-sep">/</span>
+            <span className="bc-current">{navigationContext.itemLabel || currentRoute.eyebrow}</span>
           </div>
-          <div className="topbar-context topbar-context-executive">
-            <span className="role-pill">{user.role}</span>
-            <p className="muted-text">Signed in as {user.username}</p>
+
+          <div className="topbar-actions">
+            <div className="user-profile">
+              <span>Signed in as {user.username}</span>
+              <span className="user-badge">{user.role}</span>
+            </div>
           </div>
         </header>
 
-        <div className="page-shell">{children}</div>
+        <div className={isDashboardRoute ? "dashboard-page-frame" : "page-shell"}>{children}</div>
       </div>
     </div>
   );

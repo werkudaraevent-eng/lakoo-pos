@@ -2,257 +2,190 @@ import { useMemo } from "react";
 import { Link } from "react-router-dom";
 
 import { usePosData } from "../context/PosDataContext";
-import { useWorkspace } from "../context/WorkspaceContext";
-import { buildDashboardCommandStrip, buildDashboardHeroMetrics } from "../features/dashboard/dashboardWorkspace";
-import { buildDashboardSummary, buildEventProgress } from "../features/events/eventHelpers";
+import { buildDashboardCollections } from "../features/dashboard/dashboardData";
+import { buildDashboardKpiCards } from "../features/dashboard/dashboardWorkspace";
+import { buildDashboardSummary } from "../features/events/eventHelpers";
+import { AppIcon } from "../features/ui/AppIcon";
+import { getDashboardKpiIconName } from "../features/ui/iconMaps";
 import { formatCurrency, formatDate } from "../utils/formatters";
 
-function formatWorkspaceType(type) {
-  if (type === "event") {
-    return "Event workspace";
-  }
+const PLACEHOLDER_CHART_BARS = [
+  { label: "10 AM", height: 16 },
+  { label: "11 AM", height: 32 },
+  { label: "12 PM", height: 58 },
+  { label: "1 PM", height: 92 },
+  { label: "2 PM", height: 72 },
+  { label: "3 PM", height: 40 },
+  { label: "4 PM", height: 64 },
+  { label: "5 PM", height: 82 },
+];
 
-  if (type === "store") {
-    return "Store workspace";
-  }
+const PLACEHOLDER_ITEMS = Array.from({ length: 4 }, (_, index) => ({
+  id: `placeholder-item-${index + 1}`,
+}));
 
-  return "Workspace";
-}
-
-function formatLabel(value) {
-  if (!value) {
-    return "";
-  }
-
-  return value.charAt(0).toUpperCase() + value.slice(1);
-}
-
-function sortByNewest(items) {
-  return [...items].sort((left, right) => new Date(right.createdAt) - new Date(left.createdAt));
-}
-
-function buildTopItems(sales) {
-  const tally = new Map();
-
-  sales.forEach((sale) => {
-    (Array.isArray(sale.items) ? sale.items : []).forEach((item) => {
-      tally.set(item.productNameSnapshot, (tally.get(item.productNameSnapshot) || 0) + item.qty);
-    });
-  });
-
-  return [...tally.entries()].sort((left, right) => right[1] - left[1]).slice(0, 4);
-}
-
-function buildLowStockItems(variants) {
-  return [...variants]
-    .filter((item) => item.quantityOnHand <= item.lowStockThreshold)
-    .sort((left, right) => left.quantityOnHand - right.quantityOnHand)
-    .slice(0, 5);
-}
+const PLACEHOLDER_TRANSACTIONS = Array.from({ length: 4 }, (_, index) => ({
+  id: `placeholder-tx-${index + 1}`,
+}));
 
 export function DashboardPage() {
-  const { sales, variants, inventoryMovements, workspaces, loading, loadError } = usePosData();
-  const { activeWorkspaceId } = useWorkspace();
-  const activeWorkspace = workspaces.find((workspace) => workspace.id === activeWorkspaceId) ?? null;
+  const { sales, loading, loadError } = usePosData();
   const summary = buildDashboardSummary({
     sales,
-    variants,
     now: new Date().toISOString(),
   });
-  const eventProgress = buildEventProgress({
-    workspace: activeWorkspace,
-    now: new Date().toISOString(),
-  });
-  const commandStrip = useMemo(() => buildDashboardCommandStrip(activeWorkspace), [activeWorkspace]);
-  const heroMetrics = useMemo(() => buildDashboardHeroMetrics(summary), [summary]);
-
-  const workspaceStatus = formatLabel(activeWorkspace?.eventStatus ?? activeWorkspace?.status);
-  const topItems = buildTopItems(sales);
-  const lowStockItems = buildLowStockItems(variants);
-  const recentSales = sortByNewest(sales).slice(0, 5);
-  const recentMovements = sortByNewest(inventoryMovements).slice(0, 5);
+  const kpiCards = useMemo(() => buildDashboardKpiCards(summary), [summary]);
+  const { todaySales, topItems, recentSales, chartBars } = useMemo(
+    () =>
+      buildDashboardCollections({
+        sales,
+        now: new Date().toISOString(),
+      }),
+    [sales]
+  );
 
   return (
-    <div className="page-stack dashboard-workspace dashboard-workspace-executive">
-      <section className="page-header-card dashboard-header dashboard-header-executive">
-        <div className="dashboard-header-copy">
-          <p className="eyebrow">Dashboard</p>
-          <h1>{activeWorkspace?.name ? `${activeWorkspace.name} performance` : "Executive retail overview"}</h1>
-          <p className="muted-text">
-            Revenue, product momentum, and workspace health in one sales-first surface.
-          </p>
-        </div>
-
-        <div className="dashboard-header-meta">
-          {activeWorkspace?.type ? <span className="badge-soft">{formatWorkspaceType(activeWorkspace.type)}</span> : null}
-          {workspaceStatus ? <span className="badge-soft">{workspaceStatus}</span> : null}
-        </div>
+    <div className="dashboard-container">
+      <section className="dashboard-header">
+        <h1 className="page-title">Dashboard</h1>
+        <button className="btn-outline" type="button">
+          Today
+        </button>
       </section>
 
       {loading ? <p className="info-text">Loading dashboard data...</p> : null}
       {loadError ? <p className="error-text">{loadError}</p> : null}
 
-      <section className="panel-card dashboard-command-strip dashboard-command-strip-executive">
-        {commandStrip.map((command) => (
-          <Link
-            className={`dashboard-command${command.tone ? ` dashboard-command-${command.tone}` : ""}`}
-            key={command.label}
-            to={command.href}
-          >
-            <span>{command.label}</span>
-          </Link>
+      <section className="kpi-grid">
+        {kpiCards.map((item) => (
+          <article className="kpi-card" key={item.label}>
+            <div className="kpi-title">
+              <span>{item.label}</span>
+              <div className="kpi-icon" aria-hidden="true">
+                <AppIcon name={getDashboardKpiIconName(item.label)} size={16} strokeWidth={1.9} />
+              </div>
+            </div>
+            <div className="kpi-value">{item.kind === "currency" ? formatCurrency(item.value) : item.value}</div>
+            <div
+              className={`kpi-trend ${item.tone === "down" ? "trend-down" : "trend-up"}${
+                item.value === 0 ? " trend-neutral" : ""
+              }`}
+            >
+              <span>{item.value === 0 ? "No movement yet today" : item.meta}</span>
+            </div>
+          </article>
         ))}
       </section>
 
-      <section className="dashboard-hero-grid">
-        <article className="panel-card dashboard-hero-primary">
-          <span className="stat-label">{heroMetrics.primary.label}</span>
-          <strong>{formatCurrency(heroMetrics.primary.value)}</strong>
-          <p className="summary-band-meta">{heroMetrics.primary.meta}</p>
+      <section className="dashboard-row">
+        <article className="panel">
+          <div className="panel-header">
+            <span className="panel-title">Sales Overview</span>
+            <Link className="panel-action" to="/reports">
+              View Report
+            </Link>
+          </div>
+
+          <div className="panel-body">
+            <div className={`chart-container${todaySales.length === 0 ? " is-placeholder" : ""}`}>
+              {(todaySales.length > 0 ? chartBars : PLACEHOLDER_CHART_BARS).map((bar) => (
+                <div className="chart-bar-group" key={bar.label}>
+                  <div className="chart-bar-wrapper">
+                    <div className="chart-bar" style={{ height: `${bar.height}%` }} />
+                  </div>
+                  <span className="chart-label">{bar.label}</span>
+                </div>
+              ))}
+            </div>
+            {todaySales.length === 0 ? (
+              <div className="panel-empty-copy">
+                <strong>No completed sales for today yet.</strong>
+                <span>Dashboard panels will populate after the first finalized transaction.</span>
+              </div>
+            ) : null}
+          </div>
         </article>
 
-        <div className="dashboard-hero-secondary">
-          {heroMetrics.secondary.map((item) => (
-            <article className="panel-card dashboard-hero-stat" key={item.label}>
-              <span className="stat-label">{item.label}</span>
-              <strong>{item.kind === "currency" ? formatCurrency(item.value) : item.value}</strong>
-              <p className="summary-band-meta">{item.meta}</p>
-            </article>
-          ))}
+        <article className="panel">
+          <div className="panel-header">
+            <span className="panel-title">Top Items</span>
+            <Link className="panel-action" to="/sales">
+              View All
+            </Link>
+          </div>
+
+          <div className="panel-body">
+            <div className="item-list">
+              {topItems.length > 0
+                ? topItems.map((item, index) => (
+                    <div className="list-item" key={item.name}>
+                      <span className="item-index">{index + 1}</span>
+                      <div className="item-img">
+                        <span>{item.name.charAt(0).toUpperCase()}</span>
+                      </div>
+                      <div className="item-details">
+                        <span className="item-name">{item.name}</span>
+                        <span className="item-metric">{item.qty} sold</span>
+                      </div>
+                      <span className="item-value">{formatCurrency(item.revenue)}</span>
+                    </div>
+                  ))
+                : PLACEHOLDER_ITEMS.map((item, index) => (
+                    <div className="list-item is-placeholder" key={item.id}>
+                      <span className="item-index">{index + 1}</span>
+                      <div className="item-img" />
+                      <div className="item-details">
+                        <span className="item-name">No item data yet</span>
+                        <span className="item-metric">Waiting for sales</span>
+                      </div>
+                      <span className="item-value">Rp 0</span>
+                    </div>
+                  ))}
+            </div>
+          </div>
+        </article>
+      </section>
+
+      <section className="panel">
+        <div className="panel-header">
+          <span className="panel-title">Recent Transactions</span>
+          <Link className="panel-action" to="/sales">
+            View All
+          </Link>
+        </div>
+
+        <div className="panel-body panel-body-transactions">
+          <div className="tx-list">
+            {recentSales.length > 0
+              ? recentSales.map((sale) => (
+                  <div className="tx-item" key={sale.id}>
+                    <div className="tx-info">
+                      <span className="tx-id">{sale.receiptNumber}</span>
+                      <span className="tx-time">
+                        Today, {formatDate(sale.createdAt)} / {sale.customerName || sale.cashierUser || "Customer"}
+                      </span>
+                    </div>
+                    <div className="tx-amount-group">
+                      <span className="tx-amount">{formatCurrency(sale.grandTotal)}</span>
+                      <span className="status-badge status-success">Completed</span>
+                    </div>
+                  </div>
+                ))
+              : PLACEHOLDER_TRANSACTIONS.map((sale) => (
+                  <div className="tx-item is-placeholder" key={sale.id}>
+                    <div className="tx-info">
+                      <span className="tx-id">No transaction yet</span>
+                      <span className="tx-time">Today's completed sales will appear here.</span>
+                    </div>
+                    <div className="tx-amount-group">
+                      <span className="tx-amount">Rp 0</span>
+                      <span className="status-badge status-success">Pending</span>
+                    </div>
+                  </div>
+                ))}
+          </div>
         </div>
       </section>
-
-      <section className="content-grid dashboard-layout dashboard-layout-executive">
-        <article className="panel-card dashboard-panel dashboard-panel-feature">
-          <div className="panel-head">
-            <h2>Top products</h2>
-            <span className="badge-soft">{topItems.length} best sellers</span>
-          </div>
-
-          <div className="stack-list dashboard-stack-list">
-            {topItems.length > 0 ? (
-              topItems.map(([name, qty]) => (
-                <div className="list-row dashboard-list-row" key={name}>
-                  <div>
-                    <strong>{name}</strong>
-                    <p className="muted-text">Units sold across completed sales</p>
-                  </div>
-                  <span className="pill-strong">{qty}</span>
-                </div>
-              ))
-            ) : (
-              <p className="stack-empty">Top products will appear after the first completed checkout.</p>
-            )}
-          </div>
-        </article>
-
-        <article className="panel-card dashboard-panel">
-          <div className="panel-head">
-            <h2>Stock watchlist</h2>
-            <span className={`badge-soft${summary.lowStock > 0 ? " warning" : ""}`}>
-              {summary.lowStock > 0 ? "Needs action" : "Stable"}
-            </span>
-          </div>
-
-          <div className="stack-list dashboard-stack-list">
-            {lowStockItems.length > 0 ? (
-              lowStockItems.map((item) => (
-                <div className="list-row dashboard-list-row" key={item.id}>
-                  <div>
-                    <strong>{item.productName}</strong>
-                    <p className="muted-text">
-                      {item.size} / {item.color} / {item.sku}
-                    </p>
-                  </div>
-                  <span className="pill-warning">{item.quantityOnHand} pcs</span>
-                </div>
-              ))
-            ) : (
-              <p className="stack-empty">No urgent stock pressure in this workspace.</p>
-            )}
-          </div>
-        </article>
-      </section>
-
-      <section className="content-grid dashboard-layout dashboard-layout-tight dashboard-layout-executive-secondary">
-        <article className="panel-card dashboard-panel">
-          <div className="panel-head">
-            <h2>Recent sales</h2>
-            <span className="badge-soft">{recentSales.length} receipts</span>
-          </div>
-
-          <div className="table-list dashboard-table-list">
-            {recentSales.length > 0 ? (
-              recentSales.map((sale) => (
-                <div className="table-row dashboard-table-row" key={sale.id}>
-                  <div>
-                    <strong>{sale.receiptNumber}</strong>
-                    <p className="muted-text">{sale.cashierUser} / {formatDate(sale.createdAt)}</p>
-                  </div>
-                  <span>{formatCurrency(sale.grandTotal)}</span>
-                </div>
-              ))
-            ) : (
-              <p className="stack-empty">No finalized sales yet for this workspace.</p>
-            )}
-          </div>
-        </article>
-
-        <article className="panel-card dashboard-panel">
-          <div className="panel-head">
-            <h2>Workspace activity</h2>
-            <span className="badge-soft">{recentMovements.length} updates</span>
-          </div>
-
-          <div className="table-list dashboard-table-list">
-            {recentMovements.length > 0 ? (
-              recentMovements.map((movement) => (
-                <div className="table-row dashboard-table-row" key={movement.id}>
-                  <div>
-                    <strong>{movement.type}</strong>
-                    <p className="muted-text">{movement.actorUser} / {formatDate(movement.createdAt)}</p>
-                  </div>
-                  <span className={movement.qtyDelta < 0 ? "text-danger" : "text-success"}>
-                    {movement.qtyDelta > 0 ? "+" : ""}
-                    {movement.qtyDelta}
-                  </span>
-                </div>
-              ))
-            ) : (
-              <p className="stack-empty">Inventory updates will appear once activity starts.</p>
-            )}
-          </div>
-        </article>
-      </section>
-
-      {activeWorkspace?.type === "event" && eventProgress ? (
-        <section className="panel-card dashboard-event-strip dashboard-event-strip-executive">
-          <div className="dashboard-event-copy">
-            <p className="eyebrow">Event progress</p>
-            <h2>{activeWorkspace.name}</h2>
-            <p className="muted-text">Selling window progress for the active event workspace.</p>
-          </div>
-
-          <div className="dashboard-event-track" aria-hidden="true">
-            <span className="event-progress-fill" style={{ width: `${eventProgress.progressPercent}%` }} />
-          </div>
-
-          <div className="dashboard-event-meta">
-            <div className="summary-row">
-              <span className="muted-text">Phase</span>
-              <strong>{eventProgress.phase}</strong>
-            </div>
-            <div className="summary-row">
-              <span className="muted-text">Progress</span>
-              <strong>{eventProgress.progressPercent}%</strong>
-            </div>
-            <div className="summary-row total">
-              <span className="muted-text">Remaining</span>
-              <strong>{eventProgress.remainingHours}h</strong>
-            </div>
-          </div>
-        </section>
-      ) : null}
     </div>
   );
 }

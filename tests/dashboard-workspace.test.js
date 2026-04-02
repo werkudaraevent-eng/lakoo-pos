@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 
 import {
   buildDashboardCommandStrip,
-  buildDashboardHeroMetrics,
+  buildDashboardKpiCards,
 } from "../src/features/dashboard/dashboardWorkspace.js";
 
 test("buildDashboardCommandStrip returns event-aware actions for active workspaces", () => {
@@ -17,64 +17,67 @@ test("buildDashboardCommandStrip returns event-aware actions for active workspac
   ]);
 });
 
-test("buildDashboardHeroMetrics returns revenue-led executive metrics", () => {
-  const result = buildDashboardHeroMetrics({
+test("buildDashboardKpiCards returns the Banani-style KPI cards", () => {
+  const result = buildDashboardKpiCards({
     revenue: 900000,
     transactions: 3,
-    discountTotal: 60000,
+    itemsSold: 7,
   });
 
-  assert.deepEqual(result, {
-    primary: {
-      label: "Revenue today",
+  assert.deepEqual(result, [
+    {
+      label: "Gross revenue",
       value: 900000,
       kind: "currency",
+      tone: "up",
       meta: "3 transactions today",
     },
-    secondary: [
-      {
-        label: "Transactions",
-        value: 3,
-        kind: "count",
-        meta: "Completed sales today.",
-      },
-      {
-        label: "Average order value",
-        value: 300000,
-        kind: "currency",
-        meta: "Average basket across finalized sales.",
-      },
-      {
-        label: "Discount total",
-        value: 60000,
-        kind: "currency",
-        meta: "Applied across finalized sales today.",
-      },
-    ],
-  });
+    {
+      label: "Transactions",
+      value: 3,
+      kind: "count",
+      tone: "up",
+      meta: "Completed sales today.",
+    },
+    {
+      label: "Average order value",
+      value: 300000,
+      kind: "currency",
+      tone: "down",
+      meta: "Average basket size.",
+    },
+    {
+      label: "Items sold",
+      value: 7,
+      kind: "count",
+      tone: "up",
+      meta: "Units sold today.",
+    },
+  ]);
 });
 
-test("buildDashboardHeroMetrics falls back to zero average order value when there are no transactions", () => {
-  const result = buildDashboardHeroMetrics({
+test("buildDashboardKpiCards falls back to zero average order value when there are no transactions", () => {
+  const result = buildDashboardKpiCards({
     revenue: 0,
     transactions: 0,
-    discountTotal: 0,
+    itemsSold: 0,
   });
 
-  assert.equal(result.secondary[1].value, 0);
+  assert.equal(result[2].value, 0);
 });
 
-test("buildDashboardHeroMetrics keeps revenue primary even when discount total is zero", () => {
-  const result = buildDashboardHeroMetrics({
+test("buildDashboardKpiCards keeps gross revenue first when there is one transaction", () => {
+  const result = buildDashboardKpiCards({
     revenue: 250000,
     transactions: 1,
-    discountTotal: 0,
+    itemsSold: 2,
   });
 
-  assert.deepEqual(result.primary, {
-    label: "Revenue today",
+  assert.deepEqual(result[0], {
+    label: "Gross revenue",
     value: 250000,
     kind: "currency",
+    tone: "up",
     meta: "1 transactions today",
   });
 });

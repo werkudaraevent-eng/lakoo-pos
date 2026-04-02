@@ -117,3 +117,160 @@ test("POST /api/inventory/movements uses the request workspace for writes and bo
   assert.equal(capturedPayload?.workspaceId, "event-gi");
   assert.equal(bootstrapWorkspaceId, "event-gi");
 });
+
+test("POST /api/events creates a draft event and returns refreshed bootstrap data", async () => {
+  let capturedPayload = null;
+  let capturedActorId = null;
+
+  const app = createApp({
+    authMiddleware: createAuthMiddleware({ id: "u-admin", role: "admin", isActive: true }),
+    requireRoleMiddleware: () => (_req, _res, next) => next(),
+    createEventRecordFn: async (payload, actorUserId) => {
+      capturedPayload = payload;
+      capturedActorId = actorUserId;
+      return {
+        ok: true,
+        eventId: "workspace-event-2",
+      };
+    },
+    getBootstrapFn: async () => ({
+      workspaces: [{ id: "workspace-event-2", name: "Bazar PIK", status: "draft" }],
+    }),
+  });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/events`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        name: "Bazar PIK",
+        code: "PIK-APR",
+        locationLabel: "PIK Avenue",
+        startsAt: "2026-04-05T08:00:00.000Z",
+        endsAt: "2026-04-07T15:00:00.000Z",
+        stockMode: "allocate",
+        assignedUserIds: ["u-manager", "u-cashier"],
+      }),
+    });
+
+    assert.equal(response.status, 200);
+
+    const body = await response.json();
+    assert.equal(body.ok, true);
+    assert.equal(body.eventId, "workspace-event-2");
+    assert.deepEqual(body.data.workspaces, [{ id: "workspace-event-2", name: "Bazar PIK", status: "draft" }]);
+  });
+
+  assert.deepEqual(capturedPayload, {
+    name: "Bazar PIK",
+    code: "PIK-APR",
+    locationLabel: "PIK Avenue",
+    startsAt: "2026-04-05T08:00:00.000Z",
+    endsAt: "2026-04-07T15:00:00.000Z",
+    stockMode: "allocate",
+    assignedUserIds: ["u-manager", "u-cashier"],
+  });
+  assert.equal(capturedActorId, "u-admin");
+});
+
+test("PATCH /api/events/:id/status updates event status and returns refreshed bootstrap data", async () => {
+  let capturedEventId = null;
+  let capturedPayload = null;
+  let capturedActorId = null;
+
+  const app = createApp({
+    authMiddleware: createAuthMiddleware({ id: "u-manager", role: "manager", isActive: true }),
+    requireRoleMiddleware: () => (_req, _res, next) => next(),
+    updateEventStatusRecordFn: async (eventId, payload, actorUserId) => {
+      capturedEventId = eventId;
+      capturedPayload = payload;
+      capturedActorId = actorUserId;
+      return {
+        ok: true,
+        eventId,
+        nextStatus: payload.nextStatus,
+      };
+    },
+    getBootstrapFn: async () => ({
+      workspaces: [{ id: "workspace-event-2", status: "active" }],
+    }),
+  });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/events/workspace-event-2/status`, {
+      method: "PATCH",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        nextStatus: "active",
+      }),
+    });
+
+    assert.equal(response.status, 200);
+
+    const body = await response.json();
+    assert.equal(body.ok, true);
+    assert.equal(body.eventId, "workspace-event-2");
+    assert.equal(body.nextStatus, "active");
+    assert.deepEqual(body.data.workspaces, [{ id: "workspace-event-2", status: "active" }]);
+  });
+
+  assert.equal(capturedEventId, "workspace-event-2");
+  assert.deepEqual(capturedPayload, { nextStatus: "active" });
+  assert.equal(capturedActorId, "u-manager");
+});
+
+test("POST /api/events/:id/close validates closing review and returns refreshed bootstrap data", async () => {
+  let capturedEventId = null;
+  let capturedPayload = null;
+  let capturedActorId = null;
+
+  const app = createApp({
+    authMiddleware: createAuthMiddleware({ id: "u-manager", role: "manager", isActive: true }),
+    requireRoleMiddleware: () => (_req, _res, next) => next(),
+    closeEventRecordFn: async (eventId, payload, actorUserId) => {
+      capturedEventId = eventId;
+      capturedPayload = payload;
+      capturedActorId = actorUserId;
+      return {
+        ok: true,
+        eventId,
+      };
+    },
+    getBootstrapFn: async () => ({
+      workspaces: [{ id: "workspace-event-2", status: "closed" }],
+    }),
+  });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/events/workspace-event-2/close`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        salesReviewed: true,
+        stockReviewed: true,
+        paymentReviewed: true,
+      }),
+    });
+
+    assert.equal(response.status, 200);
+
+    const body = await response.json();
+    assert.equal(body.ok, true);
+    assert.equal(body.eventId, "workspace-event-2");
+    assert.deepEqual(body.data.workspaces, [{ id: "workspace-event-2", status: "closed" }]);
+  });
+
+  assert.equal(capturedEventId, "workspace-event-2");
+  assert.deepEqual(capturedPayload, {
+    salesReviewed: true,
+    stockReviewed: true,
+    paymentReviewed: true,
+  });
+  assert.equal(capturedActorId, "u-manager");
+});
