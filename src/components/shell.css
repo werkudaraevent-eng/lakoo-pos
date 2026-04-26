@@ -250,7 +250,9 @@
 .shell-main {
   overflow-y: auto;
   background: var(--bg);
-  padding: 32px;
+  padding: 0 0 0 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .shell-main-flush {
@@ -264,6 +266,20 @@
   flex-direction: column;
   gap: 24px;
   max-width: 1200px;
+  padding: 24px 32px 48px;
+}
+
+/* All banani page containers get padding */
+.dashboard-container,
+.sales-banani-page,
+.catalog-banani-page,
+.inventory-banani-page,
+.events-banani-page,
+.promotions-banani-page,
+.reports-banani-page {
+  padding-left: 32px;
+  padding-right: 32px;
+  padding-bottom: 48px;
 }
 
 .page-header-card {
@@ -433,12 +449,10 @@ tr:hover td {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding: 20px 32px;
-  background: rgba(255, 255, 255, 0.92);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  padding: 16px 32px;
+  background: var(--panel-strong);
   border-bottom: 1px solid var(--line);
-  margin: -32px -32px 24px -32px;
+  flex-shrink: 0;
 }
 
 .sticky-header-left {
@@ -467,6 +481,11 @@ tr:hover td {
   align-items: center;
   gap: 10px;
   flex-shrink: 0;
+}
+
+/* Content padding below sticky header */
+.page-content {
+  padding: 24px 32px 48px;
 }
 
 /* Action buttons in header */
@@ -517,7 +536,7 @@ tr:hover td {
   }
 
   .shell-main {
-    padding: 20px 16px;
+    padding: 0;
   }
 
   .dual-fields {
