@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
+import { useAuth } from "../context/AuthContext";
 import { usePosData } from "../context/PosDataContext";
 import { formatCurrency } from "../utils/formatters";
 import "../features/dashboard/dashboard.css";
@@ -14,7 +15,8 @@ const statusMeta = {
 
 export function EventsPage() {
   const navigate = useNavigate();
-  const { workspaces, products, sales, loading, loadError, createEvent } = usePosData();
+  const { user } = useAuth();
+  const { workspaces, products, sales, loading, loadError, createEvent, adjustInventory } = usePosData();
   const [view, setView] = useState("list");
   const [selected, setSelected] = useState(null);
   const [stockTab, setStockTab] = useState("list");
@@ -298,11 +300,31 @@ export function EventsPage() {
               </div>
               <div style={{ display: "flex", gap: 8 }}>
                 <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setConfirmModal(false)}>Batal</button>
-                <button className="btn btn-primary" style={{ flex: 1 }} onClick={() => {
-                  setSavedAllocations({ ...allocations });
-                  setConfirmModal(false);
+                <button className="btn btn-primary" style={{ flex: 1 }} onClick={async () => {
                   setSaving(true);
-                  setTimeout(() => setSaving(false), 800);
+                  setConfirmModal(false);
+                  try {
+                    // For each product with allocation, adjust inventory
+                    for (const [productId, qty] of Object.entries(allocations)) {
+                      if (qty <= 0) continue;
+                      const p = allProducts.find((x) => x.id === productId);
+                      if (!p || !p.variants?.length) continue;
+                      // Allocate from first variant (simplified)
+                      const variant = p.variants[0];
+                      await adjustInventory({
+                        variantId: variant.id,
+                        mode: "adjustment",
+                        quantity: qty,
+                        note: `Alokasi ke event: ${ev.name}`,
+                        actor: user,
+                      });
+                    }
+                    setSavedAllocations({ ...allocations });
+                  } catch (err) {
+                    console.error("Save allocation error:", err);
+                  } finally {
+                    setSaving(false);
+                  }
                 }}>Ya, Simpan</button>
               </div>
             </div>
