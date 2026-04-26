@@ -41,7 +41,7 @@ export function LatestReceipt({ sale }) {
             <div>
               <strong>{item.productNameSnapshot}</strong>
               <p className="muted-text">
-                {item.sizeSnapshot}/{item.colorSnapshot} - {item.skuSnapshot}
+                {item.attribute1Snapshot}/{item.attribute2Snapshot} - {item.skuSnapshot}
               </p>
             </div>
             <div className="checkout-receipt-item-meta">

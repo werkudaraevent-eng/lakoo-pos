@@ -25,7 +25,7 @@ export function ProductGrid({ variants, onAdd }) {
           <div className="checkout-product-copy">
             <strong>{variant.productName}</strong>
             <p className="muted-text">
-              {variant.size} / {variant.color}
+              {variant.attribute1Value} / {variant.attribute2Value}
             </p>
             <p className="muted-text">{variant.sku}</p>
           </div>

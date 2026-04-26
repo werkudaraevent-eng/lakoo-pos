@@ -8,8 +8,14 @@ export function SettingsPage() {
     storeName: "",
     storeCode: "",
     address: "",
+    taxRate: 0,
+    attribute1Label: "Size",
+    attribute2Label: "Color",
     cashEnabled: true,
     cardEnabled: true,
+    qrisEnabled: false,
+    transferEnabled: false,
+    ewalletEnabled: false,
   });
   const [message, setMessage] = useState("");
 
@@ -18,21 +24,35 @@ export function SettingsPage() {
       storeName: settings.storeName,
       storeCode: settings.storeCode,
       address: settings.address,
+      taxRate: settings.taxRate ?? 0,
+      attribute1Label: settings.attribute1Label ?? "Size",
+      attribute2Label: settings.attribute2Label ?? "Color",
       cashEnabled: settings.paymentMethods.includes("cash"),
       cardEnabled: settings.paymentMethods.includes("card"),
+      qrisEnabled: settings.paymentMethods.includes("qris"),
+      transferEnabled: settings.paymentMethods.includes("transfer"),
+      ewalletEnabled: settings.paymentMethods.includes("ewallet"),
     });
   }, [settings]);
 
   async function handleSubmit(event) {
     event.preventDefault();
 
+    const paymentMethods = [];
+    if (form.cashEnabled) paymentMethods.push("cash");
+    if (form.cardEnabled) paymentMethods.push("card");
+    if (form.qrisEnabled) paymentMethods.push("qris");
+    if (form.transferEnabled) paymentMethods.push("transfer");
+    if (form.ewalletEnabled) paymentMethods.push("ewallet");
+
     await updateSettings({
       storeName: form.storeName,
       storeCode: form.storeCode,
       address: form.address,
-      paymentMethods: ["cash", "card"].filter((method) =>
-        method === "cash" ? form.cashEnabled : form.cardEnabled
-      ),
+      taxRate: Number(form.taxRate) || 0,
+      attribute1Label: form.attribute1Label || "Size",
+      attribute2Label: form.attribute2Label || "Color",
+      paymentMethods,
     });
 
     setMessage("Store settings updated.");
@@ -83,6 +103,33 @@ export function SettingsPage() {
             />
           </label>
 
+          <label className="field">
+            <span>Tax rate (%)</span>
+            <input
+              type="number"
+              min="0"
+              max="100"
+              value={form.taxRate}
+              onChange={(event) => setForm((current) => ({ ...current, taxRate: event.target.value }))}
+            />
+          </label>
+
+          <label className="field">
+            <span>Variant label 1 (e.g. Size, Weight, Volume)</span>
+            <input
+              value={form.attribute1Label}
+              onChange={(event) => setForm((current) => ({ ...current, attribute1Label: event.target.value }))}
+            />
+          </label>
+
+          <label className="field">
+            <span>Variant label 2 (e.g. Color, Flavor, Type)</span>
+            <input
+              value={form.attribute2Label}
+              onChange={(event) => setForm((current) => ({ ...current, attribute2Label: event.target.value }))}
+            />
+          </label>
+
           <div className="checkbox-row">
             <label>
               <input
@@ -99,6 +146,30 @@ export function SettingsPage() {
                 onChange={(event) => setForm((current) => ({ ...current, cardEnabled: event.target.checked }))}
               />
               Card
+            </label>
+            <label>
+              <input
+                checked={form.qrisEnabled}
+                type="checkbox"
+                onChange={(event) => setForm((current) => ({ ...current, qrisEnabled: event.target.checked }))}
+              />
+              QRIS
+            </label>
+            <label>
+              <input
+                checked={form.transferEnabled}
+                type="checkbox"
+                onChange={(event) => setForm((current) => ({ ...current, transferEnabled: event.target.checked }))}
+              />
+              Transfer
+            </label>
+            <label>
+              <input
+                checked={form.ewalletEnabled}
+                type="checkbox"
+                onChange={(event) => setForm((current) => ({ ...current, ewalletEnabled: event.target.checked }))}
+              />
+              E-Wallet
             </label>
           </div>
 

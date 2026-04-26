@@ -51,7 +51,7 @@ export function ReceiptPage() {
       <article className="panel-card receipt-print-card">
         <div className="receipt-print-head">
           <div>
-            <strong>{settings.storeName || "Harness POS"}</strong>
+            <strong>{settings.storeName || "Lakoo POS"}</strong>
             <p className="muted-text">{settings.storeCode}</p>
             <p className="muted-text">{settings.address}</p>
           </div>
@@ -68,7 +68,7 @@ export function ReceiptPage() {
               <div>
                 <strong>{item.productNameSnapshot}</strong>
                 <p className="muted-text">
-                  {item.sizeSnapshot}/{item.colorSnapshot} - {item.skuSnapshot}
+                  {item.attribute1Snapshot}/{item.attribute2Snapshot} - {item.skuSnapshot}
                 </p>
               </div>
               <div className="receipt-item-meta">
@@ -94,6 +94,12 @@ export function ReceiptPage() {
             <div className="summary-row">
               <span>Promo</span>
               <strong>{sale.promotion.codeSnapshot}</strong>
+            </div>
+          ) : null}
+          {sale.taxTotal > 0 ? (
+            <div className="summary-row">
+              <span>Tax</span>
+              <strong>{formatCurrency(sale.taxTotal)}</strong>
             </div>
           ) : null}
           <div className="summary-row total">

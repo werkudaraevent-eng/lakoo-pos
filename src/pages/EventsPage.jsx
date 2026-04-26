@@ -1,40 +1,47 @@
-import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 
+import { Badge } from "../components/ui/badge";
+import { Button } from "../components/ui/button";
+import { Input } from "../components/ui/input";
 import { usePosData } from "../context/PosDataContext";
 import { buildEventRowSummary, buildEventWorkspaceSummary } from "../features/events/eventWorkspace";
-import { getEventActionLabel } from "../features/events/eventHelpers";
-import { formatDate } from "../utils/formatters";
-
-function createEmptyEventDraft() {
-  return {
-    name: "",
-    code: "",
-    locationLabel: "",
-    startsAt: "",
-    endsAt: "",
-    stockMode: "allocate",
-    assignedUserIds: [],
-  };
-}
-
-function normalizeEventPayload(draft) {
-  return {
-    name: draft.name.trim(),
-    code: draft.code.trim().toUpperCase(),
-    locationLabel: draft.locationLabel.trim(),
-    startsAt: draft.startsAt ? new Date(draft.startsAt).toISOString() : "",
-    endsAt: draft.endsAt ? new Date(draft.endsAt).toISOString() : "",
-    stockMode: draft.stockMode,
-    assignedUserIds: draft.assignedUserIds,
-  };
-}
+import { AppIcon } from "../features/ui/AppIcon";
+import "../features/events/events.css";
 
 function sortEventsByStart(left, right) {
   return new Date(right.startsAt || 0) - new Date(left.startsAt || 0);
 }
 
-function formatStatus(status) {
+function formatDateLabel(value) {
+  if (!value) {
+    return "-";
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "-";
+  }
+
+  return new Intl.DateTimeFormat("id-ID", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  }).format(date);
+}
+
+function formatDateRange(startsAt, endsAt) {
+  const startLabel = formatDateLabel(startsAt);
+  const endLabel = formatDateLabel(endsAt);
+
+  if (startLabel === "-" && endLabel === "-") {
+    return "-";
+  }
+
+  return `${startLabel} - ${endLabel}`;
+}
+
+function formatStatusLabel(status) {
   if (!status) {
     return "Unknown";
   }
@@ -42,19 +49,60 @@ function formatStatus(status) {
   return status.charAt(0).toUpperCase() + status.slice(1);
 }
 
-export function EventsPage() {
-  const navigate = useNavigate();
-  const { createEvent, loadError, loading, users, workspaces } = usePosData();
-  const [draft, setDraft] = useState(createEmptyEventDraft);
-  const [message, setMessage] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-  const [query, setQuery] = useState("");
-  const [selectedId, setSelectedId] = useState(null);
+function getStatusTone(status) {
+  if (status === "active") {
+    return "status-active";
+  }
 
-  const eventUsers = useMemo(
-    () => users.filter((user) => user.role === "admin" || user.role === "manager" || user.role === "cashier"),
-    [users]
-  );
+  if (status === "draft") {
+    return "status-draft";
+  }
+
+  return "status-closed";
+}
+
+function getEventRevenueValue(event) {
+  const candidates = [event?.revenueTotal, event?.totalRevenue, event?.revenue];
+
+  for (const candidate of candidates) {
+    const parsed = Number(candidate);
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+
+  return null;
+}
+
+function formatCurrencyCell(value) {
+  if (!Number.isFinite(value)) {
+    return "-";
+  }
+
+  return new Intl.NumberFormat("id-ID", {
+    style: "currency",
+    currency: "IDR",
+    maximumFractionDigits: 0,
+  }).format(value);
+}
+
+function getEventStockSnapshot(event) {
+  const candidates = [event?.allocatedStock, event?.allocatedItems, event?.stockAllocated];
+
+  for (const candidate of candidates) {
+    const parsed = Number(candidate);
+    if (Number.isFinite(parsed)) {
+      return `${parsed} items`;
+    }
+  }
+
+  return event?.stockMode === "allocate" ? "Allocated flow" : "Manual flow";
+}
+
+export function EventsPage() {
+  const { loadError, loading, workspaces } = usePosData();
+  const [query, setQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
 
   const events = useMemo(
     () => workspaces.filter((workspace) => workspace.type === "event").sort(sortEventsByStart),
@@ -64,318 +112,149 @@ export function EventsPage() {
   const filteredEvents = useMemo(() => {
     const keyword = query.trim().toLowerCase();
 
-    if (!keyword) {
-      return events;
-    }
-
     return events.filter((event) => {
-      const haystack = `${event.name} ${event.locationLabel} ${event.status} ${event.stockMode}`.toLowerCase();
+      const matchesStatus = statusFilter === "all" || event.status === statusFilter;
+      if (!matchesStatus) {
+        return false;
+      }
+
+      if (!keyword) {
+        return true;
+      }
+
+      const haystack = `${event.name} ${event.locationLabel} ${event.code} ${event.status}`.toLowerCase();
       return haystack.includes(keyword);
     });
-  }, [events, query]);
+  }, [events, query, statusFilter]);
 
-  const summary = useMemo(() => buildEventWorkspaceSummary({ events: filteredEvents }), [filteredEvents]);
-
-  const selectedEvent = useMemo(
-    () => filteredEvents.find((event) => event.id === selectedId) ?? filteredEvents[0] ?? null,
-    [filteredEvents, selectedId]
+  const summary = useMemo(() => buildEventWorkspaceSummary({ events }), [events]);
+  const ytdRevenue = useMemo(
+    () => events.reduce((sum, event) => sum + (getEventRevenueValue(event) ?? 0), 0),
+    [events]
   );
 
-  useEffect(() => {
-    if (filteredEvents.length === 0) {
-      if (selectedId !== null) {
-        setSelectedId(null);
-      }
-      return;
-    }
-
-    const visibleSelected = filteredEvents.some((event) => event.id === selectedId);
-    if (!visibleSelected) {
-      setSelectedId(filteredEvents[0].id);
-    }
-  }, [filteredEvents, selectedId]);
-
-  async function handleSubmit(event) {
-    event.preventDefault();
-    setSubmitting(true);
-    setMessage("");
-
-    const result = await createEvent(normalizeEventPayload(draft));
-
-    if (!result.ok) {
-      setMessage(result.message);
-      setSubmitting(false);
-      return;
-    }
-
-    setDraft(createEmptyEventDraft());
-    setMessage("Event draft created.");
-    setSubmitting(false);
-    navigate(`/events/${result.eventId}`);
-  }
-
-  function toggleAssignedUser(userId) {
-    setDraft((current) => {
-      const nextAssignedUserIds = current.assignedUserIds.includes(userId)
-        ? current.assignedUserIds.filter((id) => id !== userId)
-        : [...current.assignedUserIds, userId];
-
-      return {
-        ...current,
-        assignedUserIds: nextAssignedUserIds,
-      };
-    });
-  }
-
   return (
-    <div className="page-stack events-page events-workspace">
-      <section className="page-header-card events-header-bar">
-        <div className="events-header-copy">
-          <p className="eyebrow">Events</p>
-          <h1>Event operations workspace</h1>
-          <p className="muted-text">
-            Draft, search, and govern bazaar workspaces in a denser list/detail layout built for operational use.
+    <div className="events-banani-page">
+      <section className="events-banani-header">
+        <div className="events-banani-header-copy">
+          <h1 className="events-banani-title">Events Management</h1>
+          <p className="events-banani-description">
+            Manage bazaar and pop-up store workspaces with a cleaner operational table built for scanning status, dates, and stock flow.
           </p>
         </div>
 
-        <div className="events-header-meta">
-          <span className="badge-soft">{summary.totalEvents} total</span>
-          <span className="badge-soft">{summary.draftEvents} draft</span>
-          <span className="badge-soft">{summary.activeEvents} active</span>
-          <span className="badge-soft">{summary.closedEvents} closed</span>
+        <div className="events-banani-metrics">
+          <div className="events-banani-metric">
+            <span className="events-banani-metric-label">Active Events</span>
+            <span className="events-banani-metric-value">{summary.activeEvents}</span>
+          </div>
+          <div className="events-banani-metric">
+            <span className="events-banani-metric-label">Upcoming</span>
+            <span className="events-banani-metric-value">{summary.draftEvents}</span>
+          </div>
+          <div className="events-banani-metric is-primary">
+            <span className="events-banani-metric-label">YTD Event Revenue</span>
+            <span className="events-banani-metric-value">{formatCurrencyCell(ytdRevenue)}</span>
+          </div>
         </div>
       </section>
 
       {loading ? <p className="info-text">Loading events...</p> : null}
       {loadError ? <p className="error-text">{loadError}</p> : null}
-      {message ? <p className="info-text">{message}</p> : null}
 
-      <section className="panel-card events-toolbar events-toolbar-flat">
-        <div className="events-toolbar-controls">
-          <label className="field events-search-field">
-            <span>Search event</span>
-            <input
+      <section className="events-banani-card">
+        <div className="events-banani-toolbar">
+          <label className="events-banani-search" htmlFor="events-search">
+            <span className="events-banani-search-icon" aria-hidden="true">
+              <AppIcon name="Search" size={16} strokeWidth={1.9} />
+            </span>
+            <Input
+              className="events-banani-search-input"
+              id="events-search"
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Search event name or location"
               value={query}
-              onChange={(inputEvent) => setQuery(inputEvent.target.value)}
-              placeholder="Bazar, Senayan, active, allocate"
             />
           </label>
+
+          <label className="events-banani-filter">
+            <span className="events-banani-filter-icon" aria-hidden="true">
+              <AppIcon name="Filter" size={16} strokeWidth={1.9} />
+            </span>
+            <select onChange={(event) => setStatusFilter(event.target.value)} value={statusFilter}>
+              <option value="all">All status</option>
+              <option value="draft">Upcoming</option>
+              <option value="active">Active</option>
+              <option value="closed">Completed</option>
+              <option value="archived">Archived</option>
+            </select>
+            <span className="events-banani-filter-chevron" aria-hidden="true">
+              <AppIcon name="ChevronDown" size={16} strokeWidth={1.9} />
+            </span>
+          </label>
+
+          <div className="events-banani-toolbar-spacer" />
+
+          <Button asChild className="events-banani-new" size="sm" variant="default">
+            <Link to="/events/new">
+              <AppIcon name="Plus" size={16} strokeWidth={2} />
+              <span>New Event</span>
+            </Link>
+          </Button>
         </div>
 
-        <div className="events-toolbar-summary">
-          <div className="events-kpi">
-            <span className="stat-label">Visible</span>
-            <strong>{filteredEvents.length}</strong>
-          </div>
-          <div className="events-kpi">
-            <span className="stat-label">Active</span>
-            <strong>{summary.activeEvents}</strong>
-          </div>
-          <div className="events-kpi">
-            <span className="stat-label">Draft</span>
-            <strong>{summary.draftEvents}</strong>
-          </div>
+        <div className="events-banani-table-wrap">
+          <table className="events-banani-table">
+            <thead>
+              <tr>
+                <th>Event Name</th>
+                <th>Dates</th>
+                <th>Location</th>
+                <th>Status</th>
+                <th>Stock Flow</th>
+                <th>Total Revenue</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredEvents.length > 0 ? (
+                filteredEvents.map((event) => {
+                  const row = buildEventRowSummary(event);
+                  return (
+                    <tr key={event.id}>
+                      <td>
+                        <div className="events-banani-name">
+                          <strong>{row.title}</strong>
+                          <span className="events-banani-subtitle">{event.code || row.stockModeLabel}</span>
+                        </div>
+                      </td>
+                      <td className="events-banani-muted">{formatDateRange(event.startsAt, event.endsAt)}</td>
+                      <td className="events-banani-muted">{event.locationLabel || "-"}</td>
+                      <td>
+                        <Badge className={`events-banani-badge ${getStatusTone(event.status)}`} variant="secondary">
+                          {formatStatusLabel(event.status)}
+                        </Badge>
+                      </td>
+                      <td className="events-banani-muted">{getEventStockSnapshot(event)}</td>
+                      <td className="events-banani-revenue">{formatCurrencyCell(getEventRevenueValue(event))}</td>
+                      <td>
+                        <Button asChild className="events-banani-open" size="sm" variant="outline">
+                          <Link to={`/events/${event.id}`}>Open detail</Link>
+                        </Button>
+                      </td>
+                    </tr>
+                  );
+                })
+              ) : (
+                <tr className="events-banani-empty-row">
+                  <td colSpan={7}>
+                    <div className="events-banani-empty">No event matches this filter yet.</div>
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
-      </section>
-
-      <section className="content-grid events-layout">
-        <article className="panel-card events-list-panel">
-          <div className="panel-head events-list-head">
-            <div>
-              <h2>Event list</h2>
-              <p className="muted-text">Search, open, and govern workspace events from one table-style surface.</p>
-            </div>
-            <span className="badge-soft">{filteredEvents.length} visible</span>
-          </div>
-
-          <div className="events-table">
-            <div className="events-table-head">
-              <span>Event</span>
-              <span>Stock mode</span>
-              <span>Start</span>
-              <span>Status</span>
-            </div>
-
-            {filteredEvents.length > 0 ? (
-              filteredEvents.map((event) => {
-                const row = buildEventRowSummary(event);
-                const isSelected = event.id === selectedEvent?.id;
-
-                return (
-                  <button
-                    className={`event-row-button${isSelected ? " is-selected" : ""}`}
-                    key={event.id}
-                    onClick={() => setSelectedId(event.id)}
-                    type="button"
-                  >
-                    <div className="event-row-primary">
-                      <strong>{row.title}</strong>
-                      <p className="muted-text">{row.subtitle}</p>
-                    </div>
-                    <span>{row.stockModeLabel}</span>
-                    <span className="muted-text">{event.startsAt ? formatDate(event.startsAt) : "-"}</span>
-                    <span className={`badge-soft status-${event.status}`}>{row.statusLabel}</span>
-                  </button>
-                );
-              })
-            ) : (
-              <p className="stack-empty">No event matches this filter yet.</p>
-            )}
-          </div>
-        </article>
-
-        <aside className="events-sidebar-stack">
-          <article className="panel-card events-draft-panel">
-            <div className="panel-head events-panel-head">
-              <div>
-                <p className="eyebrow">Create</p>
-                <h2>Draft event</h2>
-              </div>
-              <span className="badge-soft">Draft first</span>
-            </div>
-
-            <form className="form-stack events-form" onSubmit={handleSubmit}>
-              <div className="dual-fields">
-                <label className="field">
-                  <span>Event name</span>
-                  <input
-                    value={draft.name}
-                    onChange={(inputEvent) => setDraft((current) => ({ ...current, name: inputEvent.target.value }))}
-                    placeholder="Bazar PIK Avenue"
-                  />
-                </label>
-
-                <label className="field">
-                  <span>Event code</span>
-                  <input
-                    value={draft.code}
-                    onChange={(inputEvent) => setDraft((current) => ({ ...current, code: inputEvent.target.value }))}
-                    placeholder="PIK-APR"
-                  />
-                </label>
-              </div>
-
-              <label className="field">
-                <span>Location</span>
-                <input
-                  value={draft.locationLabel}
-                  onChange={(inputEvent) => setDraft((current) => ({ ...current, locationLabel: inputEvent.target.value }))}
-                  placeholder="PIK Avenue, Jakarta"
-                />
-              </label>
-
-              <div className="dual-fields">
-                <label className="field">
-                  <span>Starts at</span>
-                  <input
-                    type="datetime-local"
-                    value={draft.startsAt}
-                    onChange={(inputEvent) =>
-                      setDraft((current) => ({ ...current, startsAt: inputEvent.target.value }))
-                    }
-                  />
-                </label>
-
-                <label className="field">
-                  <span>Ends at</span>
-                  <input
-                    type="datetime-local"
-                    value={draft.endsAt}
-                    onChange={(inputEvent) => setDraft((current) => ({ ...current, endsAt: inputEvent.target.value }))}
-                  />
-                </label>
-              </div>
-
-              <label className="field">
-                <span>Stock mode</span>
-                <select
-                  value={draft.stockMode}
-                  onChange={(inputEvent) => setDraft((current) => ({ ...current, stockMode: inputEvent.target.value }))}
-                >
-                  <option value="allocate">Allocate from main stock</option>
-                  <option value="manual">Manual event stock</option>
-                </select>
-              </label>
-
-              <div className="summary-box events-draft-summary">
-                <div className="summary-row">
-                  <span className="muted-text">Selected stock mode</span>
-                  <strong>{getEventActionLabel(draft.stockMode)}</strong>
-                </div>
-                <p className="muted-text">
-                  This mode will apply to the full event so the stock flow stays consistent for the team.
-                </p>
-              </div>
-
-              <div className="field">
-                <span>Assign team</span>
-                <div className="event-user-grid">
-                  {eventUsers.map((user) => (
-                    <label className="checkbox-card" key={user.id}>
-                      <input
-                        checked={draft.assignedUserIds.includes(user.id)}
-                        type="checkbox"
-                        onChange={() => toggleAssignedUser(user.id)}
-                      />
-                      <span>
-                        <strong>{user.name}</strong>
-                        <small className="muted-text">
-                          @{user.username} · {user.role}
-                        </small>
-                      </span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-
-              <button className="primary-button" disabled={submitting} type="submit">
-                {submitting ? "Saving..." : "Create event draft"}
-              </button>
-            </form>
-          </article>
-
-          <article className="panel-card events-detail-panel">
-            <div className="panel-head events-panel-head">
-              <div>
-                <p className="eyebrow">Selected</p>
-                <h2>{selectedEvent ? selectedEvent.name : "No event selected"}</h2>
-              </div>
-              {selectedEvent ? <span className={`badge-soft status-${selectedEvent.status}`}>{formatStatus(selectedEvent.status)}</span> : null}
-            </div>
-
-            {selectedEvent ? (
-              <>
-                <div className="summary-box events-detail-summary">
-                  <div className="summary-row">
-                    <span className="muted-text">Location</span>
-                    <strong>{selectedEvent.locationLabel || "-"}</strong>
-                  </div>
-                  <div className="summary-row">
-                    <span className="muted-text">Stock mode</span>
-                    <strong>{buildEventRowSummary(selectedEvent).stockModeLabel}</strong>
-                  </div>
-                  <div className="summary-row">
-                    <span className="muted-text">Start</span>
-                    <strong>{selectedEvent.startsAt ? formatDate(selectedEvent.startsAt) : "-"}</strong>
-                  </div>
-                  <div className="summary-row total">
-                    <span className="muted-text">Team</span>
-                    <strong>{selectedEvent.assignedUserIds.length} users</strong>
-                  </div>
-                </div>
-
-                <div className="inline-actions events-detail-actions">
-                  <Link className="primary-button receipt-link-button" to={`/events/${selectedEvent.id}`}>
-                    Open detail
-                  </Link>
-                  <span className="badge-soft">{getEventActionLabel(selectedEvent.stockMode)}</span>
-                </div>
-              </>
-            ) : (
-              <p className="stack-empty">Select an event from the list to inspect its operational detail.</p>
-            )}
-          </article>
-        </aside>
       </section>
     </div>
   );

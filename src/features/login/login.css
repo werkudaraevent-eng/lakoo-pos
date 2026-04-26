@@ -17,10 +17,11 @@
   display: grid;
   gap: 28px;
   padding: 42px;
-  color: #fff7f0;
+  color: #f0fdfa;
   background:
-    radial-gradient(circle at top right, rgba(203, 90, 45, 0.42), transparent 30%),
-    linear-gradient(180deg, #162126 0%, #10181c 100%);
+    radial-gradient(circle at top right, rgba(46, 196, 182, 0.35), transparent 30%),
+    radial-gradient(circle at bottom left, rgba(255, 107, 107, 0.15), transparent 40%),
+    linear-gradient(180deg, #1a1d23 0%, #111318 100%);
 }
 
 .login-form-shell {

@@ -75,10 +75,10 @@ export function WorkspacePickerPage() {
     <div className="workspace-picker-page">
       <div className="workspace-picker-container">
         <div className="workspace-picker-brand">
-          <div className="workspace-picker-brand-icon">H</div>
+          <div className="workspace-picker-brand-icon">L</div>
           <div className="workspace-picker-brand-copy">
-            <p className="workspace-picker-brand-title">Harness POS</p>
-            <p className="workspace-picker-brand-subtitle">Retail OS</p>
+            <p className="workspace-picker-brand-title">Lakoo</p>
+            <p className="workspace-picker-brand-subtitle">POS</p>
           </div>
         </div>
 

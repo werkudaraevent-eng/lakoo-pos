@@ -8,10 +8,17 @@ export function mapSettingsRows(rows) {
   for (const row of rows) {
     if (row.key === "paymentMethods" || row.key === "serviceChargeEnabled") {
       settings[row.key] = JSON.parse(row.value);
+    } else if (row.key === "taxRate") {
+      settings[row.key] = Number(row.value) || 0;
     } else {
       settings[row.key] = row.value;
     }
   }
+
+  // Defaults for new settings
+  if (settings.taxRate == null) settings.taxRate = 0;
+  if (!settings.attribute1Label) settings.attribute1Label = "Size";
+  if (!settings.attribute2Label) settings.attribute2Label = "Color";
 
   return settings;
 }
@@ -52,8 +59,8 @@ export function mapProducts(rows) {
       id: row.variantId,
       productId: row.id,
       sku: row.sku,
-      size: row.size,
-      color: row.color,
+      attribute1Value: row.attribute1Value,
+      attribute2Value: row.attribute2Value,
       priceOverride: row.priceOverride,
       quantityOnHand: row.quantityOnHand,
       lowStockThreshold: row.lowStockThreshold,

@@ -1,448 +1,218 @@
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 
+import { Button } from "../components/ui/button";
+import { Badge } from "../components/ui/badge";
+import { Input } from "../components/ui/input";
 import { usePosData } from "../context/PosDataContext";
 import {
-  createEmptyProductDraft,
-  createEmptyVariantDraft,
-  normalizeProductPayload,
-  normalizeVariantPayload,
+  buildCatalogCsv,
+  buildCatalogStockSummary,
+  filterCatalogProducts,
+  paginateCatalogProducts,
+  sortCatalogProducts,
 } from "../features/catalog/catalogHelpers";
+import { AppIcon } from "../features/ui/AppIcon";
 import { formatCurrency } from "../utils/formatters";
+import "../features/catalog/catalog.css";
+
+const PAGE_SIZE = 8;
+
+function getProductMark(name) {
+  return String(name || "")
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((chunk) => chunk[0])
+    .join("")
+    .toUpperCase();
+}
+
+function downloadCatalogCsv(products) {
+  const csv = buildCatalogCsv(products);
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "catalog-export.csv";
+  link.click();
+  URL.revokeObjectURL(url);
+}
 
 export function CatalogPage() {
-  const {
-    categories,
-    createProduct,
-    createVariant,
-    loadError,
-    loading,
-    products,
-    updateProduct,
-    updateVariant,
-  } = usePosData();
+  const { loadError, loading, products } = usePosData();
   const [query, setQuery] = useState("");
-  const [productDraft, setProductDraft] = useState(createEmptyProductDraft);
-  const [variantDraft, setVariantDraft] = useState(createEmptyVariantDraft);
-  const [selectedProductId, setSelectedProductId] = useState(null);
-  const [editingProductId, setEditingProductId] = useState(null);
-  const [editingVariantId, setEditingVariantId] = useState(null);
-  const [message, setMessage] = useState("");
-  const [submitting, setSubmitting] = useState(false);
+  const [stockFilter, setStockFilter] = useState("all");
+  const [sortBy, setSortBy] = useState("name-asc");
+  const [page, setPage] = useState(1);
   const deferredQuery = useDeferredValue(query);
 
-  const selectedProduct = useMemo(
-    () => products.find((product) => product.id === selectedProductId) ?? products[0] ?? null,
-    [products, selectedProductId]
+  const filteredProducts = useMemo(
+    () => filterCatalogProducts(products, { query: deferredQuery, stockFilter }),
+    [deferredQuery, products, stockFilter]
+  );
+  const sortedProducts = useMemo(
+    () => sortCatalogProducts(filteredProducts, sortBy),
+    [filteredProducts, sortBy]
+  );
+  const paginatedProducts = useMemo(
+    () => paginateCatalogProducts(sortedProducts, { page, pageSize: PAGE_SIZE }),
+    [page, sortedProducts]
   );
 
-  const filteredProducts = useMemo(() => {
-    const keyword = deferredQuery.trim().toLowerCase();
-
-    if (!keyword) {
-      return products;
-    }
-
-    return products.filter((product) => {
-      const haystack = `${product.name} ${product.category} ${product.description} ${product.variants
-        .map((variant) => variant.sku)
-        .join(" ")}`.toLowerCase();
-
-      return haystack.includes(keyword);
-    });
-  }, [deferredQuery, products]);
-
   useEffect(() => {
-    if (!selectedProductId && products[0]) {
-      setSelectedProductId(products[0].id);
-    }
-  }, [products, selectedProductId]);
-
-  useEffect(() => {
-    if (!editingProductId) {
-      setProductDraft(createEmptyProductDraft());
-      return;
-    }
-
-    const target = products.find((product) => product.id === editingProductId);
-    if (!target) {
-      return;
-    }
-
-    setProductDraft({
-      name: target.name,
-      category: target.category,
-      description: target.description,
-      basePrice: String(target.basePrice),
-      isActive: target.isActive,
-    });
-    setSelectedProductId(target.id);
-  }, [editingProductId, products]);
-
-  useEffect(() => {
-    if (!editingVariantId || !selectedProduct) {
-      setVariantDraft(createEmptyVariantDraft());
-      return;
-    }
-
-    const target = selectedProduct.variants.find((variant) => variant.id === editingVariantId);
-    if (!target) {
-      return;
-    }
-
-    setVariantDraft({
-      sku: target.sku,
-      size: target.size,
-      color: target.color,
-      priceOverride: target.priceOverride == null ? "" : String(target.priceOverride),
-      quantityOnHand: String(target.quantityOnHand),
-      lowStockThreshold: String(target.lowStockThreshold),
-      isActive: target.isActive,
-    });
-  }, [editingVariantId, selectedProduct]);
-
-  async function handleProductSubmit(event) {
-    event.preventDefault();
-    setSubmitting(true);
-    setMessage("");
-
-    try {
-      const payload = normalizeProductPayload(productDraft);
-
-      if (editingProductId) {
-        await updateProduct(editingProductId, payload);
-        setMessage("Product updated.");
-      } else {
-        await createProduct({
-          ...payload,
-          variants: [],
-        });
-        setMessage("Product created.");
-      }
-
-      setEditingProductId(null);
-      setProductDraft(createEmptyProductDraft());
-    } catch (error) {
-      setMessage(error.message);
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
-  async function handleVariantSubmit(event) {
-    event.preventDefault();
-
-    if (!selectedProduct) {
-      setMessage("Pilih product dulu sebelum menambah variant.");
-      return;
-    }
-
-    setSubmitting(true);
-    setMessage("");
-
-    try {
-      const payload = normalizeVariantPayload(variantDraft);
-
-      if (editingVariantId) {
-        await updateVariant(editingVariantId, payload);
-        setMessage("Variant updated.");
-      } else {
-        await createVariant(selectedProduct.id, payload);
-        setMessage("Variant created.");
-      }
-
-      setEditingVariantId(null);
-      setVariantDraft(createEmptyVariantDraft());
-    } catch (error) {
-      setMessage(error.message);
-    } finally {
-      setSubmitting(false);
-    }
-  }
+    setPage(1);
+  }, [deferredQuery, stockFilter, sortBy]);
 
   return (
-    <div className="page-stack">
-      <section className="page-header-card">
+    <div className="catalog-banani-page">
+      <header className="catalog-banani-header">
         <div>
-          <p className="eyebrow">Catalog</p>
-          <h1>Operational catalog with live product and variant control.</h1>
+          <h1 className="catalog-banani-title">Catalog</h1>
           <p className="muted-text">
-            Admin dan manager bisa membuat product, menambah variant SKU, mengubah harga, dan menonaktifkan item dari satu workspace.
+            Browse assortments, review stock posture, and open product management only when you actually need to edit.
           </p>
         </div>
-      </section>
+
+        <div className="catalog-banani-header-actions">
+          <Button
+            className="catalog-banani-button is-outline"
+            onClick={() => downloadCatalogCsv(sortedProducts)}
+            size="lg"
+            type="button"
+            variant="outline"
+          >
+            <AppIcon name="Download" size={16} />
+            <span>Export CSV</span>
+          </Button>
+          <Button asChild className="catalog-banani-button is-primary" size="lg">
+            <Link to="/catalog/new">
+              <AppIcon name="Plus" size={16} />
+              <span>Add Product</span>
+            </Link>
+          </Button>
+        </div>
+      </header>
 
       {loading ? <p className="info-text">Loading catalog...</p> : null}
       {loadError ? <p className="error-text">{loadError}</p> : null}
-      {message ? <p className="info-text">{message}</p> : null}
 
-      <section className="content-grid catalog-admin-layout">
-        <article className="panel-card">
-          <div className="panel-head">
-            <h2>{editingProductId ? "Edit product" : "Create product"}</h2>
-          </div>
+      <section className="catalog-banani-toolbar">
+        <div className="catalog-banani-toolbar-group">
+          <label className="catalog-banani-search" htmlFor="catalog-search">
+            <span className="catalog-banani-search-icon" aria-hidden="true">
+              <AppIcon name="Search" size={16} />
+            </span>
+            <Input
+              className="catalog-banani-search-input"
+              id="catalog-search"
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Search product, category, SKU"
+              value={query}
+            />
+          </label>
 
-          <form className="form-stack" onSubmit={handleProductSubmit}>
-            <label className="field">
-              <span>Name</span>
-              <input
-                value={productDraft.name}
-                onChange={(event) => setProductDraft((current) => ({ ...current, name: event.target.value }))}
-              />
-            </label>
+          <label className="catalog-banani-select">
+            <select onChange={(event) => setStockFilter(event.target.value)} value={stockFilter}>
+              <option value="all">All stock</option>
+              <option value="high">Healthy stock</option>
+              <option value="low">Low stock</option>
+              <option value="none">Out of stock</option>
+            </select>
+            <span className="catalog-banani-select-icon" aria-hidden="true">
+              <AppIcon name="Filter" size={16} />
+            </span>
+          </label>
 
-            <label className="field">
-              <span>Category</span>
-              <input
-                list="catalog-categories"
-                value={productDraft.category}
-                onChange={(event) => setProductDraft((current) => ({ ...current, category: event.target.value }))}
-                placeholder="Shirts"
-              />
-              <datalist id="catalog-categories">
-                {categories.map((category) => (
-                  <option key={category.id} value={category.name} />
-                ))}
-              </datalist>
-            </label>
+          <label className="catalog-banani-select">
+            <select onChange={(event) => setSortBy(event.target.value)} value={sortBy}>
+              <option value="name-asc">Sort: Name</option>
+              <option value="price-low">Sort: Price low</option>
+              <option value="price-high">Sort: Price high</option>
+              <option value="stock-high">Sort: Stock high</option>
+            </select>
+            <span className="catalog-banani-select-icon" aria-hidden="true">
+              <AppIcon name="ArrowUpDown" size={16} />
+            </span>
+          </label>
+        </div>
 
-            <label className="field">
-              <span>Description</span>
-              <textarea
-                value={productDraft.description}
-                onChange={(event) =>
-                  setProductDraft((current) => ({ ...current, description: event.target.value }))
-                }
-              />
-            </label>
-
-            <label className="field">
-              <span>Base price</span>
-              <input
-                inputMode="numeric"
-                value={productDraft.basePrice}
-                onChange={(event) => setProductDraft((current) => ({ ...current, basePrice: event.target.value }))}
-              />
-            </label>
-
-            <label className="checkbox-inline">
-              <input
-                checked={productDraft.isActive}
-                type="checkbox"
-                onChange={(event) =>
-                  setProductDraft((current) => ({ ...current, isActive: event.target.checked }))
-                }
-              />
-              Product active
-            </label>
-
-            <div className="inline-actions">
-              <button className="primary-button" disabled={submitting} type="submit">
-                {editingProductId ? "Update product" : "Create product"}
-              </button>
-              {editingProductId ? (
-                <button
-                  className="secondary-button"
-                  onClick={() => {
-                    setEditingProductId(null);
-                    setProductDraft(createEmptyProductDraft());
-                  }}
-                  type="button"
-                >
-                  Cancel
-                </button>
-              ) : null}
-            </div>
-          </form>
-        </article>
-
-        <article className="panel-card">
-          <div className="panel-head">
-            <h2>{editingVariantId ? "Edit variant" : "Create variant"}</h2>
-            <span className="badge-soft">{selectedProduct ? selectedProduct.name : "No product selected"}</span>
-          </div>
-
-          <form className="form-stack" onSubmit={handleVariantSubmit}>
-            <div className="dual-fields">
-              <label className="field">
-                <span>SKU</span>
-                <input
-                  value={variantDraft.sku}
-                  onChange={(event) => setVariantDraft((current) => ({ ...current, sku: event.target.value }))}
-                />
-              </label>
-
-              <label className="field">
-                <span>Price override</span>
-                <input
-                  inputMode="numeric"
-                  value={variantDraft.priceOverride}
-                  onChange={(event) =>
-                    setVariantDraft((current) => ({ ...current, priceOverride: event.target.value }))
-                  }
-                  placeholder="Kosong = ikut base price"
-                />
-              </label>
-            </div>
-
-            <div className="dual-fields">
-              <label className="field">
-                <span>Size</span>
-                <input
-                  value={variantDraft.size}
-                  onChange={(event) => setVariantDraft((current) => ({ ...current, size: event.target.value }))}
-                />
-              </label>
-
-              <label className="field">
-                <span>Color</span>
-                <input
-                  value={variantDraft.color}
-                  onChange={(event) => setVariantDraft((current) => ({ ...current, color: event.target.value }))}
-                />
-              </label>
-            </div>
-
-            <div className="dual-fields">
-              <label className="field">
-                <span>Quantity on hand</span>
-                <input
-                  inputMode="numeric"
-                  value={variantDraft.quantityOnHand}
-                  onChange={(event) =>
-                    setVariantDraft((current) => ({ ...current, quantityOnHand: event.target.value }))
-                  }
-                />
-              </label>
-
-              <label className="field">
-                <span>Low stock threshold</span>
-                <input
-                  inputMode="numeric"
-                  value={variantDraft.lowStockThreshold}
-                  onChange={(event) =>
-                    setVariantDraft((current) => ({ ...current, lowStockThreshold: event.target.value }))
-                  }
-                />
-              </label>
-            </div>
-
-            <label className="checkbox-inline">
-              <input
-                checked={variantDraft.isActive}
-                type="checkbox"
-                onChange={(event) =>
-                  setVariantDraft((current) => ({ ...current, isActive: event.target.checked }))
-                }
-              />
-              Variant active
-            </label>
-
-            <div className="inline-actions">
-              <button className="primary-button" disabled={submitting || !selectedProduct} type="submit">
-                {editingVariantId ? "Update variant" : "Create variant"}
-              </button>
-              {editingVariantId ? (
-                <button
-                  className="secondary-button"
-                  onClick={() => {
-                    setEditingVariantId(null);
-                    setVariantDraft(createEmptyVariantDraft());
-                  }}
-                  type="button"
-                >
-                  Cancel
-                </button>
-              ) : null}
-            </div>
-          </form>
-        </article>
+        <p className="catalog-banani-page-info">
+          Showing {paginatedProducts.items.length} of {filteredProducts.length} products
+        </p>
       </section>
 
-      <article className="panel-card">
-        <div className="panel-head">
-          <h2>Catalog browser</h2>
-          <span className="badge-soft">{filteredProducts.length} products</span>
-        </div>
-        <label className="field">
-          <span>Search catalog or SKU</span>
-          <input
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Dress, AST-BLK-M, Shirts"
-          />
-        </label>
-      </article>
+      {paginatedProducts.items.length ? (
+        <section className="catalog-banani-grid">
+          {paginatedProducts.items.map((product) => {
+            const stock = buildCatalogStockSummary(product);
 
-      <section className="catalog-page-grid">
-        {filteredProducts.map((product) => (
-          <article
-            className={`panel-card selectable-card${selectedProduct?.id === product.id ? " is-selected" : ""}`}
-            key={product.id}
-          >
-            <div className="product-card-head">
-              <button
-                className="card-link-button"
-                onClick={() => {
-                  setSelectedProductId(product.id);
-                  setEditingVariantId(null);
-                }}
-                type="button"
-              >
-                <h2>{product.name}</h2>
-              </button>
-              <span className="badge-soft">{product.isActive ? "Active" : "Inactive"}</span>
-            </div>
-            <p className="muted-text">
-              {product.category} - {formatCurrency(product.basePrice)}
-            </p>
-            <p className="muted-text">{product.description}</p>
-            <div className="inline-actions">
-              <button className="secondary-button small-button" onClick={() => setEditingProductId(product.id)} type="button">
-                Edit product
-              </button>
-              <button
-                className="secondary-button small-button"
-                onClick={() => {
-                  setSelectedProductId(product.id);
-                  setEditingVariantId(null);
-                  setVariantDraft(createEmptyVariantDraft());
-                }}
-                type="button"
-              >
-                Add variant
-              </button>
-            </div>
-            <div className="variant-list">
-              {product.variants.map((variant) => (
-                <div className="variant-row" key={variant.id}>
-                  <div>
-                    <strong>
-                      {variant.size} / {variant.color}
-                    </strong>
-                    <p className="muted-text">{variant.sku}</p>
-                  </div>
-                  <div className="variant-meta">
-                    <span>{formatCurrency(variant.priceOverride ?? product.basePrice)}</span>
-                    <span className={variant.quantityOnHand <= variant.lowStockThreshold ? "pill-warning" : "pill-strong"}>
-                      {variant.quantityOnHand} pcs
-                    </span>
-                    <button
-                      className="secondary-button small-button"
-                      onClick={() => {
-                        setSelectedProductId(product.id);
-                        setEditingVariantId(variant.id);
-                      }}
-                      type="button"
-                    >
-                      Edit
-                    </button>
+            return (
+              <article className="catalog-banani-card" key={product.id}>
+                <div className="catalog-banani-media">
+                  <span className="catalog-banani-media-mark">{getProductMark(product.name)}</span>
+                  <div className="catalog-banani-overlay">
+                    <Badge className="catalog-banani-status" variant={product.isActive ? "secondary" : "outline"}>
+                      {product.isActive ? "Active" : "Inactive"}
+                    </Badge>
                   </div>
                 </div>
-              ))}
-            </div>
-          </article>
-        ))}
-      </section>
+
+                <div className="catalog-banani-card-body">
+                  <div className="catalog-banani-meta">
+                    <span className="catalog-banani-category">{product.category || "Uncategorized"}</span>
+                    <h2 className="catalog-banani-name">{product.name}</h2>
+                    <p className="catalog-banani-price">{formatCurrency(product.basePrice)}</p>
+                  </div>
+
+                  <div className="catalog-banani-footer">
+                    <span className="catalog-banani-stock">
+                      <span className={`catalog-banani-stock-dot ${stock.tone}`} />
+                      {stock.label}
+                    </span>
+                    <Button asChild className="catalog-banani-card-link" size="sm" variant="outline">
+                      <Link to={`/catalog/${product.id}`}>Open</Link>
+                    </Button>
+                  </div>
+                </div>
+              </article>
+            );
+          })}
+        </section>
+      ) : (
+        <section className="catalog-banani-empty">
+          No products match the current search and filter state. Broaden the filter or add a new product.
+        </section>
+      )}
+
+      <footer className="catalog-banani-pagination">
+        <p className="catalog-banani-page-info">
+          Page {paginatedProducts.page} of {paginatedProducts.totalPages}
+        </p>
+
+        <div className="catalog-banani-page-controls">
+          <Button
+            className="catalog-banani-page-button"
+            disabled={paginatedProducts.page <= 1}
+            onClick={() => setPage((current) => Math.max(1, current - 1))}
+            size="icon-sm"
+            type="button"
+            variant="outline"
+          >
+            <AppIcon name="ChevronLeft" size={16} />
+          </Button>
+          <Button
+            className="catalog-banani-page-button"
+            disabled={paginatedProducts.page >= paginatedProducts.totalPages}
+            onClick={() => setPage((current) => Math.min(paginatedProducts.totalPages, current + 1))}
+            size="icon-sm"
+            type="button"
+            variant="outline"
+          >
+            <AppIcon name="ChevronRight" size={16} />
+          </Button>
+        </div>
+      </footer>
     </div>
   );
 }

@@ -1,0 +1,376 @@
+.events-banani-page {
+  display: grid;
+  gap: 24px;
+  width: 100%;
+  max-width: 1220px;
+  margin: 0 auto;
+}
+
+.events-banani-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.events-banani-header-copy {
+  display: grid;
+  gap: 8px;
+  max-width: 42rem;
+}
+
+.events-banani-title {
+  color: #231f1b;
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.events-banani-description {
+  color: #746b61;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.events-banani-metrics {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.events-banani-metric {
+  min-width: 140px;
+  padding: 12px 16px;
+  border: 1px solid #e8e8e8;
+  border-radius: 12px;
+  background: #ffffff;
+  display: grid;
+  gap: 4px;
+}
+
+.events-banani-metric.is-primary {
+  color: #ffffff;
+  border-color: #2f2923;
+  background: #2f2923;
+}
+
+.events-banani-metric-label {
+  color: #8f8a84;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.events-banani-metric.is-primary .events-banani-metric-label {
+  color: rgba(255, 255, 255, 0.76);
+}
+
+.events-banani-metric-value {
+  color: #231f1b;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.events-banani-metric.is-primary .events-banani-metric-value {
+  color: #ffffff;
+}
+
+.events-banani-card {
+  min-height: calc(100vh - 248px);
+  border: 1px solid #e8e8e8;
+  border-radius: 18px;
+  background: #ffffff;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.events-banani-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px;
+  border-bottom: 1px solid #e8e8e8;
+}
+
+.events-banani-search {
+  width: 340px;
+  min-width: 280px;
+  height: 40px;
+  padding: 0 12px;
+  border: 1px solid #e8e8e8;
+  border-radius: 10px;
+  background: #ffffff;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.events-banani-search-icon {
+  color: #949494;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.events-banani-search-input {
+  height: auto;
+  padding: 0;
+  border: none;
+  box-shadow: none;
+  background: transparent;
+}
+
+.events-banani-search-input:focus-visible {
+  border: none;
+  box-shadow: none;
+}
+
+.events-banani-filter {
+  position: relative;
+  width: 180px;
+  min-width: 180px;
+}
+
+.events-banani-filter select {
+  width: 100%;
+  height: 40px;
+  padding: 0 40px 0 34px;
+  border: 1px solid #e8e8e8;
+  border-radius: 10px;
+  color: #231f1b;
+  font-size: 13px;
+  font-weight: 600;
+  background: #faf8f5;
+  appearance: none;
+}
+
+.events-banani-filter-icon,
+.events-banani-filter-chevron {
+  position: absolute;
+  top: 50%;
+  color: #8f8a84;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.events-banani-filter-icon {
+  left: 12px;
+}
+
+.events-banani-filter-chevron {
+  right: 12px;
+}
+
+.events-banani-toolbar-spacer {
+  flex: 1;
+}
+
+.events-banani-new {
+  min-height: 40px;
+  padding: 0 16px;
+  border-radius: 10px;
+  color: #ffffff;
+  background: #2f2923;
+  box-shadow: none;
+}
+
+.events-banani-new span,
+.events-banani-new svg {
+  color: inherit;
+}
+
+.events-banani-table-wrap {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.events-banani-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.events-banani-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 12px 24px;
+  border-bottom: 1px solid #e8e8e8;
+  color: #8f8a84;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-align: left;
+  text-transform: uppercase;
+  background: #faf8f5;
+}
+
+.events-banani-table tbody td {
+  padding: 16px 24px;
+  border-bottom: 1px solid #ece7e0;
+  color: #231f1b;
+  font-size: 14px;
+  vertical-align: middle;
+}
+
+.events-banani-name {
+  display: grid;
+  gap: 4px;
+}
+
+.events-banani-name strong {
+  color: #231f1b;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.events-banani-subtitle {
+  color: #8f8a84;
+  font-size: 12px;
+}
+
+.events-banani-muted {
+  color: #746b61;
+}
+
+.events-banani-revenue {
+  font-weight: 700;
+}
+
+.events-banani-open {
+  min-height: 32px;
+  padding: 0 12px;
+  border-color: #e8e8e8;
+  color: #231f1b;
+  box-shadow: none;
+}
+
+.events-banani-empty-row td {
+  padding: 24px;
+}
+
+.events-banani-empty {
+  padding: 20px;
+  border: 1px dashed #e8e8e8;
+  border-radius: 14px;
+  color: #8f8a84;
+  background: #faf8f5;
+}
+
+.events-banani-badge.status-draft {
+  background: #f7f0e4;
+  color: #9a642f;
+}
+
+.events-banani-badge.status-active {
+  background: #e8f5ec;
+  color: #2f6a4f;
+}
+
+.events-banani-badge.status-closed,
+.events-banani-badge.status-archived {
+  background: #efebe4;
+  color: #746b61;
+}
+
+.event-create-page {
+  display: grid;
+  gap: 20px;
+  max-width: 860px;
+}
+
+.event-create-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.event-create-users {
+  display: grid;
+  gap: 10px;
+}
+
+.event-create-user-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.event-create-user-card {
+  padding: 12px 14px;
+  border: 1px solid #e8e8e8;
+  border-radius: 14px;
+  background: #faf8f5;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.event-create-user-card input {
+  margin-top: 2px;
+}
+
+.event-create-user-copy {
+  display: grid;
+  gap: 4px;
+}
+
+.event-create-user-copy strong {
+  font-size: 14px;
+}
+
+.event-create-summary {
+  padding: 16px;
+  border: 1px solid #e8e8e8;
+  border-radius: 14px;
+  background: #faf8f5;
+  display: grid;
+  gap: 10px;
+}
+
+@media (max-width: 1180px) {
+  .events-banani-header,
+  .events-banani-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .events-banani-search,
+  .events-banani-filter {
+    width: 100%;
+  }
+}
+
+@media (max-width: 720px) {
+  .events-banani-page {
+    gap: 20px;
+  }
+
+  .events-banani-card {
+    min-height: auto;
+  }
+
+  .events-banani-table thead {
+    display: none;
+  }
+
+  .events-banani-table,
+  .events-banani-table tbody,
+  .events-banani-table tr,
+  .events-banani-table td {
+    display: block;
+    width: 100%;
+  }
+
+  .events-banani-table tbody tr {
+    border-bottom: 1px solid #ece7e0;
+  }
+
+  .events-banani-table tbody td {
+    padding: 10px 18px;
+    border-bottom: none;
+  }
+
+  .event-create-user-grid {
+    grid-template-columns: 1fr;
+  }
+}

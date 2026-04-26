@@ -3,9 +3,9 @@ export function LoginForm({ form, authLoading, error, onChange, onSubmit }) {
     <section className="login-form-shell">
       <div className="login-card">
         <div>
-          <p className="eyebrow">Sign In</p>
-          <h2>Masuk ke workspace POS</h2>
-          <p className="muted-text">Gunakan akun demo di samping untuk mencoba role berbeda.</p>
+          <p className="eyebrow">Lakoo</p>
+          <h2>Masuk ke dashboard</h2>
+          <p className="muted-text">Login dengan akun yang sudah terdaftar.</p>
         </div>
 
         <form className="form-stack" onSubmit={onSubmit}>

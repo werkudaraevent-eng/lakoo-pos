@@ -43,8 +43,42 @@ function slugify(value) {
     .replace(/^-+|-+$/g, "");
 }
 
+const SCRYPT_KEYLEN = 64;
+const SCRYPT_COST = 16384;
+const SCRYPT_BLOCK_SIZE = 8;
+const SCRYPT_PARALLELIZATION = 1;
+
 function hashPassword(password) {
-  return crypto.createHash("sha256").update(password).digest("hex");
+  const salt = crypto.randomBytes(16).toString("hex");
+  const derived = crypto.scryptSync(password, salt, SCRYPT_KEYLEN, {
+    N: SCRYPT_COST,
+    r: SCRYPT_BLOCK_SIZE,
+    p: SCRYPT_PARALLELIZATION,
+  });
+  return `scrypt:${salt}:${derived.toString("hex")}`;
+}
+
+function verifyPassword(password, storedHash) {
+  // Support legacy SHA256 hashes (64-char hex) for migration
+  if (storedHash && storedHash.length === 64 && !storedHash.includes(":")) {
+    const sha256 = crypto.createHash("sha256").update(password).digest("hex");
+    return crypto.timingSafeEqual(Buffer.from(sha256), Buffer.from(storedHash));
+  }
+
+  // New scrypt format: "scrypt:<salt>:<hash>"
+  const parts = storedHash.split(":");
+  if (parts.length !== 3 || parts[0] !== "scrypt") {
+    return false;
+  }
+
+  const [, salt, hash] = parts;
+  const derived = crypto.scryptSync(password, salt, SCRYPT_KEYLEN, {
+    N: SCRYPT_COST,
+    r: SCRYPT_BLOCK_SIZE,
+    p: SCRYPT_PARALLELIZATION,
+  });
+
+  return crypto.timingSafeEqual(Buffer.from(derived.toString("hex")), Buffer.from(hash));
 }
 
 function createId(prefix) {
@@ -133,8 +167,8 @@ async function fetchProducts(executor) {
       p.created_at AS "createdAt",
       pv.id AS "variantId",
       pv.sku,
-      pv.size,
-      pv.color,
+      pv.attribute1_value AS "attribute1Value",
+      pv.attribute2_value AS "attribute2Value",
       pv.price_override AS "priceOverride",
       pv.quantity_on_hand AS "quantityOnHand",
       pv.low_stock_threshold AS "lowStockThreshold",
@@ -218,6 +252,7 @@ async function fetchSales(executor, { workspaceId, fallbackWorkspaceId }) {
       u.name AS "cashierUser",
       s.subtotal,
       s.discount_total AS "discountTotal",
+      COALESCE(s.tax_total, 0) AS "taxTotal",
       s.grand_total AS "grandTotal",
       s.payment_method AS "paymentMethod",
       s.paid_amount AS "paidAmount",
@@ -235,8 +270,8 @@ async function fetchSales(executor, { workspaceId, fallbackWorkspaceId }) {
       variant_id AS "variantId",
       product_name_snapshot AS "productNameSnapshot",
       sku_snapshot AS "skuSnapshot",
-      size_snapshot AS "sizeSnapshot",
-      color_snapshot AS "colorSnapshot",
+      attribute1_snapshot AS "attribute1Snapshot",
+      attribute2_snapshot AS "attribute2Snapshot",
       unit_price_snapshot AS "unitPriceSnapshot",
       qty,
       line_total AS "lineTotal"
@@ -263,8 +298,8 @@ async function fetchInventoryMovements(executor, { workspaceId, fallbackWorkspac
       m.variant_id AS "variantId",
       pv.sku,
       p.name AS "productName",
-      pv.size,
-      pv.color,
+      pv.attribute1_value AS "attribute1Value",
+      pv.attribute2_value AS "attribute2Value",
       m.type,
       m.qty_delta AS "qtyDelta",
       m.note,
@@ -395,7 +430,7 @@ export async function authenticateUser(username, password) {
   `;
   const user = rows[0];
 
-  if (!user || !user.isActive || user.passwordHash !== hashPassword(password)) {
+  if (!user || !user.isActive || !verifyPassword(password, user.passwordHash)) {
     return null;
   }
 
@@ -728,8 +763,8 @@ export async function finalizeSaleRecord(payload, actorUserId) {
                 SELECT
                   pv.id,
                   pv.sku,
-                  pv.size,
-                  pv.color,
+                  pv.attribute1_value AS "attribute1Value",
+                  pv.attribute2_value AS "attribute2Value",
                   wvs.quantity_on_hand AS "quantityOnHand",
                   pv.price_override AS "priceOverride",
                   p.name AS "productName",
@@ -744,8 +779,8 @@ export async function finalizeSaleRecord(payload, actorUserId) {
                 SELECT
                   pv.id,
                   pv.sku,
-                  pv.size,
-                  pv.color,
+                  pv.attribute1_value AS "attribute1Value",
+                  pv.attribute2_value AS "attribute2Value",
                   pv.quantity_on_hand AS "quantityOnHand",
                   pv.price_override AS "priceOverride",
                   p.name AS "productName",
@@ -767,7 +802,7 @@ export async function finalizeSaleRecord(payload, actorUserId) {
       for (let index = 0; index < cart.length; index += 1) {
         if (dbVariants[index].quantityOnHand < cart[index].qty) {
           throw new Error(
-            `Stock ${dbVariants[index].productName} ${dbVariants[index].size}/${dbVariants[index].color} tidak cukup.`
+            `Stock ${dbVariants[index].productName} ${dbVariants[index].attribute1Value}/${dbVariants[index].attribute2Value} tidak cukup.`
           );
         }
       }
@@ -812,15 +847,23 @@ export async function finalizeSaleRecord(payload, actorUserId) {
             : Math.min(subtotal, matchedPromo.value);
       }
 
+      // Tax calculation
+      const settingsRows = await tx`SELECT key, value FROM settings WHERE key = 'taxRate' LIMIT 1`;
+      const taxRate = settingsRows[0] ? Number(settingsRows[0].value) : 0;
+      const afterDiscount = subtotal - discount;
+      const taxTotal = taxRate > 0 ? Math.round((afterDiscount * taxRate) / 100) : 0;
+      const grandTotal = afterDiscount + taxTotal;
+
+      // Receipt number: LKO-YYYYMMDD-XXXX (random, no race condition)
       const saleId = createId("sale");
-      const countRows = await tx`SELECT COUNT(*)::int AS count FROM sales`;
-      const receiptSeed = countRows[0].count + 1;
-      const receiptNumber = `POS-${new Date().toISOString().slice(0, 10).replaceAll("-", "")}-${receiptSeed}`;
+      const datePart = new Date().toISOString().slice(0, 10).replaceAll("-", "");
+      const randomPart = crypto.randomBytes(2).toString("hex").toUpperCase();
+      const receiptNumber = `LKO-${datePart}-${randomPart}`;
       const createdAt = nowIso();
 
       await tx`
         INSERT INTO sales
-        (id, receipt_number, cashier_user_id, workspace_id, subtotal, discount_total, grand_total, payment_method, paid_amount, created_at)
+        (id, receipt_number, cashier_user_id, workspace_id, subtotal, discount_total, tax_total, grand_total, payment_method, paid_amount, created_at)
         VALUES (
           ${saleId},
           ${receiptNumber},
@@ -828,9 +871,10 @@ export async function finalizeSaleRecord(payload, actorUserId) {
           ${workspace.id},
           ${subtotal},
           ${discount},
-          ${subtotal - discount},
+          ${taxTotal},
+          ${grandTotal},
           ${payload.paymentMethod},
-          ${subtotal - discount},
+          ${grandTotal},
           ${createdAt}
         )
       `;
@@ -842,15 +886,15 @@ export async function finalizeSaleRecord(payload, actorUserId) {
 
         await tx`
           INSERT INTO sale_items
-          (id, sale_id, variant_id, product_name_snapshot, sku_snapshot, size_snapshot, color_snapshot, unit_price_snapshot, qty, line_total)
+          (id, sale_id, variant_id, product_name_snapshot, sku_snapshot, attribute1_snapshot, attribute2_snapshot, unit_price_snapshot, qty, line_total)
           VALUES (
             ${createId("si")},
             ${saleId},
             ${item.variantId},
             ${variant.productName},
             ${variant.sku},
-            ${variant.size},
-            ${variant.color},
+            ${variant.attribute1Value},
+            ${variant.attribute2Value},
             ${item.price},
             ${item.qty},
             ${lineTotal}
@@ -921,6 +965,9 @@ export async function updateSettingsRecord(payload) {
     ["address", payload.address],
     ["paymentMethods", JSON.stringify(payload.paymentMethods || [])],
     ["serviceChargeEnabled", JSON.stringify(Boolean(payload.serviceChargeEnabled))],
+    ["taxRate", String(payload.taxRate ?? 0)],
+    ["attribute1Label", payload.attribute1Label ?? "Size"],
+    ["attribute2Label", payload.attribute2Label ?? "Color"],
   ];
 
   await executor.begin(async (tx) => {
@@ -960,13 +1007,13 @@ export async function createProductRecord(payload) {
       for (const variant of payload.variants || []) {
         await tx`
           INSERT INTO product_variants
-          (id, product_id, sku, size, color, price_override, quantity_on_hand, low_stock_threshold, is_active, created_at)
+          (id, product_id, sku, attribute1_value, attribute2_value, price_override, quantity_on_hand, low_stock_threshold, is_active, created_at)
           VALUES (
             ${createId("v")},
             ${productId},
             ${variant.sku},
-            ${variant.size},
-            ${variant.color},
+            ${variant.attribute1Value || variant.size || ''},
+            ${variant.attribute2Value || variant.color || ''},
             ${variant.priceOverride == null ? null : Number(variant.priceOverride)},
             ${Number(variant.quantityOnHand)},
             ${Number(variant.lowStockThreshold)},
@@ -1033,13 +1080,13 @@ export async function createVariantRecord(productId, payload) {
   try {
     await executor`
       INSERT INTO product_variants
-      (id, product_id, sku, size, color, price_override, quantity_on_hand, low_stock_threshold, is_active, created_at)
+      (id, product_id, sku, attribute1_value, attribute2_value, price_override, quantity_on_hand, low_stock_threshold, is_active, created_at)
       VALUES (
         ${createId("v")},
         ${productId},
         ${payload.sku},
-        ${payload.size},
-        ${payload.color},
+        ${payload.attribute1Value || payload.size || ''},
+        ${payload.attribute2Value || payload.color || ''},
         ${payload.priceOverride == null ? null : Number(payload.priceOverride)},
         ${Number(payload.quantityOnHand)},
         ${Number(payload.lowStockThreshold)},
@@ -1072,8 +1119,8 @@ export async function updateVariantRecord(variantId, payload) {
       UPDATE product_variants
       SET
         sku = ${payload.sku},
-        size = ${payload.size},
-        color = ${payload.color},
+        attribute1_value = ${payload.attribute1Value || payload.size || ''},
+        attribute2_value = ${payload.attribute2Value || payload.color || ''},
         price_override = ${payload.priceOverride == null ? null : Number(payload.priceOverride)},
         quantity_on_hand = ${Number(payload.quantityOnHand)},
         low_stock_threshold = ${Number(payload.lowStockThreshold)},

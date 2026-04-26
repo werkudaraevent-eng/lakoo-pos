@@ -110,6 +110,7 @@ export function AppShell({ children }) {
   const { user, logout } = useAuth();
   const location = useLocation();
   const isDashboardRoute = location.pathname.startsWith("/dashboard");
+  const isCheckoutRoute = location.pathname.startsWith("/checkout");
   const allowedGroups = navigationGroups
     .map((group) => ({
       ...group,
@@ -129,8 +130,8 @@ export function AppShell({ children }) {
               <AppIcon name="ShoppingBag" size={18} strokeWidth={2} />
             </div>
             <div className="brand-text">
-              <span className="brand-subtitle">Harness POS</span>
-              <span className="brand-title">Retail OS</span>
+              <span className="brand-subtitle">Lakoo</span>
+              <span className="brand-title">POS</span>
             </div>
           </div>
 
@@ -180,7 +181,15 @@ export function AppShell({ children }) {
           </div>
         </header>
 
-        <div className={isDashboardRoute ? "dashboard-page-frame" : "page-shell"}>{children}</div>
+        <div
+          className={
+            isDashboardRoute
+              ? "dashboard-page-frame"
+              : `page-shell${isCheckoutRoute ? " page-shell-checkout" : ""}`
+          }
+        >
+          {children}
+        </div>
       </div>
     </div>
   );

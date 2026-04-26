@@ -34,7 +34,7 @@ export function CartSummary({
               <div>
                 <strong>{item.productName}</strong>
                 <p className="muted-text">
-                  {item.size} / {item.color} - {item.sku}
+                  {item.attribute1Value} / {item.attribute2Value} - {item.sku}
                 </p>
               </div>
               <strong>{formatCurrency(item.price * item.qty)}</strong>

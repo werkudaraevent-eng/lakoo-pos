@@ -1,0 +1,330 @@
+.inventory-banani-page {
+  display: grid;
+  gap: 24px;
+  width: 100%;
+  max-width: 1240px;
+  margin: 0 auto;
+}
+
+.inventory-banani-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.inventory-banani-title {
+  color: #231f1b;
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.inventory-banani-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.inventory-banani-button {
+  min-height: 40px;
+  padding: 0 16px;
+  border-radius: 10px;
+  box-shadow: none;
+}
+
+.inventory-banani-button.is-primary {
+  color: #ffffff;
+  background: #2f2923;
+}
+
+.inventory-banani-button.is-primary span,
+.inventory-banani-button.is-primary svg {
+  color: inherit;
+}
+
+.inventory-banani-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.inventory-banani-toolbar-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.inventory-banani-search {
+  width: 320px;
+  min-width: 280px;
+  height: 40px;
+  padding: 0 12px;
+  border: 1px solid #e8e8e8;
+  border-radius: 10px;
+  background: #ffffff;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.inventory-banani-search-input {
+  height: auto;
+  padding: 0;
+  border: none;
+  box-shadow: none;
+  background: transparent;
+}
+
+.inventory-banani-search-input:focus-visible {
+  border: none;
+  box-shadow: none;
+}
+
+.inventory-banani-select {
+  position: relative;
+  min-width: 160px;
+}
+
+.inventory-banani-select select {
+  width: 100%;
+  height: 40px;
+  padding: 0 40px 0 14px;
+  border: 1px solid #e8e8e8;
+  border-radius: 10px;
+  color: #231f1b;
+  font-size: 13px;
+  font-weight: 600;
+  background: #ffffff;
+  appearance: none;
+}
+
+.inventory-banani-select-icon {
+  position: absolute;
+  top: 50%;
+  right: 12px;
+  color: #8f8a84;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.inventory-banani-page-info {
+  color: #746b61;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.inventory-banani-table-card {
+  overflow: hidden;
+  border: 1px solid #e8e8e8;
+  border-radius: 16px;
+  background: #ffffff;
+}
+
+.inventory-banani-table-wrap {
+  overflow-x: auto;
+}
+
+.inventory-banani-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.inventory-banani-table th {
+  padding: 14px 20px;
+  border-bottom: 1px solid #e8e8e8;
+  color: #8f8a84;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.inventory-banani-table td {
+  padding: 16px 20px;
+  border-bottom: 1px solid #ece7e0;
+  color: #231f1b;
+  font-size: 14px;
+  vertical-align: middle;
+}
+
+.inventory-banani-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.inventory-banani-product {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.inventory-banani-avatar {
+  width: 40px;
+  height: 40px;
+  border: 1px solid #e8e8e8;
+  border-radius: 12px;
+  background: linear-gradient(180deg, #f5f0e7 0%, #efe7db 100%);
+  color: #2f2923;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.inventory-banani-product-copy {
+  display: grid;
+  gap: 4px;
+}
+
+.inventory-banani-product-copy strong {
+  font-size: 14px;
+}
+
+.inventory-banani-subtle {
+  color: #8f8a84;
+  font-size: 12px;
+}
+
+.inventory-banani-qty {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.inventory-banani-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.inventory-banani-status .dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+}
+
+.inventory-banani-status.stable {
+  background: rgba(47, 106, 79, 0.12);
+  color: #2f6a4f;
+}
+
+.inventory-banani-status.stable .dot {
+  background: #2f6a4f;
+}
+
+.inventory-banani-status.warning {
+  background: rgba(154, 100, 47, 0.14);
+  color: #9a642f;
+}
+
+.inventory-banani-status.warning .dot {
+  background: #9a642f;
+}
+
+.inventory-banani-status.none {
+  background: rgba(168, 81, 67, 0.12);
+  color: #a85143;
+}
+
+.inventory-banani-status.none .dot {
+  background: #a85143;
+}
+
+.inventory-banani-table-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 20px;
+  border-top: 1px solid #e8e8e8;
+}
+
+.inventory-banani-page-controls {
+  display: flex;
+  gap: 8px;
+}
+
+.inventory-banani-empty {
+  padding: 24px;
+  border: 1px dashed #e8e8e8;
+  border-radius: 14px;
+  color: #8f8a84;
+  background: #faf8f5;
+}
+
+.inventory-manage-page {
+  display: grid;
+  gap: 20px;
+  max-width: 980px;
+}
+
+.inventory-manage-summary {
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+  border: 1px solid #e8e8e8;
+  border-radius: 16px;
+  background: #faf8f5;
+}
+
+.inventory-manage-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.inventory-manage-list {
+  display: grid;
+  gap: 12px;
+}
+
+.inventory-manage-row {
+  padding: 12px 14px;
+  border: 1px solid #e8e8e8;
+  border-radius: 14px;
+  background: #faf8f5;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.inventory-manage-row strong {
+  font-size: 14px;
+}
+
+@media (max-width: 980px) {
+  .inventory-banani-header,
+  .inventory-banani-table-footer {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
+@media (max-width: 720px) {
+  .inventory-banani-toolbar,
+  .inventory-banani-toolbar-group {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .inventory-banani-search,
+  .inventory-banani-select {
+    width: 100%;
+  }
+
+  .inventory-manage-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

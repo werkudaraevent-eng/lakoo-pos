@@ -17,3 +17,49 @@
 [2m11.06.25[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m Re-optimizing dependencies because lockfile has changed
 [2m11.06.25[22m [36m[1m[vite][22m[39m server restarted.
 [2m11.07.50[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles.css[22m
+[2m11.08.25[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles.css[22m
+[2m11.10.40[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/pages/CheckoutPage.jsx, /src/styles.css[22m
+[2m11.11.54[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/pages/CheckoutPage.jsx, /src/styles.css[22m
+[2m11.11.56[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32m✨ new dependencies optimized: [33mclass-variance-authority, radix-ui, clsx, tailwind-merge[32m[39m
+[2m11.11.56[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32m✨ optimized dependencies changed. reloading[39m
+[2m11.12.57[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/features/checkout/checkout.css, /src/styles.css[22m
+[2m11.13.09[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/features/checkout/checkout.css, /src/styles.css[22m
+[2m11.13.30[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/pages/CheckoutPage.jsx, /src/styles.css[22m
+[2m11.28.07[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles.css[22m
+[2m11.28.33[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/features/checkout/checkout.css, /src/styles.css[22m
+[2m11.36.55[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/features/checkout/checkout.css, /src/styles.css[22m
+[2m11.42.12[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/features/checkout/checkout.css, /src/styles.css[22m
+[2m11.44.11[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/features/checkout/checkout.css, /src/styles.css[22m
+[2m11.56.29[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/features/ui/AppIcon.jsx, /src/styles.css[22m
+[2m11.59.18[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/pages/SalesPage.jsx, /src/styles.css[22m
+[2m12.00.12[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/pages/SalesPage.jsx, /src/styles.css[22m
+[2m12.26.06[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/pages/EventsPage.jsx, /src/styles.css[22m
+[2m12.26.57[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/pages/EventsPage.jsx, /src/styles.css[22m
+[2m12.27.42[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/app/App.jsx, /src/styles.css[22m
+[2m12.31.04[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles.css, /src/features/events/events.css[22m
+[2m13.16.24[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/pages/CatalogPage.jsx, /src/styles.css[22m
+[2m13.22.32[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/app/App.jsx, /src/styles.css[22m
+[2m13.22.32[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/features/ui/AppIcon.jsx, /src/styles.css[22m
+[2m13.22.32[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/pages/CatalogPage.jsx, /src/styles.css[22m
+[2m14.15.44[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/pages/InventoryPage.jsx, /src/styles.css[22m
+[2m14.18.53[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/pages/InventoryPage.jsx, /src/styles.css[22m
+[2m14.18.53[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/app/App.jsx, /src/styles.css[22m
+[2m14.18.53[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/features/ui/AppIcon.jsx, /src/styles.css[22m
+[2m14.34.51[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/pages/PromotionsPage.jsx, /src/styles.css[22m
+[2m14.34.51[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/pages/PromotionsPage.jsx, /src/styles.css[22m
+[2m14.34.51[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/app/App.jsx, /src/styles.css[22m
+[2m15.05.26[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/pages/ReportsPage.jsx, /src/styles.css[22m
+[2m15.15.01[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles.css[22m
+[2m16.38.17[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles.css[22m
+[2m16.52.32[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/pages/CheckoutPage.jsx, /src/styles.css[22m
+[2m16.52.52[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/features/checkout/checkout.css, /src/styles.css[22m
+[2m17.00.20[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/features/checkout/checkout.css, /src/styles.css[22m
+[2m17.01.52[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/pages/CheckoutPage.jsx, /src/styles.css[22m
+[2m17.02.07[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/features/checkout/checkout.css, /src/styles.css[22m
+[2m17.45.36[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/pages/CheckoutPage.jsx, /src/styles.css[22m
+[2m17.45.53[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/features/checkout/checkout.css, /src/styles.css[22m
+[2m17.56.44[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/features/checkout/checkout.css, /src/styles.css[22m
+[2m18.03.01[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/components/AppShell.jsx, /src/styles.css[22m
+[2m18.04.05[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles.css[22m
+[2m18.04.20[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/features/checkout/checkout.css, /src/styles.css[22m
+[2m18.04.40[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/features/checkout/checkout.css, /src/styles.css[22m

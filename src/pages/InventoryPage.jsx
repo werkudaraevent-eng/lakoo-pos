@@ -1,273 +1,260 @@
-import { useEffect, useMemo, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 
-import { useAuth } from "../context/AuthContext";
+import { Button } from "../components/ui/button";
+import { Input } from "../components/ui/input";
 import { usePosData } from "../context/PosDataContext";
-import { useWorkspace } from "../context/WorkspaceContext";
-import { buildInventoryWorkspaceSummary, getInventoryStatusLabel } from "../features/inventory/inventoryWorkspace";
-import { formatDate } from "../utils/formatters";
+import {
+  buildInventoryCsv,
+  buildInventoryProductRows,
+  filterInventoryProductRows,
+  paginateInventoryRows,
+} from "../features/inventory/inventoryWorkspace";
+import { AppIcon } from "../features/ui/AppIcon";
+import "../features/inventory/inventory.css";
 
-function matchesInventoryQuery(variant, query) {
-  if (!query) {
-    return true;
-  }
+const PAGE_SIZE = 8;
 
-  const haystack = `${variant.productName} ${variant.size} ${variant.color} ${variant.sku}`.toLowerCase();
-  return haystack.includes(query.toLowerCase());
+function downloadInventoryCsv(rows) {
+  const csv = buildInventoryCsv(rows);
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "inventory-export.csv";
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+function getProductMark(name) {
+  return String(name || "")
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((chunk) => chunk[0])
+    .join("")
+    .toUpperCase();
 }
 
 export function InventoryPage() {
-  const { user } = useAuth();
-  const { variants, inventoryMovements, adjustInventory, loading, loadError, workspaces } = usePosData();
-  const { activeWorkspaceId } = useWorkspace();
-  const [form, setForm] = useState({
-    variantId: "",
-    mode: "restock",
-    quantity: 1,
-    note: "",
-  });
+  const { categories, loadError, loading, products, workspaces } = usePosData();
   const [query, setQuery] = useState("");
-  const [showLowStockOnly, setShowLowStockOnly] = useState(false);
-  const [message, setMessage] = useState("");
-  const activeWorkspace = workspaces.find((workspace) => workspace.id === activeWorkspaceId) ?? null;
-  const inventoryLocked =
-    activeWorkspace?.type === "event" && !["draft", "active"].includes(activeWorkspace.status);
+  const [category, setCategory] = useState("all");
+  const [status, setStatus] = useState("all");
+  const [location, setLocation] = useState("all");
+  const [page, setPage] = useState(1);
+  const deferredQuery = useDeferredValue(query);
 
-  const filteredVariants = useMemo(() => {
-    return variants.filter((variant) => {
-      const matchesQuery = matchesInventoryQuery(variant, query);
-      const matchesLowStock = !showLowStockOnly || variant.quantityOnHand <= variant.lowStockThreshold;
-
-      return matchesQuery && matchesLowStock;
-    });
-  }, [query, showLowStockOnly, variants]);
-
-  const summary = useMemo(() => buildInventoryWorkspaceSummary({ variants: filteredVariants }), [filteredVariants]);
-
-  const selectedVariant = useMemo(() => {
-    return filteredVariants.find((variant) => variant.id === form.variantId) ?? filteredVariants[0] ?? null;
-  }, [filteredVariants, form.variantId]);
+  const locationOptions = useMemo(
+    () =>
+      workspaces
+        .filter((workspace) => workspace.type === "event" && workspace.isVisible !== false)
+        .map((workspace) => workspace.name),
+    [workspaces]
+  );
+  const selectedWorkspace =
+    location === "all"
+      ? null
+      : workspaces.find((workspace) => workspace.name === location) ?? null;
+  const inventoryRows = useMemo(
+    () => buildInventoryProductRows(products, { activeWorkspace: selectedWorkspace }),
+    [products, selectedWorkspace]
+  );
+  const filteredRows = useMemo(
+    () => filterInventoryProductRows(inventoryRows, { query: deferredQuery, category, status }),
+    [category, deferredQuery, inventoryRows, status]
+  );
+  const paginatedRows = useMemo(
+    () => paginateInventoryRows(filteredRows, { page, pageSize: PAGE_SIZE }),
+    [filteredRows, page]
+  );
 
   useEffect(() => {
-    if (!form.variantId && filteredVariants[0]) {
-      setForm((current) => ({ ...current, variantId: filteredVariants[0].id }));
-      return;
-    }
-
-    if (filteredVariants.length === 0 && form.variantId) {
-      setForm((current) => ({ ...current, variantId: "" }));
-      return;
-    }
-
-    const visibleSelected = filteredVariants.some((variant) => variant.id === form.variantId);
-    if (!visibleSelected && filteredVariants[0]?.id && form.variantId !== filteredVariants[0].id) {
-      setForm((current) => ({ ...current, variantId: filteredVariants[0].id }));
-    }
-  }, [filteredVariants, form.variantId]);
-
-  async function handleSubmit(event) {
-    event.preventDefault();
-    const result = await adjustInventory({ ...form, actor: user });
-    setMessage(result.ok ? "Stock updated." : result.message);
-
-    if (result.ok) {
-      setForm((current) => ({ ...current, quantity: 1, note: "" }));
-    }
-  }
+    setPage(1);
+  }, [deferredQuery, category, status, location]);
 
   return (
-    <div className="page-stack inventory-page inventory-workspace">
-      <section className="page-header-card inventory-header-bar">
-        <div className="inventory-header-copy">
-          <p className="eyebrow">Inventory</p>
-          <h1>Stock control workspace</h1>
+    <div className="inventory-banani-page">
+      <header className="inventory-banani-header">
+        <div>
+          <h1 className="inventory-banani-title">Inventory</h1>
           <p className="muted-text">
-            Restock dan adjustment dicatat sebagai movement terpisah agar quantity on hand selalu bisa ditelusuri.
+            Scan product stock quickly, filter by category or status, and leave stock actions to dedicated flows.
           </p>
         </div>
 
-        <div className="inventory-header-meta">
-          {activeWorkspace ? <span className="badge-soft">{activeWorkspace.name}</span> : null}
-          {activeWorkspace?.stockMode ? <span className="badge-soft">{activeWorkspace.stockMode}</span> : null}
-          {activeWorkspace?.status ? <span className="badge-soft">{activeWorkspace.status}</span> : null}
+        <div className="inventory-banani-actions">
+          <Button
+            className="inventory-banani-button"
+            onClick={() => downloadInventoryCsv(filteredRows)}
+            size="lg"
+            type="button"
+            variant="outline"
+          >
+            <AppIcon name="Download" size={16} />
+            <span>Export CSV</span>
+          </Button>
+          <Button className="inventory-banani-button" disabled size="lg" type="button" variant="outline">
+            <AppIcon name="ArrowRightLeft" size={16} />
+            <span>Transfer Stock</span>
+          </Button>
+          <Button asChild className="inventory-banani-button is-primary" size="lg">
+            <Link to="/inventory/receive">
+              <AppIcon name="PackagePlus" size={16} />
+              <span>Receive Stock</span>
+            </Link>
+          </Button>
         </div>
-      </section>
+      </header>
 
       {loading ? <p className="info-text">Loading inventory...</p> : null}
       {loadError ? <p className="error-text">{loadError}</p> : null}
+      {location !== "all" ? (
+        <p className="info-text">
+          Workspace split is shown for <strong>{location}</strong>. Warehouse values outside that context remain hidden
+          because the current model does not expose full multi-location stock.
+        </p>
+      ) : null}
 
-      <section className="panel-card inventory-toolbar inventory-toolbar-flat">
-        <div className="inventory-toolbar-controls inventory-toolbar-controls-flat">
-          <label className="field inventory-search-field">
-            <span>Search</span>
-            <input
-              value={query}
+      <section className="inventory-banani-toolbar">
+        <div className="inventory-banani-toolbar-group">
+          <label className="inventory-banani-search" htmlFor="inventory-search">
+            <AppIcon name="Search" size={16} />
+            <Input
+              className="inventory-banani-search-input"
+              id="inventory-search"
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="Product, variant, SKU"
+              placeholder="Search product, SKU or tags"
+              value={query}
             />
           </label>
 
-          <label className="field inventory-filter-field">
-            <span>Stock scope</span>
-            <button
-              className={`secondary-button inventory-filter-button${showLowStockOnly ? " is-selected" : ""}`}
-              onClick={() => setShowLowStockOnly((current) => !current)}
-              type="button"
-            >
-              {showLowStockOnly ? "Low stock only" : "All variants"}
-            </button>
+          <label className="inventory-banani-select">
+            <select onChange={(event) => setLocation(event.target.value)} value={location}>
+              <option value="all">Location: All</option>
+              {locationOptions.map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
+            <span className="inventory-banani-select-icon" aria-hidden="true">
+              <AppIcon name="MapPin" size={16} />
+            </span>
+          </label>
+
+          <label className="inventory-banani-select">
+            <select onChange={(event) => setCategory(event.target.value)} value={category}>
+              <option value="all">Category: All</option>
+              {categories.map((item) => (
+                <option key={item.id} value={item.name}>
+                  {item.name}
+                </option>
+              ))}
+            </select>
+            <span className="inventory-banani-select-icon" aria-hidden="true">
+              <AppIcon name="Tag" size={16} />
+            </span>
+          </label>
+
+          <label className="inventory-banani-select">
+            <select onChange={(event) => setStatus(event.target.value)} value={status}>
+              <option value="all">Status: All</option>
+              <option value="stable">In stock</option>
+              <option value="warning">Low stock</option>
+              <option value="none">Out of stock</option>
+            </select>
+            <span className="inventory-banani-select-icon" aria-hidden="true">
+              <AppIcon name="Filter" size={16} />
+            </span>
           </label>
         </div>
 
-        <div className="inventory-toolbar-summary">
-          <div className="inventory-kpi">
-            <span className="stat-label">Visible variants</span>
-            <strong>{summary.totalVariants}</strong>
-          </div>
-          <div className="inventory-kpi">
-            <span className="stat-label">Low stock</span>
-            <strong>{summary.lowStockCount}</strong>
-          </div>
-          <div className="inventory-kpi">
-            <span className="stat-label">Total on hand</span>
-            <strong>{summary.totalOnHand}</strong>
-          </div>
-        </div>
+        <p className="inventory-banani-page-info">
+          Showing {paginatedRows.items.length} of {filteredRows.length} products
+        </p>
       </section>
 
-      <section className="content-grid inventory-layout inventory-layout-split">
-        <article className="panel-card inventory-list-panel inventory-list-panel-split">
-          <div className="panel-head inventory-list-head">
-            <div>
-              <h2>Stock list</h2>
-              <p className="muted-text">Select a variant to inspect stock level and post a movement.</p>
+      <section className="inventory-banani-table-card">
+        {paginatedRows.items.length ? (
+          <>
+            <div className="inventory-banani-table-wrap">
+              <table className="inventory-banani-table">
+                <thead>
+                  <tr>
+                    <th>Product</th>
+                    <th>Category</th>
+                    <th>Total Stock</th>
+                    <th>Warehouse</th>
+                    <th>{selectedWorkspace?.name || "Active Workspace"}</th>
+                    <th>Status</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {paginatedRows.items.map((row) => (
+                    <tr key={row.id}>
+                      <td>
+                        <div className="inventory-banani-product">
+                          <span className="inventory-banani-avatar">{getProductMark(row.name)}</span>
+                          <div className="inventory-banani-product-copy">
+                            <strong>{row.name}</strong>
+                            <span className="inventory-banani-subtle">{row.sku}</span>
+                          </div>
+                        </div>
+                      </td>
+                      <td>{row.category || "-"}</td>
+                      <td className="inventory-banani-qty">{row.totalStock}</td>
+                      <td className="inventory-banani-qty">{row.warehouseStock == null ? "-" : row.warehouseStock}</td>
+                      <td className="inventory-banani-qty">{row.workspaceStock == null ? "-" : row.workspaceStock}</td>
+                      <td>
+                        <span className={`inventory-banani-status ${row.status.tone}`}>
+                          <span className="dot" />
+                          {row.status.label}
+                        </span>
+                      </td>
+                      <td>
+                        <Button asChild size="sm" variant="outline">
+                          <Link to={`/catalog/${row.id}`}>Open detail</Link>
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-            <span className="badge-soft">{filteredVariants.length} visible</span>
-          </div>
 
-          <div className="inventory-table inventory-table-split">
-            <div className="inventory-table-head">
-              <span>Variant</span>
-              <span>On hand</span>
-              <span>Threshold</span>
-              <span>Status</span>
-            </div>
-            {filteredVariants.length === 0 ? <p className="stack-empty">No variants match this filter.</p> : null}
-            {filteredVariants.map((variant) => {
-              const status = getInventoryStatusLabel(variant);
-              const isSelected = variant.id === form.variantId;
-
-              return (
-                <button
-                  className={`inventory-row-button${isSelected ? " is-selected" : ""}`}
-                  key={variant.id}
-                  onClick={() => setForm((current) => ({ ...current, variantId: variant.id }))}
+            <footer className="inventory-banani-table-footer">
+              <p className="inventory-banani-page-info">
+                Page {paginatedRows.page} of {paginatedRows.totalPages}
+              </p>
+              <div className="inventory-banani-page-controls">
+                <Button
+                  disabled={paginatedRows.page <= 1}
+                  onClick={() => setPage((current) => Math.max(1, current - 1))}
+                  size="icon-sm"
                   type="button"
+                  variant="outline"
                 >
-                  <div className="inventory-row-primary">
-                    <strong>{variant.productName}</strong>
-                    <p className="muted-text">
-                      {variant.size}/{variant.color} · {variant.sku}
-                    </p>
-                  </div>
-                  <strong>{variant.quantityOnHand}</strong>
-                  <span className="muted-text">{variant.lowStockThreshold}</span>
-                  <span className={`inventory-status-pill inventory-status-pill-${status.tone}`}>{status.label}</span>
-                </button>
-              );
-            })}
+                  <AppIcon name="ChevronLeft" size={16} />
+                </Button>
+                <Button
+                  disabled={paginatedRows.page >= paginatedRows.totalPages}
+                  onClick={() => setPage((current) => Math.min(paginatedRows.totalPages, current + 1))}
+                  size="icon-sm"
+                  type="button"
+                  variant="outline"
+                >
+                  <AppIcon name="ChevronRight" size={16} />
+                </Button>
+              </div>
+            </footer>
+          </>
+        ) : (
+          <div className="inventory-banani-empty">
+            No products match the current filter state. Broaden the filters or change location context.
           </div>
-        </article>
-
-        <article className="panel-card inventory-action-panel inventory-action-panel-split">
-          <div className="panel-head inventory-action-head">
-            <div>
-              <p className="eyebrow">Selected variant</p>
-              <h2>{selectedVariant ? selectedVariant.productName : "No variant selected"}</h2>
-              {selectedVariant ? (
-                <p className="muted-text">
-                  {selectedVariant.size}/{selectedVariant.color} · {selectedVariant.sku}
-                </p>
-              ) : (
-                <p className="muted-text">Choose a variant from the stock list to post a movement.</p>
-              )}
-            </div>
-            {selectedVariant ? <span className="badge-soft">{selectedVariant.quantityOnHand} on hand</span> : null}
-          </div>
-
-          <div className="inventory-selected-summary">
-            <div className="summary-row">
-              <span>Threshold</span>
-              <strong>{selectedVariant ? selectedVariant.lowStockThreshold : "-"}</strong>
-            </div>
-            <div className="summary-row">
-              <span>Last checked</span>
-              <strong>{selectedVariant ? formatDate(selectedVariant.updatedAt ?? selectedVariant.createdAt) : "-"}</strong>
-            </div>
-          </div>
-
-          <form className="form-stack inventory-form" onSubmit={handleSubmit}>
-            <label className="field">
-              <span>Mode</span>
-              <select
-                value={form.mode}
-                onChange={(event) => setForm((current) => ({ ...current, mode: event.target.value }))}
-              >
-                <option value="restock">Restock</option>
-                <option value="adjustment">Adjustment</option>
-              </select>
-            </label>
-
-            <label className="field">
-              <span>Quantity</span>
-              <input
-                min="1"
-                type="number"
-                value={form.quantity}
-                onChange={(event) => setForm((current) => ({ ...current, quantity: event.target.value }))}
-              />
-            </label>
-
-            <label className="field">
-              <span>Note</span>
-              <textarea
-                value={form.note}
-                onChange={(event) => setForm((current) => ({ ...current, note: event.target.value }))}
-                placeholder="Weekend replenishment, damaged item, display sample..."
-              />
-            </label>
-
-            {inventoryLocked ? <p className="error-text">Stock changes are locked for this event status.</p> : null}
-            {message ? <p className="info-text">{message}</p> : null}
-
-            <button className="primary-button" disabled={inventoryLocked || !selectedVariant} type="submit">
-              Save movement
-            </button>
-          </form>
-
-          <div className="inventory-history-panel">
-            <div className="panel-head inventory-history-head">
-              <h3>Movement history</h3>
-              <span className="badge-soft">Recent 10</span>
-            </div>
-
-            <div className="table-list inventory-history-list">
-              {inventoryMovements.slice(0, 10).map((movement) => (
-                <div className="table-row inventory-history-row" key={movement.id}>
-                  <div>
-                    <strong>{movement.note}</strong>
-                    <p className="muted-text">
-                      {movement.type} · {movement.actorUser} · {formatDate(movement.createdAt)}
-                    </p>
-                  </div>
-                  <span className={movement.qtyDelta < 0 ? "text-danger" : "text-success"}>
-                    {movement.qtyDelta > 0 ? "+" : ""}
-                    {movement.qtyDelta}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </article>
+        )}
       </section>
     </div>
   );

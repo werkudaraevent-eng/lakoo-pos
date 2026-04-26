@@ -1,0 +1,397 @@
+.catalog-banani-page {
+  display: grid;
+  gap: 24px;
+  width: 100%;
+  max-width: 1240px;
+  margin: 0 auto;
+}
+
+.catalog-banani-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.catalog-banani-title {
+  color: #231f1b;
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.catalog-banani-header-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.catalog-banani-button {
+  min-height: 40px;
+  padding: 0 16px;
+  border-radius: 10px;
+  box-shadow: none;
+}
+
+.catalog-banani-button.is-primary {
+  color: #ffffff;
+  background: #2f2923;
+}
+
+.catalog-banani-button.is-primary span,
+.catalog-banani-button.is-primary svg {
+  color: inherit;
+}
+
+.catalog-banani-button.is-outline {
+  color: #231f1b;
+  border-color: #e8e8e8;
+  background: #ffffff;
+}
+
+.catalog-banani-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.catalog-banani-toolbar-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.catalog-banani-search {
+  width: 320px;
+  min-width: 280px;
+  height: 40px;
+  padding: 0 12px;
+  border: 1px solid #e8e8e8;
+  border-radius: 10px;
+  background: #ffffff;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.catalog-banani-search-icon {
+  color: #949494;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.catalog-banani-search-input {
+  height: auto;
+  padding: 0;
+  border: none;
+  box-shadow: none;
+  background: transparent;
+}
+
+.catalog-banani-search-input:focus-visible {
+  border: none;
+  box-shadow: none;
+}
+
+.catalog-banani-select {
+  position: relative;
+  min-width: 160px;
+}
+
+.catalog-banani-select select {
+  width: 100%;
+  height: 40px;
+  padding: 0 40px 0 14px;
+  border: 1px solid #e8e8e8;
+  border-radius: 10px;
+  color: #231f1b;
+  font-size: 13px;
+  font-weight: 600;
+  background: #ffffff;
+  appearance: none;
+}
+
+.catalog-banani-select-icon {
+  position: absolute;
+  top: 50%;
+  right: 12px;
+  color: #8f8a84;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.catalog-banani-page-info {
+  color: #746b61;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.catalog-banani-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 20px;
+}
+
+.catalog-banani-card {
+  padding: 0;
+  border: 1px solid #e8e8e8;
+  border-radius: 16px;
+  background: #ffffff;
+  overflow: hidden;
+  text-align: left;
+  box-shadow: none;
+}
+
+.catalog-banani-media {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1;
+  background: linear-gradient(180deg, #f5f0e7 0%, #efe7db 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.catalog-banani-media-mark {
+  color: #2f2923;
+  font-size: 2.8rem;
+  font-weight: 800;
+  letter-spacing: -0.08em;
+}
+
+.catalog-banani-overlay {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+}
+
+.catalog-banani-card-body {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.catalog-banani-meta {
+  display: grid;
+  gap: 4px;
+}
+
+.catalog-banani-category {
+  color: #8f8a84;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.catalog-banani-name {
+  color: #231f1b;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.catalog-banani-price {
+  color: #231f1b;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.catalog-banani-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #ece7e0;
+}
+
+.catalog-banani-stock {
+  color: #746b61;
+  font-size: 12px;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.catalog-banani-stock-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+}
+
+.catalog-banani-stock-dot.high {
+  background: #2f6a4f;
+}
+
+.catalog-banani-stock-dot.low {
+  background: #9a642f;
+}
+
+.catalog-banani-stock-dot.none {
+  background: #a85143;
+}
+
+.catalog-banani-card-link {
+  min-height: 32px;
+  padding: 0 12px;
+  border-color: #e8e8e8;
+  color: #231f1b;
+  box-shadow: none;
+}
+
+.catalog-banani-status[data-variant="secondary"] {
+  color: #2f6a4f;
+  background: rgba(47, 106, 79, 0.12);
+}
+
+.catalog-banani-status[data-variant="outline"] {
+  color: #8f8a84;
+  background: rgba(255, 255, 255, 0.86);
+}
+
+.catalog-banani-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding-top: 24px;
+  border-top: 1px solid #e8e8e8;
+}
+
+.catalog-banani-page-controls {
+  display: flex;
+  gap: 8px;
+}
+
+.catalog-banani-page-button {
+  min-width: 32px;
+  min-height: 32px;
+  border-color: #e8e8e8;
+  color: #231f1b;
+  box-shadow: none;
+}
+
+.catalog-banani-empty {
+  padding: 24px;
+  border: 1px dashed #e8e8e8;
+  border-radius: 14px;
+  color: #8f8a84;
+  background: #faf8f5;
+}
+
+.catalog-manage-page {
+  display: grid;
+  gap: 20px;
+  max-width: 980px;
+}
+
+.catalog-manage-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.catalog-manage-page .page-header-card {
+  box-shadow: none;
+  background: rgba(255, 255, 255, 0.96);
+}
+
+.catalog-manage-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+}
+
+.catalog-manage-variant-list {
+  display: grid;
+  gap: 12px;
+}
+
+.catalog-manage-variant-row {
+  padding: 12px 14px;
+  border: 1px solid #e8e8e8;
+  border-radius: 14px;
+  background: #faf8f5;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.catalog-manage-variant-meta {
+  display: grid;
+  gap: 4px;
+}
+
+.catalog-manage-variant-meta strong {
+  font-size: 14px;
+}
+
+.catalog-manage-variant-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.catalog-manage-stock-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.catalog-manage-stock-pill.high {
+  color: #2f6a4f;
+  background: rgba(47, 106, 79, 0.12);
+}
+
+.catalog-manage-stock-pill.low {
+  color: #9a642f;
+  background: rgba(154, 100, 47, 0.14);
+}
+
+.catalog-manage-stock-pill.none {
+  color: #a85143;
+  background: rgba(168, 81, 67, 0.12);
+}
+
+@media (max-width: 980px) {
+  .catalog-banani-header,
+  .catalog-banani-pagination {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .catalog-manage-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .catalog-banani-toolbar,
+  .catalog-banani-toolbar-group {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .catalog-banani-search,
+  .catalog-banani-select {
+    width: 100%;
+  }
+
+  .catalog-manage-variant-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

@@ -1,0 +1,509 @@
+.sales-banani-page {
+  display: grid;
+  gap: 24px;
+  width: 100%;
+  max-width: 1220px;
+  margin: 0 auto;
+}
+
+.sales-banani-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.sales-banani-header-copy {
+  display: grid;
+  gap: 8px;
+  max-width: 42rem;
+}
+
+.sales-banani-title {
+  color: #231f1b;
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.sales-banani-description {
+  color: #746b61;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.sales-banani-metrics {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.sales-banani-metric {
+  min-width: 152px;
+  padding: 12px 16px;
+  border: 1px solid #e8e8e8;
+  border-radius: 12px;
+  background: #ffffff;
+  display: grid;
+  gap: 4px;
+}
+
+.sales-banani-metric.is-primary {
+  color: #ffffff;
+  border-color: #2f2923;
+  background: #2f2923;
+}
+
+.sales-banani-metric-label {
+  color: #8f8a84;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.sales-banani-metric.is-primary .sales-banani-metric-label {
+  color: rgba(255, 255, 255, 0.76);
+}
+
+.sales-banani-metric-value {
+  color: #231f1b;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.sales-banani-metric.is-primary .sales-banani-metric-value {
+  color: #ffffff;
+}
+
+.sales-banani-card {
+  border: 1px solid #e8e8e8;
+  border-radius: 18px;
+  background: #ffffff;
+  overflow: hidden;
+  min-height: calc(100vh - 248px);
+  display: flex;
+  flex-direction: column;
+}
+
+.sales-banani-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px;
+  border-bottom: 1px solid #e8e8e8;
+}
+
+.sales-banani-search {
+  width: 340px;
+  min-width: 280px;
+  height: 40px;
+  padding: 0 12px;
+  border: 1px solid #e8e8e8;
+  border-radius: 10px;
+  background: #ffffff;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sales-banani-search-icon {
+  color: #949494;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sales-banani-search-input {
+  height: auto;
+  padding: 0;
+  border: none;
+  box-shadow: none;
+  background: transparent;
+}
+
+.sales-banani-search-input:focus-visible {
+  border: none;
+  box-shadow: none;
+}
+
+.sales-banani-filter {
+  position: relative;
+  width: 188px;
+  min-width: 188px;
+}
+
+.sales-banani-filter select {
+  width: 100%;
+  height: 40px;
+  padding: 0 40px 0 14px;
+  border: 1px solid #e8e8e8;
+  border-radius: 10px;
+  color: #231f1b;
+  font-size: 13px;
+  font-weight: 600;
+  background: #faf8f5;
+  appearance: none;
+}
+
+.sales-banani-filter-icon,
+.sales-banani-filter-chevron {
+  position: absolute;
+  top: 50%;
+  color: #8f8a84;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.sales-banani-filter-icon {
+  left: 12px;
+}
+
+.sales-banani-filter-chevron {
+  right: 12px;
+}
+
+.sales-banani-filter select {
+  padding-left: 34px;
+}
+
+.sales-banani-toolbar-spacer {
+  flex: 1;
+}
+
+.sales-banani-pagination {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.sales-banani-page-info {
+  color: #746b61;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.sales-banani-page-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.sales-banani-page-button {
+  min-width: 32px;
+  min-height: 32px;
+  color: #746b61;
+  border-color: #e8e8e8;
+  background: #ffffff;
+  box-shadow: none;
+}
+
+.sales-banani-page-button:disabled {
+  opacity: 0.42;
+}
+
+.sales-banani-body {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 380px minmax(0, 1fr);
+  min-height: 0;
+}
+
+.sales-banani-list-pane {
+  min-height: 0;
+  border-right: 1px solid #e8e8e8;
+  background: #ffffff;
+  display: flex;
+  flex-direction: column;
+}
+
+.sales-banani-list-head {
+  padding: 12px 16px;
+  border-bottom: 1px solid #e8e8e8;
+  color: #8f8a84;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  background: #faf8f5;
+}
+
+.sales-banani-list {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.sales-banani-row {
+  position: relative;
+  width: 100%;
+  padding: 16px;
+  border: none;
+  border-bottom: 1px solid #ece7e0;
+  background: #ffffff;
+  display: grid;
+  gap: 8px;
+  text-align: left;
+}
+
+.sales-banani-row.is-active {
+  background: #faf6ef;
+}
+
+.sales-banani-row.is-active::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 3px;
+  background: #2f2923;
+}
+
+.sales-banani-row-top,
+.sales-banani-row-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.sales-banani-row-id,
+.sales-banani-row-total {
+  color: #231f1b;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.sales-banani-row-meta,
+.sales-banani-row-cashier {
+  color: #8f8a84;
+  font-size: 12px;
+}
+
+.sales-banani-list-empty {
+  margin: 16px;
+  padding: 16px;
+  border: 1px dashed #e8e8e8;
+  border-radius: 12px;
+  color: #8f8a84;
+  background: #faf8f5;
+}
+
+.sales-banani-detail-pane {
+  min-width: 0;
+  min-height: 0;
+  padding: 24px;
+  background: #faf6ef;
+  overflow-y: auto;
+}
+
+.sales-banani-detail-card {
+  min-height: 100%;
+  padding: 24px;
+  border: 1px solid #e8e8e8;
+  border-radius: 18px;
+  background: #ffffff;
+  display: grid;
+  align-content: start;
+  gap: 20px;
+}
+
+.sales-banani-detail-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.sales-banani-detail-copy {
+  display: grid;
+  gap: 8px;
+}
+
+.sales-banani-detail-title {
+  color: #231f1b;
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.sales-banani-detail-meta {
+  color: #746b61;
+  font-size: 13px;
+}
+
+.sales-banani-detail-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.sales-banani-payment {
+  text-transform: capitalize;
+}
+
+.sales-banani-print {
+  border-color: #e8e8e8;
+  color: #231f1b;
+  background: #ffffff;
+  box-shadow: none;
+}
+
+.sales-banani-summary {
+  padding: 16px;
+  border: 1px solid #e8e8e8;
+  border-radius: 14px;
+  background: #faf8f5;
+  display: grid;
+  gap: 12px;
+}
+
+.sales-banani-summary-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  color: #746b61;
+  font-size: 13px;
+}
+
+.sales-banani-summary-row strong {
+  color: #231f1b;
+}
+
+.sales-banani-summary-row.is-total {
+  color: #231f1b;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.sales-banani-items {
+  display: grid;
+  gap: 10px;
+}
+
+.sales-banani-item {
+  padding: 14px 16px;
+  border: 1px solid #ece7e0;
+  border-radius: 14px;
+  background: #faf8f5;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.sales-banani-item-copy {
+  display: grid;
+  gap: 4px;
+}
+
+.sales-banani-item-copy strong {
+  color: #231f1b;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.sales-banani-item-copy span {
+  color: #746b61;
+  font-size: 12px;
+}
+
+.sales-banani-item-meta {
+  display: grid;
+  justify-items: end;
+  gap: 4px;
+  color: #746b61;
+  font-size: 12px;
+}
+
+.sales-banani-item-meta strong {
+  color: #231f1b;
+  font-size: 14px;
+}
+
+.sales-banani-empty {
+  min-height: 100%;
+  display: grid;
+  place-items: center;
+}
+
+.sales-banani-empty-box {
+  max-width: 340px;
+  text-align: center;
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+}
+
+.sales-banani-empty-icon {
+  width: 56px;
+  height: 56px;
+  border: 1px solid #e8e8e8;
+  border-radius: 999px;
+  color: #8f8a84;
+  background: #ffffff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sales-banani-empty-box h3 {
+  color: #231f1b;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.sales-banani-empty-box p {
+  color: #746b61;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+@media (max-width: 1180px) {
+  .sales-banani-header,
+  .sales-banani-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .sales-banani-search,
+  .sales-banani-filter {
+    width: 100%;
+  }
+
+  .sales-banani-pagination {
+    justify-content: space-between;
+  }
+
+  .sales-banani-body {
+    grid-template-columns: 1fr;
+  }
+
+  .sales-banani-list-pane {
+    border-right: none;
+    border-bottom: 1px solid #e8e8e8;
+    max-height: 360px;
+  }
+}
+
+@media (max-width: 720px) {
+  .sales-banani-page {
+    gap: 20px;
+  }
+
+  .sales-banani-card {
+    min-height: auto;
+  }
+
+  .sales-banani-detail-pane,
+  .sales-banani-detail-card {
+    padding: 18px;
+  }
+
+  .sales-banani-detail-header,
+  .sales-banani-item {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .sales-banani-item-meta {
+    justify-items: start;
+  }
+}
