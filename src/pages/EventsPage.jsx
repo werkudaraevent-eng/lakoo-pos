@@ -1,6 +1,8 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
+import { PageHeader } from "../components/PageHeader";
+
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -135,14 +137,7 @@ export function EventsPage() {
 
   return (
     <div className="events-banani-page">
-      <section className="events-banani-header">
-        <div className="events-banani-header-copy">
-          <h1 className="events-banani-title">Events Management</h1>
-          <p className="events-banani-description">
-            Manage bazaar and pop-up store workspaces with a cleaner operational table built for scanning status, dates, and stock flow.
-          </p>
-        </div>
-
+      <PageHeader title="Event" description="Kelola bazaar dan pop-up store.">
         <div className="events-banani-metrics">
           <div className="events-banani-metric">
             <span className="events-banani-metric-label">Active Events</span>
@@ -157,7 +152,7 @@ export function EventsPage() {
             <span className="events-banani-metric-value">{formatCurrencyCell(ytdRevenue)}</span>
           </div>
         </div>
-      </section>
+      </PageHeader>
 
       {loading ? <p className="info-text">Loading events...</p> : null}
       {loadError ? <p className="error-text">{loadError}</p> : null}

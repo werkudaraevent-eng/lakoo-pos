@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { Link } from "react-router-dom";
 
+import { PageHeader } from "../components/PageHeader";
 import { usePosData } from "../context/PosDataContext";
 import { buildDashboardCollections } from "../features/dashboard/dashboardData";
 import { buildDashboardKpiCards } from "../features/dashboard/dashboardWorkspace";
@@ -46,12 +47,7 @@ export function DashboardPage() {
 
   return (
     <div className="dashboard-container">
-      <section className="dashboard-header">
-        <h1 className="page-title">Dashboard</h1>
-        <button className="btn-outline" type="button">
-          Today
-        </button>
-      </section>
+      <PageHeader title="Dashboard" description="Ringkasan performa bisnis hari ini." />
 
       {loading ? <p className="info-text">Loading dashboard data...</p> : null}
       {loadError ? <p className="error-text">{loadError}</p> : null}

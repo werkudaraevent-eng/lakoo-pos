@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 
+import { PageHeader } from "../components/PageHeader";
 import { usePosData } from "../context/PosDataContext";
 import { formatDate } from "../utils/formatters";
 
@@ -61,15 +62,7 @@ export function UsersPage() {
 
   return (
     <div className="page-stack">
-      <section className="page-header-card">
-        <div>
-          <p className="eyebrow">User Management</p>
-          <h1>Admin control over staff access.</h1>
-          <p className="muted-text">
-            Tambah user baru, ubah role, aktif/nonaktifkan akun, dan reset password dari satu halaman admin.
-          </p>
-        </div>
-      </section>
+      <PageHeader title="Pengguna" description="Kelola akun, role, dan akses staff." />
 
       <section className="content-grid two-column">
         <article className="panel-card">

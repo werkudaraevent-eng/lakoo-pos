@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
+import { PageHeader } from "../components/PageHeader";
+
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -77,14 +79,7 @@ export function SalesPage() {
 
   return (
     <div className="sales-banani-page">
-      <section className="sales-banani-header">
-        <div className="sales-banani-header-copy">
-          <h1 className="sales-banani-title">Transaction workspace</h1>
-          <p className="sales-banani-description">
-            Review finalized receipts in a split view with the receipt list on the left and the selected receipt detail on the right.
-          </p>
-        </div>
-
+      <PageHeader title="Penjualan" description="Riwayat transaksi dan detail struk.">
         <div className="sales-banani-metrics">
           <div className="sales-banani-metric">
             <span className="sales-banani-metric-label">Matched receipts</span>
@@ -95,7 +90,7 @@ export function SalesPage() {
             <span className="sales-banani-metric-value">{formatCurrency(summary.matchedRevenue)}</span>
           </div>
         </div>
-      </section>
+      </PageHeader>
 
       {loading ? <p className="info-text">Loading sales...</p> : null}
       {loadError ? <p className="error-text">{loadError}</p> : null}

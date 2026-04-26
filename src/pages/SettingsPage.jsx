@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 
+import { PageHeader } from "../components/PageHeader";
 import { apiGet } from "../api/client";
 import { usePosData } from "../context/PosDataContext";
 
@@ -73,15 +74,7 @@ export function SettingsPage() {
 
   return (
     <div className="page-stack">
-      <section className="page-header-card">
-        <div>
-          <p className="eyebrow">Settings</p>
-          <h1>Store-level operational defaults.</h1>
-          <p className="muted-text">
-            Halaman ini disiapkan untuk profile toko dan payment methods, sesuai lingkup MVP saat ini.
-          </p>
-        </div>
-      </section>
+      <PageHeader title="Pengaturan" description="Profil toko, metode pembayaran, dan konfigurasi sistem." />
 
       {tenantInfo?.tenant ? (
         <article className="panel-card narrow-card">

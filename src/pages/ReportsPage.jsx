@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 
+import { PageHeader } from "../components/PageHeader";
 import { Button } from "../components/ui/button";
 import { usePosData } from "../context/PosDataContext";
 import {
@@ -37,14 +38,7 @@ export function ReportsPage() {
 
   return (
     <div className="reports-banani-page">
-      <header className="reports-banani-header">
-        <div>
-          <h1 className="reports-banani-title">Reports Overview</h1>
-          <p className="muted-text">
-            Read sales performance quickly from a single surface that favors trend visibility over dashboard clutter.
-          </p>
-        </div>
-
+      <PageHeader title="Laporan" description="Analisis performa penjualan dan tren bisnis.">
         <div className="reports-banani-actions">
           <label className="reports-banani-select">
             <select onChange={(event) => setPeriod(event.target.value)} value={period}>
@@ -60,7 +54,7 @@ export function ReportsPage() {
             <span>Export Report</span>
           </Button>
         </div>
-      </header>
+      </PageHeader>
 
       {loading ? <p className="info-text">Loading reports...</p> : null}
       {loadError ? <p className="error-text">{loadError}</p> : null}

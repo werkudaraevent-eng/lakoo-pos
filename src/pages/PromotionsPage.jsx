@@ -1,6 +1,7 @@
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
+import { PageHeader } from "../components/PageHeader";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { usePosData } from "../context/PosDataContext";
@@ -59,14 +60,7 @@ export function PromotionsPage() {
 
   return (
     <div className="promotions-banani-page">
-      <header className="promotions-banani-header">
-        <div>
-          <h1 className="promotions-banani-title">Promotions</h1>
-          <p className="muted-text">
-            Track promo status, review actual usage, and keep promotional rules in a cleaner management surface.
-          </p>
-        </div>
-
+      <PageHeader title="Promosi" description="Kelola kode promo dan diskon.">
         <div className="promotions-banani-actions">
           <Button
             className="promotions-banani-button"
@@ -85,7 +79,7 @@ export function PromotionsPage() {
             </Link>
           </Button>
         </div>
-      </header>
+      </PageHeader>
 
       {loading ? <p className="info-text">Loading promotions...</p> : null}
       {loadError ? <p className="error-text">{loadError}</p> : null}

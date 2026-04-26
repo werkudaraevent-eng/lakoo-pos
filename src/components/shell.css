@@ -424,6 +424,88 @@ tr:hover td {
   background: var(--bg-soft);
 }
 
+/* ── Sticky Page Header ── */
+.sticky-header {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 20px 32px;
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--line);
+  margin: -32px -32px 24px -32px;
+}
+
+.sticky-header-left {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.sticky-header-title {
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--text);
+  margin: 0;
+}
+
+.sticky-header-desc {
+  font-size: 14px;
+  color: var(--text-soft);
+  margin: 0;
+}
+
+.sticky-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+/* Action buttons in header */
+.header-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 18px;
+  border: 1.5px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel-strong);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+  text-decoration: none;
+}
+
+.header-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent-deep);
+  background: var(--accent-soft);
+}
+
+.header-btn-primary {
+  background: linear-gradient(135deg, #2EC4B6 0%, #1a9e92 100%);
+  border-color: transparent;
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(46, 196, 182, 0.2);
+}
+
+.header-btn-primary:hover {
+  box-shadow: 0 4px 14px rgba(46, 196, 182, 0.35);
+  transform: translateY(-1px);
+  color: #fff;
+  background: linear-gradient(135deg, #28b0a3 0%, #178a7f 100%);
+}
+
 /* ── Responsive ── */
 @media (max-width: 900px) {
   .shell {

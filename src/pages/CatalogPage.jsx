@@ -1,6 +1,7 @@
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
+import { PageHeader } from "../components/PageHeader";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
 import { Input } from "../components/ui/input";
@@ -66,14 +67,7 @@ export function CatalogPage() {
 
   return (
     <div className="catalog-banani-page">
-      <header className="catalog-banani-header">
-        <div>
-          <h1 className="catalog-banani-title">Catalog</h1>
-          <p className="muted-text">
-            Browse assortments, review stock posture, and open product management only when you actually need to edit.
-          </p>
-        </div>
-
+      <PageHeader title="Katalog" description="Kelola produk, varian, dan stok.">
         <div className="catalog-banani-header-actions">
           <Button
             className="catalog-banani-button is-outline"
@@ -92,7 +86,7 @@ export function CatalogPage() {
             </Link>
           </Button>
         </div>
-      </header>
+      </PageHeader>
 
       {loading ? <p className="info-text">Loading catalog...</p> : null}
       {loadError ? <p className="error-text">{loadError}</p> : null}
