@@ -1,196 +1,116 @@
 import { NavLink, useLocation } from "react-router-dom";
 
 import { useAuth } from "../context/AuthContext";
-import { getShellRouteMeta, getShellTone } from "../features/shell/shellLayout";
+import "./shell.css";
 import { AppIcon } from "../features/ui/AppIcon";
 import { getNavigationIconName } from "../features/ui/iconMaps";
 import { WorkspaceSwitcher } from "../features/workspaces/components/WorkspaceSwitcher";
 
 const navigationGroups = [
   {
-    label: "Operate",
+    label: "Menu Utama",
     items: [
-      {
-        label: "Dashboard",
-        description: "Summary and alerts",
-        to: "/dashboard",
-        roles: ["admin", "manager", "cashier"],
-      },
-      {
-        label: "Checkout",
-        description: "Sell and print receipts",
-        to: "/checkout",
-        roles: ["admin", "manager", "cashier"],
-      },
-      {
-        label: "Sales",
-        description: "Review transactions",
-        to: "/sales",
-        roles: ["admin", "manager", "cashier"],
-      },
+      { label: "Dashboard", to: "/dashboard", roles: ["admin", "manager", "cashier"] },
+      { label: "Kasir", to: "/checkout", roles: ["admin", "manager", "cashier"] },
+      { label: "Penjualan", to: "/sales", roles: ["admin", "manager", "cashier"] },
     ],
   },
   {
-    label: "Stock",
+    label: "Kelola",
     items: [
-      {
-        label: "Events",
-        description: "Bazaar workspaces",
-        to: "/events",
-        roles: ["admin", "manager"],
-      },
-      {
-        label: "Catalog",
-        description: "Products and variants",
-        to: "/catalog",
-        roles: ["admin", "manager"],
-      },
-      {
-        label: "Inventory",
-        description: "Adjust and audit stock",
-        to: "/inventory",
-        roles: ["admin", "manager"],
-      },
-      {
-        label: "Promotions",
-        description: "Offers and discount rules",
-        to: "/promotions",
-        roles: ["admin", "manager"],
-      },
+      { label: "Event", to: "/events", roles: ["admin", "manager"] },
+      { label: "Katalog", to: "/catalog", roles: ["admin", "manager"] },
+      { label: "Inventori", to: "/inventory", roles: ["admin", "manager"] },
+      { label: "Promosi", to: "/promotions", roles: ["admin", "manager"] },
     ],
   },
   {
-    label: "Admin",
+    label: "Pengaturan",
     items: [
-      {
-        label: "Reports",
-        description: "Performance reporting",
-        to: "/reports",
-        roles: ["admin", "manager"],
-      },
-      {
-        label: "Settings",
-        description: "Store preferences",
-        to: "/settings",
-        roles: ["admin"],
-      },
-      {
-        label: "Users",
-        description: "Access and roles",
-        to: "/users",
-        roles: ["admin"],
-      },
+      { label: "Laporan", to: "/reports", roles: ["admin", "manager"] },
+      { label: "Pengaturan", to: "/settings", roles: ["admin"] },
+      { label: "Pengguna", to: "/users", roles: ["admin"] },
     ],
   },
 ];
 
-function matchesPath(pathname, target) {
-  return pathname === target || pathname.startsWith(`${target}/`);
-}
-
-function getNavigationContext(pathname, groups) {
-  for (const group of groups) {
-    const item = group.items.find((entry) => matchesPath(pathname, entry.to));
-
-    if (item) {
-      return {
-        groupLabel: group.label,
-        itemLabel: item.label,
-      };
-    }
-  }
-
-  return {
-    groupLabel: "Workspace",
-    itemLabel: "Overview",
-  };
+function getUserInitial(user) {
+  const source = user?.name || user?.username || "U";
+  return source.charAt(0).toUpperCase();
 }
 
 export function AppShell({ children }) {
   const { user, logout } = useAuth();
   const location = useLocation();
-  const isDashboardRoute = location.pathname.startsWith("/dashboard");
   const isCheckoutRoute = location.pathname.startsWith("/checkout");
+
   const allowedGroups = navigationGroups
     .map((group) => ({
       ...group,
       items: group.items.filter((item) => item.roles.includes(user.role)),
     }))
     .filter((group) => group.items.length > 0);
-  const currentRoute = getShellRouteMeta(location.pathname);
-  const shellTone = getShellTone(location.pathname);
-  const navigationContext = getNavigationContext(location.pathname, allowedGroups);
 
   return (
-    <div className={`app-shell app-shell-${shellTone} dashboard-shell`}>
-      <aside className="sidebar dashboard-sidebar">
-        <div className="sidebar-top">
-          <div className="brand">
-            <div className="brand-logo" aria-hidden="true">
-              <AppIcon name="ShoppingBag" size={18} strokeWidth={2} />
-            </div>
-            <div className="brand-text">
-              <span className="brand-subtitle">Lakoo</span>
-              <span className="brand-title">POS</span>
+    <div className={`shell${isCheckoutRoute ? " shell-checkout" : ""}`}>
+      {/* Sidebar */}
+      <aside className="shell-sidebar">
+        <div className="shell-sidebar-top">
+          {/* Brand */}
+          <div className="shell-brand">
+            <div className="shell-brand-logo">L</div>
+            <div className="shell-brand-text">
+              <span className="shell-brand-name">Lakoo</span>
+              <span className="shell-brand-sub">Point of Sale</span>
             </div>
           </div>
 
-          <nav aria-label="Primary">
+          {/* Navigation */}
+          <nav className="shell-nav">
             {allowedGroups.map((group) => (
-              <section className="nav-section" key={group.label}>
-                <h3 className="nav-heading">{group.label}</h3>
-                {group.items.map((item) => (
-                  <NavLink
-                    className={({ isActive }) => `nav-item${isActive ? " active" : ""}`}
-                    key={item.to}
-                    to={item.to}
-                    end={item.to !== "/sales"}
-                  >
-                    <span className="nav-icon" aria-hidden="true">
-                      <AppIcon name={getNavigationIconName(item.label)} size={18} strokeWidth={1.9} />
-                    </span>
-                    <span className="nav-label">{item.label}</span>
-                  </NavLink>
-                ))}
-              </section>
+              <div className="shell-nav-group" key={group.label}>
+                <span className="shell-nav-label">{group.label}</span>
+                <div className="shell-nav-items">
+                  {group.items.map((item) => (
+                    <NavLink
+                      className={({ isActive }) => `shell-nav-item${isActive ? " active" : ""}`}
+                      key={item.to}
+                      to={item.to}
+                      end={item.to !== "/sales"}
+                    >
+                      <span className="shell-nav-icon">
+                        <AppIcon name={getNavigationIconName(item.label === "Kasir" ? "Checkout" : item.label === "Penjualan" ? "Sales" : item.label === "Katalog" ? "Catalog" : item.label === "Inventori" ? "Inventory" : item.label === "Promosi" ? "Promotions" : item.label === "Laporan" ? "Reports" : item.label === "Pengaturan" ? "Settings" : item.label === "Pengguna" ? "Users" : item.label === "Event" ? "Events" : item.label)} size={18} strokeWidth={1.8} />
+                      </span>
+                      <span className="shell-nav-text">{item.label}</span>
+                    </NavLink>
+                  ))}
+                </div>
+              </div>
             ))}
           </nav>
         </div>
 
-        <div className="sidebar-footer">
+        {/* Sidebar footer */}
+        <div className="shell-sidebar-bottom">
           <WorkspaceSwitcher variant="banani" />
-          <button className="sidebar-logout-link" onClick={logout} type="button">
-            Logout
-          </button>
+
+          <div className="shell-user">
+            <div className="shell-user-avatar">{getUserInitial(user)}</div>
+            <div className="shell-user-info">
+              <span className="shell-user-name">{user?.name || user?.username}</span>
+              <span className="shell-user-role">{user?.role}</span>
+            </div>
+            <button className="shell-user-logout" onClick={logout} type="button" title="Keluar">
+              <AppIcon name="LogOut" size={16} strokeWidth={1.8} />
+            </button>
+          </div>
         </div>
       </aside>
 
-      <div className="main-content">
-        <header className="topbar">
-          <div className="breadcrumb">
-            <span className="bc-link">{navigationContext.groupLabel}</span>
-            <span className="bc-sep">/</span>
-            <span className="bc-current">{navigationContext.itemLabel || currentRoute.eyebrow}</span>
-          </div>
-
-          <div className="topbar-actions">
-            <div className="user-profile">
-              <span>Signed in as {user.username}</span>
-              <span className="user-badge">{user.role}</span>
-            </div>
-          </div>
-        </header>
-
-        <div
-          className={
-            isDashboardRoute
-              ? "dashboard-page-frame"
-              : `page-shell${isCheckoutRoute ? " page-shell-checkout" : ""}`
-          }
-        >
-          {children}
-        </div>
-      </div>
+      {/* Main content */}
+      <main className={`shell-main${isCheckoutRoute ? " shell-main-flush" : ""}`}>
+        {children}
+      </main>
     </div>
   );
 }
