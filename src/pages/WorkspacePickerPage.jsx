@@ -14,15 +14,8 @@ import "../features/workspaces/workspace-picker.css";
 
 function getNextPath(locationState, user) {
   const requestedPath = typeof locationState?.from === "string" ? locationState.from : "";
-  if (requestedPath && !requestedPath.startsWith("/workspace/select")) {
-    return requestedPath;
-  }
+  if (requestedPath && !requestedPath.startsWith("/workspace/select")) return requestedPath;
   return getRoleLandingPath(user?.role);
-}
-
-function getUserInitial(user) {
-  const source = user?.name || user?.username || "U";
-  return source.charAt(0).toUpperCase();
 }
 
 export function WorkspacePickerPage() {
@@ -30,30 +23,24 @@ export function WorkspacePickerPage() {
   const location = useLocation();
   const [searchParams] = useSearchParams();
   const { user, logout } = useAuth();
-  const { workspaces, sales, loading, hasLoaded, loadError } = usePosData();
+  const { workspaces, loading, hasLoaded, loadError } = usePosData();
   const { activeWorkspaceId, selectWorkspace, clearWorkspace } = useWorkspace();
   const accessibleWorkspaces = filterAccessibleWorkspaces(workspaces, user);
   const pickerOptions = buildWorkspacePickerOptions(accessibleWorkspaces, activeWorkspaceId);
   const autoWorkspaceId = searchParams.get("auto");
   const nextPath = getNextPath(location.state, user);
 
+  const now = new Date();
+  const dateStr = now.toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+
   useEffect(() => {
-    if (
-      shouldClearWorkspaceSelection({
-        activeWorkspaceId,
-        accessibleWorkspaces,
-        hasLoaded,
-        loadError,
-      })
-    ) {
+    if (shouldClearWorkspaceSelection({ activeWorkspaceId, accessibleWorkspaces, hasLoaded, loadError })) {
       clearWorkspace();
     }
   }, [accessibleWorkspaces, activeWorkspaceId, clearWorkspace, hasLoaded, loadError]);
 
   useEffect(() => {
-    if (loading || !autoWorkspaceId || accessibleWorkspaces.length !== 1) {
-      return;
-    }
+    if (loading || !autoWorkspaceId || accessibleWorkspaces.length !== 1) return;
     const workspace = accessibleWorkspaces.find((item) => item.id === autoWorkspaceId);
     if (!workspace) return;
     selectWorkspace(workspace);
@@ -65,134 +52,82 @@ export function WorkspacePickerPage() {
     navigate(nextPath, { replace: true });
   }
 
-  // Count today's sales per workspace (simple heuristic)
-  const today = new Date().toISOString().slice(0, 10);
-  const todaySalesCount = (sales || []).filter(
-    (s) => s.createdAt && s.createdAt.slice(0, 10) === today
-  ).length;
-
   return (
     <div className="wsp-page">
       {/* Top bar */}
-      <header className="wsp-topbar">
-        <div className="wsp-topbar-brand">
-          <div className="wsp-topbar-logo">L</div>
-          <span className="wsp-topbar-name">Lakoo</span>
-        </div>
+      <div className="wsp-topbar">
+        <div className="wsp-topbar-brand">Lakoo.</div>
         <div className="wsp-topbar-right">
-          <div className="wsp-topbar-user">
-            <div className="wsp-topbar-avatar">{getUserInitial(user)}</div>
-            <div className="wsp-topbar-user-info">
-              <span className="wsp-topbar-user-name">{user?.name || user?.username}</span>
-              <span className="wsp-topbar-user-role">{user?.role}</span>
-            </div>
+          <div className="wsp-topbar-user-info">
+            <div className="wsp-topbar-user-name">{user?.name || user?.username}</div>
+            <div className="wsp-topbar-user-role">{user?.role}</div>
           </div>
-          <button className="wsp-topbar-logout" onClick={logout} type="button">
-            Keluar
-          </button>
+          <div className="wsp-topbar-avatar">
+            {(user?.name || user?.username || "U").charAt(0).toUpperCase()}
+          </div>
+          <button className="wsp-topbar-logout" onClick={logout} type="button">Keluar</button>
         </div>
-      </header>
+      </div>
 
-      {/* Main content */}
-      <main className="wsp-center">
-        <div className="wsp-hero">
-          <h1>Selamat datang kembali 👋</h1>
-          <p>Pilih outlet atau event untuk memulai sesi kerja Anda.</p>
-        </div>
+      {/* Content */}
+      <div className="wsp-center">
+        <div className="wsp-inner">
+          <div className="wsp-date">{dateStr}</div>
+          <h1 className="wsp-title">Pilih Sesi Penjualan</h1>
+          <p className="wsp-subtitle">
+            Halo, <strong>{user?.name || user?.username}</strong>! Pilih sesi untuk memulai aktivitas hari ini.
+          </p>
 
-        {/* Stats bar */}
-        <div className="wsp-stats-bar">
-          <div className="wsp-stat">
-            <span className="wsp-stat-value">{pickerOptions.length}</span>
-            <span className="wsp-stat-label">Workspace</span>
-          </div>
-          <div className="wsp-stat-divider" />
-          <div className="wsp-stat">
-            <span className="wsp-stat-value">{todaySalesCount}</span>
-            <span className="wsp-stat-label">Transaksi Hari Ini</span>
-          </div>
-          <div className="wsp-stat-divider" />
-          <div className="wsp-stat">
-            <span className="wsp-stat-value">
-              {pickerOptions.filter((w) => w.typeLabel === "Event").length}
-            </span>
-            <span className="wsp-stat-label">Event Aktif</span>
-          </div>
-        </div>
-
-        {/* Workspace grid */}
-        <div className="wsp-section">
-          {loading ? (
-            <div className="wsp-loading">
-              <div className="wsp-loading-spinner" />
-              <p>Memuat workspace...</p>
-            </div>
-          ) : null}
-
-          {!loading && loadError ? (
-            <div className="wsp-empty-state">
-              <div className="wsp-empty-icon">⚠️</div>
-              <h3>Gagal memuat</h3>
-              <p>{loadError}</p>
-            </div>
-          ) : null}
-
-          {!loading && !loadError && pickerOptions.length === 0 ? (
-            <div className="wsp-empty-state">
-              <div className="wsp-empty-icon">📭</div>
-              <h3>Belum ada workspace</h3>
-              <p>Tidak ada workspace yang tersedia untuk akun Anda.</p>
-            </div>
-          ) : null}
+          {loading ? <div className="wsp-loading">Memuat workspace...</div> : null}
+          {!loading && loadError ? <div className="wsp-error">{loadError}</div> : null}
 
           {!loading && !loadError && pickerOptions.length > 0 ? (
             <div className="wsp-grid">
               {pickerOptions.map((workspace) => {
                 const isEvent = workspace.typeLabel === "Event";
-                const statusLower = (workspace.statusLabel || "").toLowerCase();
                 return (
                   <button
-                    className={`wsp-tile${workspace.isCurrent ? " is-active" : ""}${isEvent ? " is-event" : ""}`}
+                    className="wsp-card"
                     key={workspace.id}
                     onClick={() => handleSelect(workspace.id)}
                     type="button"
                   >
-                    {workspace.isCurrent ? (
-                      <div className="wsp-tile-active-badge">Sesi Aktif</div>
-                    ) : null}
-
-                    <div className="wsp-tile-icon-wrap">
-                      <div className="wsp-tile-icon">
-                        {isEvent ? "🎪" : "🏪"}
-                      </div>
+                    <div className={`wsp-card-icon ${isEvent ? "is-event" : "is-store"}`}>
+                      {isEvent ? (
+                        <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+                          <path d="M4 3h16l-2 7H6L4 3z"/><path d="M6 10v10a1 1 0 001 1h10a1 1 0 001-1V10"/><path d="M9 21v-5a1 1 0 011-1h4a1 1 0 011 1v5"/>
+                        </svg>
+                      ) : (
+                        <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+                          <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>
+                        </svg>
+                      )}
                     </div>
-
-                    <div className="wsp-tile-content">
-                      <h3 className="wsp-tile-name">{workspace.name}</h3>
-                      <div className="wsp-tile-tags">
-                        <span className={`wsp-tile-type${isEvent ? " is-event" : ""}`}>
-                          {isEvent ? "Event" : "Toko"}
+                    <div className="wsp-card-body">
+                      <div className="wsp-card-head">
+                        <span className="wsp-card-name">{workspace.name}</span>
+                        <span className={`wsp-card-badge ${isEvent ? "badge-blue" : "badge-amber"}`}>
+                          {isEvent ? "Bazar" : "Toko Tetap"}
                         </span>
-                        {workspace.statusLabel ? (
-                          <span className={`wsp-tile-status status-${statusLower}`}>
-                            {workspace.statusLabel}
-                          </span>
-                        ) : null}
                       </div>
+                      {workspace.statusLabel ? (
+                        <div className="wsp-card-location">{workspace.statusLabel}</div>
+                      ) : null}
                     </div>
-
-                    <div className="wsp-tile-arrow">
-                      <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                        <path d="M7.5 5L12.5 10L7.5 15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                      </svg>
+                    <div className="wsp-card-chevron">
+                      <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
                     </div>
                   </button>
                 );
               })}
             </div>
           ) : null}
+
+          {!loading && !loadError && pickerOptions.length === 0 ? (
+            <div className="wsp-empty">Tidak ada workspace yang tersedia.</div>
+          ) : null}
         </div>
-      </main>
+      </div>
     </div>
   );
 }
