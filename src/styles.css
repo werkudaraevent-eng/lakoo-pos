@@ -81,9 +81,17 @@ body,
   min-height: 100%;
 }
 
+/* Thin scrollbars (Nyam style) */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--line); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+* { scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
+
 body {
   margin: 0;
   min-width: 320px;
+  overflow: hidden;
   font-family: 'Plus Jakarta Sans Variable', 'Plus Jakarta Sans', sans-serif;
   color: var(--text);
   background: var(--bg);

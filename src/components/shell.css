@@ -20,6 +20,7 @@
   background: var(--sidebar);
   display: flex;
   flex-direction: column;
+  padding: 0;
   overflow: hidden;
 }
 
@@ -27,7 +28,7 @@
   flex: 1;
   display: flex;
   flex-direction: column;
-  overflow-y: auto;
+  overflow: hidden;
 }
 
 /* Brand */
@@ -94,6 +95,26 @@
 .shell-nav {
   padding: 12px 0;
   flex: 1;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,0.1) transparent;
+}
+
+.shell-nav::-webkit-scrollbar {
+  width: 4px;
+}
+
+.shell-nav::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.shell-nav::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.1);
+  border-radius: 4px;
+}
+
+.shell-nav::-webkit-scrollbar-thumb:hover {
+  background: rgba(255,255,255,0.2);
 }
 
 .shell-nav-section {
