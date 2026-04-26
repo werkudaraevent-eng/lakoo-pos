@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link, useBlocker, useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 import { usePosData } from "../context/PosDataContext";
 import { formatCurrency } from "../utils/formatters";
@@ -42,8 +42,7 @@ export function EventsPage() {
     return () => window.removeEventListener("beforeunload", handler);
   }, [isDirty]);
 
-  // Block React Router navigation when dirty
-  const blocker = useBlocker(isDirty && view === "detail");
+
 
   const events = useMemo(() => {
     return (workspaces || [])
@@ -310,26 +309,7 @@ export function EventsPage() {
           </div>
         ) : null}
 
-        {/* Router Navigation Block Modal */}
-        {blocker.state === "blocked" ? (
-          <div className="modal-overlay">
-            <div className="modal" style={{ width: 380, textAlign: "center" }}>
-              <div style={{ width: 52, height: 52, borderRadius: "50%", background: "var(--danger-soft)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 14px" }}>
-                <svg width={22} height={22} fill="none" stroke="var(--danger)" strokeWidth="2.5" strokeLinecap="round" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
-              </div>
-              <div style={{ fontSize: 17, fontWeight: 800, marginBottom: 8 }}>Perubahan Belum Disimpan</div>
-              <div style={{ fontSize: 13.5, color: "var(--text-soft)", marginBottom: 20 }}>
-                Anda memiliki perubahan alokasi stok yang belum disimpan. Yakin ingin keluar tanpa menyimpan?
-              </div>
-              <div style={{ display: "flex", gap: 8 }}>
-                <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => blocker.reset()}>Kembali Edit</button>
-                <button className="btn" style={{ flex: 1, background: "var(--danger)", color: "#fff" }} onClick={() => blocker.proceed()}>Buang Perubahan</button>
-              </div>
-            </div>
-          </div>
-        ) : null}
-
-        {/* Discard Changes Modal (in-page navigation) */}
+        {/* Discard Changes Modal */}
         {discardModal ? (
           <div className="modal-overlay" onClick={() => setDiscardModal(null)}>
             <div className="modal" style={{ width: 380, textAlign: "center" }} onClick={(e) => e.stopPropagation()}>
