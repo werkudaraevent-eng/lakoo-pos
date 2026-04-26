@@ -43,8 +43,14 @@ export function CatalogManagePage() {
   const [submitting, setSubmitting] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
   const [initialized, setInitialized] = useState(false);
+  const [saveError, setSaveError] = useState("");
 
-  // Load product data for edit — only once on mount
+  // Reset initialized when productId changes (navigating to different product)
+  useEffect(() => {
+    setInitialized(false);
+  }, [productId]);
+
+  // Load product data for edit — only once per product
   useEffect(() => {
     if (!product || initialized) return;
     setForm({
@@ -73,7 +79,15 @@ export function CatalogManagePage() {
   function addSize() {
     const label = newSize.trim().toUpperCase();
     if (!label || variants.find((v) => v.label === label)) return;
-    setVariants((prev) => [...prev, { label, qty: 0, sku: "" }]);
+    const skuPrefix = (form.name || "PRD").substring(0, 3).toUpperCase().replace(/\s/g, "");
+    setVariants((prev) => [...prev, {
+      label,
+      qty: 0,
+      sku: `${skuPrefix}-${label}`,
+      attribute1Value: label,
+      attribute2Value: "",
+      lowStockThreshold: 3,
+    }]);
     setNewSize("");
   }
 
@@ -83,6 +97,10 @@ export function CatalogManagePage() {
 
   function setQty(label, val) {
     setVariants((prev) => prev.map((v) => v.label === label ? { ...v, qty: Math.max(0, parseInt(val) || 0) } : v));
+  }
+
+  function updateVariantField(label, field, val) {
+    setVariants((prev) => prev.map((v) => v.label === label ? { ...v, [field]: val } : v));
   }
 
   async function handleSave() {
@@ -113,30 +131,32 @@ export function CatalogManagePage() {
         // Update variants one by one
         // Note: each call triggers bootstrap reload, but we block form reset with `initialized` flag
         for (const v of variants) {
-          if (v.id) {
-            await updateVariant(v.id, {
-              sku: v.sku,
-              attribute1Value: v.attribute1Value || v.label,
-              attribute2Value: v.attribute2Value || "",
-              quantityOnHand: parseInt(v.qty) || 0,
-              lowStockThreshold: v.lowStockThreshold || 3,
-              isActive: true,
-              priceOverride: v.priceOverride != null ? v.priceOverride : null,
-            });
-          } else if (v.label) {
-            await createVariant(productId, {
-              sku: v.sku || `${form.name.substring(0, 3).toUpperCase()}-${v.label}`,
-              attribute1Value: v.label,
-              attribute2Value: "",
-              quantityOnHand: parseInt(v.qty) || 0,
-              lowStockThreshold: 3,
-              isActive: true,
-            });
+          const variantPayload = {
+            sku: v.sku || `${form.name.substring(0, 3).toUpperCase().replace(/\s/g, "")}-${v.label}`,
+            attribute1Value: v.label,
+            attribute2Value: v.attribute2Value || "",
+            quantityOnHand: parseInt(v.qty) || 0,
+            lowStockThreshold: v.lowStockThreshold || 3,
+            isActive: true,
+          };
+          if (v.priceOverride != null) variantPayload.priceOverride = v.priceOverride;
+
+          try {
+            if (v.id) {
+              await updateVariant(v.id, variantPayload);
+            } else if (v.label) {
+              await createVariant(productId, variantPayload);
+            }
+          } catch (err) {
+            console.error("Variant save error:", v.label, err);
           }
         }
       }
       setSaved(true);
+      setSaveError("");
       setTimeout(() => { setSaved(false); navigate("/catalog"); }, 1200);
+    } catch (err) {
+      setSaveError(err.message || "Gagal menyimpan. Coba lagi.");
     } finally {
       setSubmitting(false);
     }
@@ -161,6 +181,12 @@ export function CatalogManagePage() {
           {saved ? "✓ Tersimpan!" : submitting ? "Menyimpan..." : "Simpan Perubahan"}
         </button>
       </div>
+
+      {saveError ? (
+        <div style={{ background: "var(--danger-soft)", border: "1px solid var(--danger)", borderRadius: 8, padding: "10px 14px", marginBottom: 16, fontSize: 13, color: "var(--danger)", fontWeight: 600 }}>
+          {saveError}
+        </div>
+      ) : null}
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 320px", gap: 16, alignItems: "start" }}>
         {/* Left column */}
