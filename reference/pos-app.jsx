@@ -255,12 +255,20 @@ const SessionPage = ({ user, onSelectSession, onLogout }) => {
 
 // ── Sidebar ────────────────────────────────────────────
 const NAV = [
+  { section: 'Utama' },
   { id:'dashboard', label:'Dashboard', icon:'dashboard' },
   { id:'kasir', label:'Kasir / POS', icon:'pos' },
+  { section: 'Inventori' },
   { id:'katalog', label:'Katalog Produk', icon:'catalog' },
   { id:'stok', label:'Manajemen Stok', icon:'stock' },
+  { section: 'Penjualan' },
   { id:'riwayat', label:'Riwayat Transaksi', icon:'history' },
   { id:'laporan', label:'Laporan & Analitik', icon:'laporan' },
+  { id:'event', label:'Event & Bazar', icon:'event' },
+  { id:'promosi', label:'Promosi', icon:'promo' },
+  { section: 'Sistem' },
+  { id:'pengguna', label:'Pengguna', icon:'users' },
+  { id:'pengaturan', label:'Pengaturan', icon:'settings' },
 ];
 
 const PAGE_TITLES = {
@@ -270,6 +278,10 @@ const PAGE_TITLES = {
   stok: 'Manajemen Stok',
   riwayat: 'Riwayat Transaksi',
   laporan: 'Laporan & Analitik',
+  event: 'Event & Bazar',
+  promosi: 'Promosi',
+  pengguna: 'Pengguna',
+  pengaturan: 'Pengaturan',
 };
 
 const Sidebar = ({ active, onNav, user, session, onChangeSession }) => (
@@ -287,13 +299,15 @@ const Sidebar = ({ active, onNav, user, session, onChangeSession }) => (
       </div>
     </div>
     <nav className="sidebar-nav">
-      <div className="nav-section">Menu</div>
-      {NAV.map(n => (
-        <div key={n.id} className={`nav-item${active===n.id?' active':''}`} onClick={() => onNav(n.id)}>
-          <span className="icon"><Icon name={n.icon} size={17} /></span>
-          <span>{n.label}</span>
-        </div>
-      ))}
+      {NAV.map((n, i) => n.section
+        ? <div key={i} className="nav-section">{n.section}</div>
+        : (
+          <div key={n.id} className={`nav-item${active===n.id?' active':''}`} onClick={() => onNav(n.id)}>
+            <span className="icon"><Icon name={n.icon} size={17} /></span>
+            <span>{n.label}</span>
+          </div>
+        )
+      )}
     </nav>
     <div className="sidebar-footer">
       <div className="user-card">
@@ -363,7 +377,7 @@ const App = () => {
   const handleLogout = () => { setUser(null); setSession(null); setScreen('login'); };
   const handleChangeSession = () => setScreen('session');
 
-  const pages = { dashboard: Dashboard, kasir: Kasir, katalog: Katalog, stok: Stok, riwayat: Riwayat, laporan: Laporan };
+  const pages = { dashboard: Dashboard, kasir: Kasir, katalog: Katalog, stok: Stok, riwayat: Riwayat, laporan: Laporan, event: EventBazar, promosi: Promosi, pengguna: Pengguna, pengaturan: Pengaturan };
   const PageComponent = pages[page] || Dashboard;
 
   if (screen === 'login') return <LoginPage onLogin={handleLogin} />;

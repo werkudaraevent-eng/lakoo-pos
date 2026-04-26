@@ -5,183 +5,170 @@ import { usePosData } from "../context/PosDataContext";
 import { buildDashboardCollections } from "../features/dashboard/dashboardData";
 import { buildDashboardKpiCards } from "../features/dashboard/dashboardWorkspace";
 import { buildDashboardSummary } from "../features/events/eventHelpers";
-import { AppIcon } from "../features/ui/AppIcon";
-import { getDashboardKpiIconName } from "../features/ui/iconMaps";
-import { formatCurrency, formatDate } from "../utils/formatters";
+import { formatCurrency } from "../utils/formatters";
 import "../features/dashboard/dashboard.css";
-
-const PLACEHOLDER_CHART_BARS = [
-  { label: "10 AM", height: 16 },
-  { label: "11 AM", height: 32 },
-  { label: "12 PM", height: 58 },
-  { label: "1 PM", height: 92 },
-  { label: "2 PM", height: 72 },
-  { label: "3 PM", height: 40 },
-  { label: "4 PM", height: 64 },
-  { label: "5 PM", height: 82 },
-];
-
-const PLACEHOLDER_ITEMS = Array.from({ length: 4 }, (_, index) => ({
-  id: `placeholder-item-${index + 1}`,
-}));
-
-const PLACEHOLDER_TRANSACTIONS = Array.from({ length: 4 }, (_, index) => ({
-  id: `placeholder-tx-${index + 1}`,
-}));
 
 export function DashboardPage() {
   const { sales, loading, loadError } = usePosData();
-  const summary = buildDashboardSummary({
-    sales,
-    now: new Date().toISOString(),
-  });
+  const summary = buildDashboardSummary({ sales, now: new Date().toISOString() });
   const kpiCards = useMemo(() => buildDashboardKpiCards(summary), [summary]);
   const { todaySales, topItems, recentSales, chartBars } = useMemo(
-    () =>
-      buildDashboardCollections({
-        sales,
-        now: new Date().toISOString(),
-      }),
+    () => buildDashboardCollections({ sales, now: new Date().toISOString() }),
     [sales]
   );
 
+  // Compute weekly data from sales
+  const weeklyData = useMemo(() => {
+    const days = ["Min", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab"];
+    const now = new Date();
+    const result = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(now);
+      d.setDate(d.getDate() - i);
+      const dayStr = d.toISOString().slice(0, 10);
+      const rev = (sales || [])
+        .filter((s) => s.createdAt && s.createdAt.slice(0, 10) === dayStr)
+        .reduce((sum, s) => sum + (s.grandTotal || 0), 0);
+      result.push({ day: days[d.getDay()], rev, isToday: i === 0 });
+    }
+    return result;
+  }, [sales]);
+
+  const maxWeekly = Math.max(...weeklyData.map((d) => d.rev), 1);
+  const totalWeekly = weeklyData.reduce((s, d) => s + d.rev, 0);
+  const chartH = 80;
+
+  // Top products from topItems
+  const topProducts = topItems.slice(0, 5);
+  const maxSold = topProducts.length > 0 ? topProducts[0].qty : 1;
+
   return (
-    <div className="dashboard-container">
+    <div className="content">
+      {loading ? <p className="text-sm text-muted" style={{ padding: 16 }}>Memuat data...</p> : null}
+      {loadError ? <p style={{ padding: 16, color: "var(--danger)" }}>{loadError}</p> : null}
 
-
-      {loading ? <p className="info-text">Loading dashboard data...</p> : null}
-      {loadError ? <p className="error-text">{loadError}</p> : null}
-
-      <section className="kpi-grid">
-        {kpiCards.map((item) => (
-          <article className="kpi-card" key={item.label}>
-            <div className="kpi-title">
-              <span>{item.label}</span>
-              <div className="kpi-icon" aria-hidden="true">
-                <AppIcon name={getDashboardKpiIconName(item.label)} size={16} strokeWidth={1.9} />
-              </div>
+      {/* KPIs */}
+      <div className="grid-4 mb-16">
+        {kpiCards.map((k) => (
+          <div key={k.label} className="card">
+            <div className="kpi-label">{k.label}</div>
+            <div className="kpi-value">
+              {k.kind === "currency" ? formatCurrency(k.value) : k.value}
             </div>
-            <div className="kpi-value">{item.kind === "currency" ? formatCurrency(item.value) : item.value}</div>
-            <div
-              className={`kpi-trend ${item.tone === "down" ? "trend-down" : "trend-up"}${
-                item.value === 0 ? " trend-neutral" : ""
-              }`}
-            >
-              <span>{item.value === 0 ? "No movement yet today" : item.meta}</span>
+            <div className="kpi-sub">
+              <span className={k.tone === "down" ? "kpi-down" : k.value === 0 ? "" : "kpi-up"}>
+                {k.value === 0 ? "Belum ada data hari ini" : k.meta}
+              </span>
             </div>
-          </article>
+          </div>
         ))}
-      </section>
+      </div>
 
-      <section className="dashboard-row">
-        <article className="panel">
-          <div className="panel-header">
-            <span className="panel-title">Sales Overview</span>
-            <Link className="panel-action" to="/reports">
-              View Report
+      <div className="grid-2">
+        {/* Weekly Chart */}
+        <div className="card">
+          <div className="row-between mb-16">
+            <div className="section-title" style={{ marginBottom: 0 }}>Pendapatan Minggu Ini</div>
+            <Link to="/reports" className="text-sm" style={{ color: "var(--accent)", fontWeight: 600, textDecoration: "none" }}>
+              Lihat Laporan →
             </Link>
           </div>
+          <svg width="100%" viewBox={`0 0 ${weeklyData.length * 60} ${chartH + 28}`} style={{ overflow: "visible" }}>
+            {weeklyData.map((d, i) => {
+              const bh = maxWeekly > 0 ? (d.rev / maxWeekly) * chartH : 0;
+              const x = i * 60 + 16;
+              return (
+                <g key={i}>
+                  <rect x={x} y={chartH - bh} width={28} height={Math.max(bh, 2)} rx={4}
+                    fill={d.isToday ? "var(--accent)" : "var(--surface-2)"} />
+                  <text x={x + 14} y={chartH + 18} textAnchor="middle" fontSize={11}
+                    fill="var(--text-soft)" fontWeight={600} style={{ fontFamily: "inherit" }}>{d.day}</text>
+                  {d.rev > 0 ? (
+                    <text x={x + 14} y={chartH - bh - 6} textAnchor="middle" fontSize={10}
+                      fill="var(--text-soft)" style={{ fontFamily: "inherit" }}>
+                      {(d.rev / 1000000).toFixed(1)}M
+                    </text>
+                  ) : null}
+                </g>
+              );
+            })}
+          </svg>
+          <div className="row-between" style={{ marginTop: 8 }}>
+            <span className="text-sm text-muted">Total minggu ini</span>
+            <span className="font-bold" style={{ fontSize: 15 }}>{formatCurrency(totalWeekly)}</span>
+          </div>
+        </div>
 
-          <div className="panel-body">
-            <div className={`chart-container${todaySales.length === 0 ? " is-placeholder" : ""}`}>
-              {(todaySales.length > 0 ? chartBars : PLACEHOLDER_CHART_BARS).map((bar) => (
-                <div className="chart-bar-group" key={bar.label}>
-                  <div className="chart-bar-wrapper">
-                    <div className="chart-bar" style={{ height: `${bar.height}%` }} />
-                  </div>
-                  <span className="chart-label">{bar.label}</span>
+        {/* Top Products */}
+        <div className="card">
+          <div className="row-between mb-16">
+            <div className="section-title" style={{ marginBottom: 0 }}>Produk Terlaris</div>
+            <span className="text-sm text-muted">Hari ini</span>
+          </div>
+          {topProducts.length > 0 ? topProducts.map((p, i) => {
+            const pct = maxSold > 0 ? (p.qty / maxSold) * 100 : 0;
+            return (
+              <div key={i} style={{ marginBottom: 14 }}>
+                <div className="row-between" style={{ marginBottom: 5 }}>
+                  <span style={{ fontSize: 13, fontWeight: 600 }}>{p.name}</span>
+                  <span style={{ fontSize: 12.5, color: "var(--text-soft)" }}>{p.qty} terjual</span>
                 </div>
-              ))}
-            </div>
-            {todaySales.length === 0 ? (
-              <div className="panel-empty-copy">
-                <strong>No completed sales for today yet.</strong>
-                <span>Dashboard panels will populate after the first finalized transaction.</span>
+                <div style={{ height: 5, background: "var(--surface-2)", borderRadius: 4 }}>
+                  <div style={{ height: "100%", width: `${pct}%`, background: "var(--accent)", borderRadius: 4, transition: "width 0.6s ease" }} />
+                </div>
               </div>
-            ) : null}
-          </div>
-        </article>
-
-        <article className="panel">
-          <div className="panel-header">
-            <span className="panel-title">Top Items</span>
-            <Link className="panel-action" to="/sales">
-              View All
-            </Link>
-          </div>
-
-          <div className="panel-body">
-            <div className="item-list">
-              {topItems.length > 0
-                ? topItems.map((item, index) => (
-                    <div className="list-item" key={item.name}>
-                      <span className="item-index">{index + 1}</span>
-                      <div className="item-img">
-                        <span>{item.name.charAt(0).toUpperCase()}</span>
-                      </div>
-                      <div className="item-details">
-                        <span className="item-name">{item.name}</span>
-                        <span className="item-metric">{item.qty} sold</span>
-                      </div>
-                      <span className="item-value">{formatCurrency(item.revenue)}</span>
-                    </div>
-                  ))
-                : PLACEHOLDER_ITEMS.map((item, index) => (
-                    <div className="list-item is-placeholder" key={item.id}>
-                      <span className="item-index">{index + 1}</span>
-                      <div className="item-img" />
-                      <div className="item-details">
-                        <span className="item-name">No item data yet</span>
-                        <span className="item-metric">Waiting for sales</span>
-                      </div>
-                      <span className="item-value">Rp 0</span>
-                    </div>
-                  ))}
+            );
+          }) : (
+            <div className="text-sm text-muted" style={{ padding: "24px 0", textAlign: "center" }}>
+              Belum ada data penjualan hari ini
             </div>
-          </div>
-        </article>
-      </section>
+          )}
+        </div>
+      </div>
 
-      <section className="panel">
-        <div className="panel-header">
-          <span className="panel-title">Recent Transactions</span>
-          <Link className="panel-action" to="/sales">
-            View All
+      {/* Recent Transactions */}
+      <div className="card" style={{ marginTop: 16 }}>
+        <div className="row-between mb-16">
+          <div className="section-title" style={{ marginBottom: 0 }}>Transaksi Terbaru</div>
+          <Link to="/sales" className="text-sm" style={{ color: "var(--accent)", fontWeight: 600, textDecoration: "none" }}>
+            Lihat Semua →
           </Link>
         </div>
-
-        <div className="panel-body panel-body-transactions">
-          <div className="tx-list">
-            {recentSales.length > 0
-              ? recentSales.map((sale) => (
-                  <div className="tx-item" key={sale.id}>
-                    <div className="tx-info">
-                      <span className="tx-id">{sale.receiptNumber}</span>
-                      <span className="tx-time">
-                        Today, {formatDate(sale.createdAt)} / {sale.customerName || sale.cashierUser || "Customer"}
-                      </span>
-                    </div>
-                    <div className="tx-amount-group">
-                      <span className="tx-amount">{formatCurrency(sale.grandTotal)}</span>
-                      <span className="status-badge status-success">Completed</span>
-                    </div>
-                  </div>
-                ))
-              : PLACEHOLDER_TRANSACTIONS.map((sale) => (
-                  <div className="tx-item is-placeholder" key={sale.id}>
-                    <div className="tx-info">
-                      <span className="tx-id">No transaction yet</span>
-                      <span className="tx-time">Today's completed sales will appear here.</span>
-                    </div>
-                    <div className="tx-amount-group">
-                      <span className="tx-amount">Rp 0</span>
-                      <span className="status-badge status-success">Pending</span>
-                    </div>
-                  </div>
-                ))}
-          </div>
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Waktu</th>
+                <th>Items</th>
+                <th>Total</th>
+                <th>Metode</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {recentSales.length > 0 ? recentSales.slice(0, 5).map((sale) => (
+                <tr key={sale.id}>
+                  <td><span style={{ fontWeight: 700, fontSize: 13 }}>{sale.receiptNumber}</span></td>
+                  <td className="text-muted text-sm">
+                    {new Date(sale.createdAt).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })}
+                  </td>
+                  <td>{sale.items?.length || 0}</td>
+                  <td><span style={{ fontWeight: 700 }}>{formatCurrency(sale.grandTotal)}</span></td>
+                  <td><span className="badge badge-gray">{sale.paymentMethod}</span></td>
+                  <td><span className="badge badge-green">Lunas</span></td>
+                </tr>
+              )) : (
+                <tr>
+                  <td colSpan={6} className="text-muted text-sm" style={{ textAlign: "center", padding: 32 }}>
+                    Belum ada transaksi hari ini
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
-      </section>
+      </div>
     </div>
   );
 }
