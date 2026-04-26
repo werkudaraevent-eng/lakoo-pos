@@ -1,13 +1,8 @@
-import "../components/shell.css";
-
-export function PageHeader({ title, description, children }) {
+export function PageHeader({ children }) {
+  if (!children) return null;
   return (
-    <div className="sticky-header">
-      <div className="sticky-header-left">
-        <h1 className="sticky-header-title">{title}</h1>
-        {description ? <p className="sticky-header-desc">{description}</p> : null}
-      </div>
-      {children ? <div className="sticky-header-actions">{children}</div> : null}
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 10, marginBottom: 16 }}>
+      {children}
     </div>
   );
 }

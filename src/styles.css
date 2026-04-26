@@ -2,6 +2,7 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 @import "@fontsource-variable/geist";
+@import "@fontsource-variable/plus-jakarta-sans";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -74,7 +75,7 @@ body,
 body {
   margin: 0;
   min-width: 320px;
-  font-family: "Manrope", "Segoe UI", sans-serif;
+  font-family: 'Plus Jakarta Sans Variable', 'Plus Jakarta Sans', sans-serif;
   color: var(--text);
   background: var(--bg);
 }
@@ -107,7 +108,7 @@ h1,
 h2,
 h3 {
   margin: 0;
-  font-family: "Manrope", "Segoe UI", sans-serif;
+  font-family: 'Plus Jakarta Sans Variable', 'Plus Jakarta Sans', sans-serif;
   line-height: 1.08;
   letter-spacing: -0.03em;
 }
@@ -3227,7 +3228,7 @@ p {
 
 @theme inline {
   --font-heading: var(--font-sans);
-  --font-sans: 'Geist Variable', sans-serif;
+  --font-sans: 'Plus Jakarta Sans Variable', 'Plus Jakarta Sans', sans-serif;
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
