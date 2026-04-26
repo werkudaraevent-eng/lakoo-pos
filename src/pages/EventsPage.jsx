@@ -146,41 +146,95 @@ export function EventsPage() {
           ))}
         </div>
 
-        <div className="card" style={{ padding: 0, overflow: "hidden" }}>
-          <table>
-            <thead>
-              <tr>
-                <th>Produk</th><th>SKU</th><th>Stok Toko</th><th>Alokasi Event</th><th>Sisa Toko</th>
-              </tr>
-            </thead>
-            <tbody>
-              {allProducts.slice(0, 8).map((p) => {
-                const tokoStock = (p.variants || []).reduce((s, v) => s + (v.quantityOnHand || 0), 0);
-                const sku = (p.variants || [])[0]?.sku || "-";
-                return (
-                  <tr key={p.id}>
-                    <td style={{ fontWeight: 600 }}>{p.name}</td>
-                    <td><span className="tag">{sku}</span></td>
-                    <td>{tokoStock}</td>
-                    <td>
-                      {ev.stockMode === "allocate"
-                        ? <input type="number" style={{ width: 70, padding: "4px 8px", border: "1px solid var(--line)", borderRadius: 6, fontSize: 13, fontFamily: "inherit" }} defaultValue={0} min={0} max={tokoStock} />
-                        : <span className="text-muted text-sm">Mengikuti toko</span>
-                      }
-                    </td>
-                    <td>
-                      <span style={{ fontWeight: 600 }}>{tokoStock}</span>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-        {ev.stockMode === "allocate" ? (
-          <div style={{ marginTop: 12, display: "flex", justifyContent: "flex-end" }}>
-            <button className="btn btn-primary">Simpan Alokasi Stok</button>
+        {/* Tab: Produk & Stok — read-only overview */}
+        {stockTab === "list" ? (
+          <div className="card" style={{ padding: 0, overflow: "hidden" }}>
+            <table>
+              <thead>
+                <tr>
+                  <th>Produk</th><th>SKU</th><th>Stok Toko</th><th>Terjual di Event</th><th>Sisa Event</th>
+                </tr>
+              </thead>
+              <tbody>
+                {allProducts.slice(0, 8).map((p) => {
+                  const tokoStock = (p.variants || []).reduce((s, v) => s + (v.quantityOnHand || 0), 0);
+                  const sku = (p.variants || [])[0]?.sku || "-";
+                  const isActive = ev.status === "active" || ev.status === "closed";
+                  const sold = isActive ? Math.floor(tokoStock * 0.2) : 0;
+                  const sisa = ev.stockMode === "allocate" ? tokoStock - sold : tokoStock;
+                  return (
+                    <tr key={p.id}>
+                      <td style={{ fontWeight: 600 }}>{p.name}</td>
+                      <td><span className="tag">{sku}</span></td>
+                      <td style={{ color: "var(--text-soft)" }}>{tokoStock}</td>
+                      <td>
+                        {isActive
+                          ? <span style={{ fontWeight: 600, color: "var(--accent)" }}>{sold}</span>
+                          : <span className="text-muted text-sm">—</span>
+                        }
+                      </td>
+                      <td>
+                        <span style={{ fontWeight: 600, color: sisa <= 3 ? "var(--danger)" : "var(--text)" }}>{sisa}</span>
+                        {sisa <= 3 ? <span style={{ marginLeft: 6, fontSize: 11, color: "var(--danger)", fontWeight: 600 }}>Hampir habis</span> : null}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
+        ) : null}
+
+        {/* Tab: Alokasi Stok */}
+        {stockTab === "allocate" ? (
+          ev.stockMode === "manual" ? (
+            <div className="card" style={{ padding: 24, textAlign: "center", color: "var(--text-soft)" }}>
+              <div style={{ fontSize: 32, marginBottom: 8 }}>🔗</div>
+              <div style={{ fontWeight: 700, fontSize: 15, color: "var(--text)", marginBottom: 6 }}>Mode: Ambil dari Toko Utama</div>
+              <div style={{ fontSize: 13, maxWidth: 380, margin: "0 auto" }}>Event ini menggunakan stok toko secara langsung. Tidak perlu alokasi — setiap penjualan langsung memotong stok toko utama.</div>
+              <div style={{ marginTop: 16 }}><span className="badge badge-blue">Tidak ada alokasi terpisah</span></div>
+            </div>
+          ) : (
+            <>
+              <div style={{ marginBottom: 12, padding: "10px 14px", background: "var(--accent-light)", borderRadius: 10, border: "1px solid var(--accent-soft)", fontSize: 13, color: "var(--accent)" }}>
+                <strong>Mode: Alokasi Sendiri</strong> — Tentukan jumlah unit yang dibawa ke event. Stok toko utama belum terpotong sampai Anda menyimpan alokasi.
+              </div>
+              <div className="card" style={{ padding: 0, overflow: "hidden" }}>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Produk</th><th>SKU</th><th>Stok Toko</th><th>Alokasi ke Event</th><th>Sisa di Toko</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {allProducts.slice(0, 8).map((p) => {
+                      const tokoStock = (p.variants || []).reduce((s, v) => s + (v.quantityOnHand || 0), 0);
+                      const sku = (p.variants || [])[0]?.sku || "-";
+                      const sisa = tokoStock;
+                      return (
+                        <tr key={p.id}>
+                          <td style={{ fontWeight: 600 }}>{p.name}</td>
+                          <td><span className="tag">{sku}</span></td>
+                          <td style={{ color: "var(--text-soft)" }}>{tokoStock}</td>
+                          <td>
+                            <input type="number" style={{ width: 80, padding: "5px 8px", border: "1.5px solid var(--line)", borderRadius: 6, fontSize: 13, fontFamily: "inherit", background: "#fff" }} defaultValue={0} min={0} max={tokoStock} />
+                          </td>
+                          <td>
+                            <span style={{ fontWeight: 600, color: sisa <= 3 ? "var(--danger)" : "var(--text)" }}>{sisa}</span>
+                            {sisa <= 3 ? <span style={{ marginLeft: 6, fontSize: 11, color: "var(--danger)", fontWeight: 600 }}>⚠ Tipis</span> : null}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+              <div style={{ marginTop: 12, display: "flex", justifyContent: "flex-end", gap: 8 }}>
+                <button className="btn btn-ghost">Reset</button>
+                <button className="btn btn-primary">Simpan Alokasi Stok</button>
+              </div>
+            </>
+          )
         ) : null}
       </div>
     );
