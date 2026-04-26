@@ -195,7 +195,7 @@ export function CheckoutPage() {
         <section className="catalog-section">
           <header className="main-header-wrapper">
             <div className="catalog-header">
-              <h1 className="page-title">Checkout</h1>
+              <h1 className="page-title">Kasir</h1>
 
               <div className="catalog-toolbar">
                 <label className="search-box" htmlFor="checkout-search">

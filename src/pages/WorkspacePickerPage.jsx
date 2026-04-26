@@ -10,6 +10,7 @@ import {
   getRoleLandingPath,
   shouldClearWorkspaceSelection,
 } from "../features/workspaces/workspaceGuards";
+import "../features/workspaces/workspace-picker.css";
 
 function getNextPath(locationState, user) {
   const requestedPath = typeof locationState?.from === "string" ? locationState.from : "";
@@ -24,6 +25,13 @@ function getNextPath(locationState, user) {
 function getUserInitial(user) {
   const source = user?.name || user?.username || "U";
   return source.charAt(0).toUpperCase();
+}
+
+function getStatusColor(status) {
+  if (status === "active" || status === "Active") return "var(--success)";
+  if (status === "draft" || status === "Draft") return "var(--warning)";
+  if (status === "closed" || status === "Closed") return "var(--danger)";
+  return "var(--text-soft)";
 }
 
 export function WorkspacePickerPage() {
@@ -72,76 +80,128 @@ export function WorkspacePickerPage() {
   }
 
   return (
-    <div className="workspace-picker-page">
-      <div className="workspace-picker-container">
-        <div className="workspace-picker-brand">
-          <div className="workspace-picker-brand-icon">L</div>
-          <div className="workspace-picker-brand-copy">
-            <p className="workspace-picker-brand-title">Lakoo</p>
-            <p className="workspace-picker-brand-subtitle">POS</p>
+    <div className="wsp-page">
+      {/* Sidebar brand */}
+      <aside className="wsp-sidebar">
+        <div className="wsp-sidebar-brand">
+          <div className="wsp-logo">L</div>
+          <span className="wsp-logo-text">Lakoo</span>
+        </div>
+
+        <div className="wsp-sidebar-features">
+          <div className="wsp-sidebar-feature">
+            <span>⚡</span>
+            <span>Checkout cepat</span>
+          </div>
+          <div className="wsp-sidebar-feature">
+            <span>📊</span>
+            <span>Laporan real-time</span>
+          </div>
+          <div className="wsp-sidebar-feature">
+            <span>🏪</span>
+            <span>Multi-outlet</span>
+          </div>
+          <div className="wsp-sidebar-feature">
+            <span>🎪</span>
+            <span>Event management</span>
           </div>
         </div>
 
-        <section className="workspace-picker-card">
-          <header className="workspace-picker-card-header">
-            <div className="workspace-picker-user-badge">
-              <div className="workspace-picker-user-avatar">{getUserInitial(user)}</div>
-              <div className="workspace-picker-user-text">
-                Signed in as <strong>{user?.role || "user"}</strong>
+        <div className="wsp-sidebar-footer">
+          <p>© 2026 Lakoo POS</p>
+        </div>
+      </aside>
+
+      {/* Main content */}
+      <main className="wsp-main">
+        <div className="wsp-content">
+          {/* User header */}
+          <div className="wsp-user-bar">
+            <div className="wsp-user-info">
+              <div className="wsp-avatar">{getUserInitial(user)}</div>
+              <div>
+                <p className="wsp-user-name">{user?.name || user?.username || "User"}</p>
+                <p className="wsp-user-role">{user?.role || "user"}</p>
               </div>
             </div>
+            <button className="wsp-logout-btn" onClick={logout} type="button">
+              Keluar
+            </button>
+          </div>
 
-            <h1>Select workspace</h1>
-            <p className="workspace-picker-subtitle">
-              Choose the workspace you want to use for this session. You can switch again later.
-            </p>
-          </header>
+          {/* Title */}
+          <div className="wsp-title-section">
+            <h1>Pilih Workspace</h1>
+            <p>Pilih toko atau event yang ingin Anda kelola saat ini.</p>
+          </div>
 
-          <div className="workspace-picker-card-body">
-            {loading ? <p className="workspace-picker-message">Loading workspaces...</p> : null}
-            {!loading && loadError ? <p className="workspace-picker-message error-text">{loadError}</p> : null}
+          {/* Workspace list */}
+          <div className="wsp-list-section">
+            {loading ? (
+              <div className="wsp-empty">
+                <div className="wsp-empty-icon">⏳</div>
+                <p>Memuat workspace...</p>
+              </div>
+            ) : null}
+
+            {!loading && loadError ? (
+              <div className="wsp-empty wsp-empty-error">
+                <div className="wsp-empty-icon">⚠️</div>
+                <p>{loadError}</p>
+              </div>
+            ) : null}
+
             {!loading && !loadError && pickerOptions.length === 0 ? (
-              <p className="workspace-picker-message">No workspaces are available for your account.</p>
+              <div className="wsp-empty">
+                <div className="wsp-empty-icon">📭</div>
+                <p>Tidak ada workspace yang tersedia untuk akun Anda.</p>
+              </div>
             ) : null}
 
             {!loading && !loadError && pickerOptions.length > 0 ? (
-              <div className="workspace-picker-list">
-                {pickerOptions.map((workspace) => (
-                  <button
-                    className={`workspace-picker-item${workspace.isCurrent ? " is-current" : ""}`}
-                    key={workspace.id}
-                    onClick={() => handleSelect(workspace.id)}
-                    type="button"
-                  >
-                    <div className={`workspace-picker-item-badge${workspace.typeLabel === 'Event' ? ' is-event' : ''}`}>
-                      {workspace.typeLabel === 'Event' ? '🎪' : '🏪'}
-                    </div>
-                    <div className="workspace-picker-item-copy">
-                      <div className="workspace-picker-item-head">
-                        <strong>{workspace.name}</strong>
-                        {workspace.isCurrent ? <span className="workspace-picker-current">Current</span> : null}
+              <div className="wsp-grid">
+                {pickerOptions.map((workspace) => {
+                  const isEvent = workspace.typeLabel === "Event";
+                  return (
+                    <button
+                      className={`wsp-card${workspace.isCurrent ? " is-current" : ""}${isEvent ? " is-event" : ""}`}
+                      key={workspace.id}
+                      onClick={() => handleSelect(workspace.id)}
+                      type="button"
+                    >
+                      <div className="wsp-card-icon">
+                        {isEvent ? "🎪" : "🏪"}
                       </div>
-                      <div className="workspace-picker-item-meta">
-                        <span className="workspace-picker-chip">{workspace.typeLabel}</span>
-                        {workspace.statusLabel ? (
-                          <span className="workspace-picker-chip">{workspace.statusLabel}</span>
-                        ) : null}
+                      <div className="wsp-card-body">
+                        <div className="wsp-card-head">
+                          <strong className="wsp-card-name">{workspace.name}</strong>
+                          {workspace.isCurrent ? (
+                            <span className="wsp-card-current">Aktif</span>
+                          ) : null}
+                        </div>
+                        <div className="wsp-card-meta">
+                          <span className={`wsp-card-type${isEvent ? " is-event" : ""}`}>
+                            {workspace.typeLabel}
+                          </span>
+                          {workspace.statusLabel ? (
+                            <span
+                              className="wsp-card-status"
+                              style={{ color: getStatusColor(workspace.statusLabel) }}
+                            >
+                              ● {workspace.statusLabel}
+                            </span>
+                          ) : null}
+                        </div>
                       </div>
-                    </div>
-                    <span className="workspace-picker-chevron">/</span>
-                  </button>
-                ))}
+                      <div className="wsp-card-arrow">→</div>
+                    </button>
+                  );
+                })}
               </div>
             ) : null}
           </div>
-
-          <footer className="workspace-picker-card-footer">
-            <button className="workspace-picker-logout" onClick={logout} type="button">
-              Log out and return to sign in
-            </button>
-          </footer>
-        </section>
-      </div>
+        </div>
+      </main>
     </div>
   );
 }

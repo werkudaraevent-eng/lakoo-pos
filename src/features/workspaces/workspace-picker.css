@@ -1,0 +1,334 @@
+/* ── Workspace Picker — matches login page design language ── */
+
+.wsp-page {
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  min-height: 100vh;
+}
+
+/* ── Sidebar ── */
+.wsp-sidebar {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 40px 32px;
+  color: #f0fdfa;
+  background:
+    radial-gradient(ellipse at 20% 0%, rgba(46, 196, 182, 0.40) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 100%, rgba(255, 107, 107, 0.18) 0%, transparent 50%),
+    linear-gradient(160deg, #111318 0%, #1a1d23 50%, #111318 100%);
+  position: relative;
+}
+
+.wsp-sidebar::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.02'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+  pointer-events: none;
+}
+
+.wsp-sidebar-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  position: relative;
+  z-index: 1;
+}
+
+.wsp-logo {
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  background: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 20px;
+  color: #fff;
+}
+
+.wsp-logo-text {
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.wsp-sidebar-features {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  position: relative;
+  z-index: 1;
+}
+
+.wsp-sidebar-feature {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 14px;
+  color: rgba(240, 253, 250, 0.7);
+}
+
+.wsp-sidebar-footer {
+  position: relative;
+  z-index: 1;
+}
+
+.wsp-sidebar-footer p {
+  font-size: 12px;
+  color: rgba(240, 253, 250, 0.3);
+}
+
+/* ── Main content ── */
+.wsp-main {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+  background: var(--bg);
+}
+
+.wsp-content {
+  width: 100%;
+  max-width: 640px;
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+/* User bar */
+.wsp-user-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  background: var(--panel-strong);
+  border-radius: var(--radius-md);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.wsp-user-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.wsp-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 16px;
+}
+
+.wsp-user-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.wsp-user-role {
+  font-size: 13px;
+  color: var(--text-soft);
+  text-transform: capitalize;
+}
+
+.wsp-logout-btn {
+  padding: 8px 18px;
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-soft);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.wsp-logout-btn:hover {
+  border-color: var(--danger);
+  color: var(--danger);
+  background: var(--danger-soft);
+}
+
+/* Title */
+.wsp-title-section h1 {
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--text);
+  margin-bottom: 6px;
+}
+
+.wsp-title-section p {
+  font-size: 15px;
+  color: var(--text-soft);
+}
+
+/* Workspace grid */
+.wsp-list-section {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.wsp-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.wsp-card {
+  display: grid;
+  grid-template-columns: 56px 1fr 32px;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  padding: 20px;
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--panel-strong);
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
+}
+
+.wsp-card:hover {
+  border-color: var(--accent);
+  box-shadow: 0 8px 24px rgba(46, 196, 182, 0.12);
+  transform: translateY(-2px);
+}
+
+.wsp-card.is-current {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.wsp-card-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  background: var(--accent-soft);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+}
+
+.wsp-card.is-event .wsp-card-icon {
+  background: rgba(255, 107, 107, 0.10);
+}
+
+.wsp-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.wsp-card-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.wsp-card-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.wsp-card-current {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.wsp-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.wsp-card-type {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent-deep);
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+}
+
+.wsp-card-type.is-event {
+  color: #c0392b;
+  background: rgba(255, 107, 107, 0.10);
+}
+
+.wsp-card-status {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.wsp-card-arrow {
+  font-size: 18px;
+  color: var(--text-soft);
+  transition: transform 0.2s;
+}
+
+.wsp-card:hover .wsp-card-arrow {
+  transform: translateX(4px);
+  color: var(--accent);
+}
+
+/* Empty states */
+.wsp-empty {
+  padding: 48px 24px;
+  text-align: center;
+  border: 1.5px dashed var(--line);
+  border-radius: var(--radius-md);
+  background: var(--panel-strong);
+}
+
+.wsp-empty-icon {
+  font-size: 40px;
+  margin-bottom: 12px;
+}
+
+.wsp-empty p {
+  font-size: 15px;
+  color: var(--text-soft);
+}
+
+.wsp-empty-error p {
+  color: var(--danger);
+}
+
+/* ── Responsive ── */
+@media (max-width: 900px) {
+  .wsp-page {
+    grid-template-columns: 1fr;
+  }
+
+  .wsp-sidebar {
+    display: none;
+  }
+
+  .wsp-main {
+    padding: 24px 16px;
+  }
+}
