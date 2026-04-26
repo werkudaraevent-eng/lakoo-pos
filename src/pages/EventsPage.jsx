@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
 import { usePosData } from "../context/PosDataContext";
@@ -18,6 +18,21 @@ export function EventsPage() {
   const [view, setView] = useState("list");
   const [selected, setSelected] = useState(null);
   const [stockTab, setStockTab] = useState("list");
+  const [allocations, setAllocations] = useState({}); // { productId: qty }
+  const [savedAllocations, setSavedAllocations] = useState({}); // last saved state
+  const [confirmModal, setConfirmModal] = useState(false);
+  const [discardModal, setDiscardModal] = useState(null); // null or callback
+  const [saving, setSaving] = useState(false);
+
+  const isDirty = JSON.stringify(allocations) !== JSON.stringify(savedAllocations);
+
+  function tryNavigateAway(callback) {
+    if (isDirty) {
+      setDiscardModal(() => callback);
+    } else {
+      callback();
+    }
+  }
 
   const events = useMemo(() => {
     return (workspaces || [])
@@ -116,7 +131,7 @@ export function EventsPage() {
     return (
       <div className="content">
         <div className="row" style={{ marginBottom: 20, flexWrap: "wrap", gap: 8 }}>
-          <button className="btn btn-ghost btn-sm" onClick={() => setView("list")}>← Kembali</button>
+          <button className="btn btn-ghost btn-sm" onClick={() => tryNavigateAway(() => { setView("list"); setAllocations({}); setSavedAllocations({}); })}>← Kembali</button>
           <div style={{ fontSize: 18, fontWeight: 800, flex: 1 }}>{ev.name}</div>
           <span className={`badge ${meta.cls}`}>{meta.label}</span>
           {ev.status === "draft" ? <button className="btn btn-primary btn-sm">Aktifkan</button> : null}
@@ -217,11 +232,19 @@ export function EventsPage() {
                           <td><span className="tag">{sku}</span></td>
                           <td style={{ color: "var(--text-soft)" }}>{tokoStock}</td>
                           <td>
-                            <input type="number" style={{ width: 80, padding: "5px 8px", border: "1.5px solid var(--line)", borderRadius: 6, fontSize: 13, fontFamily: "inherit", background: "#fff" }} defaultValue={0} min={0} max={tokoStock} />
+                            <input type="number" style={{ width: 80, padding: "5px 8px", border: "1.5px solid var(--line)", borderRadius: 6, fontSize: 13, fontFamily: "inherit", background: "#fff" }}
+                              value={allocations[p.id] || 0}
+                              min={0} max={tokoStock}
+                              onChange={(e) => setAllocations((prev) => ({ ...prev, [p.id]: Math.min(tokoStock, Math.max(0, parseInt(e.target.value) || 0)) }))}
+                            />
                           </td>
                           <td>
-                            <span style={{ fontWeight: 600, color: sisa <= 3 ? "var(--danger)" : "var(--text)" }}>{sisa}</span>
-                            {sisa <= 3 ? <span style={{ marginLeft: 6, fontSize: 11, color: "var(--danger)", fontWeight: 600 }}>⚠ Tipis</span> : null}
+                            {(() => { const sisaToko = tokoStock - (allocations[p.id] || 0); return (
+                              <>
+                                <span style={{ fontWeight: 600, color: sisaToko <= 3 ? "var(--danger)" : "var(--text)" }}>{sisaToko}</span>
+                                {sisaToko <= 3 ? <span style={{ marginLeft: 6, fontSize: 11, color: "var(--danger)", fontWeight: 600 }}>⚠ Tipis</span> : null}
+                              </>
+                            ); })()}
                           </td>
                         </tr>
                       );
@@ -230,11 +253,67 @@ export function EventsPage() {
                 </table>
               </div>
               <div style={{ marginTop: 12, display: "flex", justifyContent: "flex-end", gap: 8 }}>
-                <button className="btn btn-ghost">Reset</button>
-                <button className="btn btn-primary">Simpan Alokasi Stok</button>
+                <button className="btn btn-ghost" onClick={() => setAllocations({ ...savedAllocations })}>Reset</button>
+                <button className="btn btn-primary" disabled={!isDirty} onClick={() => setConfirmModal(true)}>
+                  {saving ? "Menyimpan..." : "Simpan Alokasi Stok"}
+                </button>
               </div>
             </>
           )
+        ) : null}
+
+        {/* Confirm Save Modal */}
+        {confirmModal ? (
+          <div className="modal-overlay" onClick={() => setConfirmModal(false)}>
+            <div className="modal" style={{ width: 400, textAlign: "center" }} onClick={(e) => e.stopPropagation()}>
+              <div style={{ width: 52, height: 52, borderRadius: "50%", background: "var(--accent-soft)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 14px" }}>
+                <svg width={24} height={24} fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z" /></svg>
+              </div>
+              <div style={{ fontSize: 17, fontWeight: 800, marginBottom: 8 }}>Simpan Alokasi Stok?</div>
+              <div style={{ fontSize: 13.5, color: "var(--text-soft)", marginBottom: 6 }}>
+                Anda akan mengalokasikan stok berikut ke event <strong>{ev.name}</strong>:
+              </div>
+              <div style={{ background: "var(--surface)", borderRadius: 8, padding: "10px 14px", marginBottom: 20, fontSize: 13 }}>
+                {Object.entries(allocations).filter(([, qty]) => qty > 0).map(([pid, qty]) => {
+                  const p = allProducts.find((x) => x.id === pid);
+                  return p ? <div key={pid} style={{ display: "flex", justifyContent: "space-between", padding: "2px 0" }}><span>{p.name}</span><strong>{qty} unit</strong></div> : null;
+                })}
+                {Object.values(allocations).every((q) => q === 0) ? <span className="text-muted">Belum ada alokasi</span> : null}
+              </div>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setConfirmModal(false)}>Batal</button>
+                <button className="btn btn-primary" style={{ flex: 1 }} onClick={() => {
+                  setSavedAllocations({ ...allocations });
+                  setConfirmModal(false);
+                  setSaving(true);
+                  setTimeout(() => setSaving(false), 800);
+                }}>Ya, Simpan</button>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        {/* Discard Changes Modal */}
+        {discardModal ? (
+          <div className="modal-overlay" onClick={() => setDiscardModal(null)}>
+            <div className="modal" style={{ width: 380, textAlign: "center" }} onClick={(e) => e.stopPropagation()}>
+              <div style={{ width: 52, height: 52, borderRadius: "50%", background: "var(--danger-soft)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 14px" }}>
+                <svg width={22} height={22} fill="none" stroke="var(--danger)" strokeWidth="2.5" strokeLinecap="round" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+              </div>
+              <div style={{ fontSize: 17, fontWeight: 800, marginBottom: 8 }}>Perubahan Belum Disimpan</div>
+              <div style={{ fontSize: 13.5, color: "var(--text-soft)", marginBottom: 20 }}>
+                Anda memiliki perubahan alokasi stok yang belum disimpan. Yakin ingin keluar tanpa menyimpan?
+              </div>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setDiscardModal(null)}>Kembali Edit</button>
+                <button className="btn" style={{ flex: 1, background: "var(--danger)", color: "#fff" }} onClick={() => {
+                  const cb = discardModal;
+                  setDiscardModal(null);
+                  cb();
+                }}>Buang Perubahan</button>
+              </div>
+            </div>
+          </div>
         ) : null}
       </div>
     );
