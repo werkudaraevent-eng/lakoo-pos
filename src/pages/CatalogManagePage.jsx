@@ -42,10 +42,11 @@ export function CatalogManagePage() {
   const [saved, setSaved] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
+  const [initialized, setInitialized] = useState(false);
 
-  // Load product data for edit
+  // Load product data for edit — only once on mount
   useEffect(() => {
-    if (!product) return;
+    if (!product || initialized) return;
     setForm({
       name: product.name || "",
       category: product.category || "",
@@ -64,7 +65,8 @@ export function CatalogManagePage() {
         lowStockThreshold: v.lowStockThreshold || 0,
       }))
     );
-  }, [product]);
+    setInitialized(true);
+  }, [product, initialized]);
 
   const totalStock = variants.reduce((s, v) => s + (parseInt(v.qty) || 0), 0);
 
@@ -102,12 +104,14 @@ export function CatalogManagePage() {
           })),
         });
       } else {
+        // Update product info first
         await updateProduct(productId, {
           ...form,
           basePrice: parseInt(String(form.basePrice).replace(/\D/g, "")) || 0,
           isActive: true,
         });
-        // Update existing variants
+        // Update variants one by one
+        // Note: each call triggers bootstrap reload, but we block form reset with `initialized` flag
         for (const v of variants) {
           if (v.id) {
             await updateVariant(v.id, {
@@ -117,8 +121,9 @@ export function CatalogManagePage() {
               quantityOnHand: parseInt(v.qty) || 0,
               lowStockThreshold: v.lowStockThreshold || 3,
               isActive: true,
+              priceOverride: v.priceOverride != null ? v.priceOverride : null,
             });
-          } else {
+          } else if (v.label) {
             await createVariant(productId, {
               sku: v.sku || `${form.name.substring(0, 3).toUpperCase()}-${v.label}`,
               attribute1Value: v.label,
