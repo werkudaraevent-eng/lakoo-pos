@@ -8,16 +8,20 @@ import { getNavigationIconName } from "../features/ui/iconMaps";
 import "./shell.css";
 
 const NAV_ITEMS = [
+  { section: "Utama" },
   { id: "dashboard", label: "Dashboard", to: "/dashboard", icon: "Dashboard", roles: ["admin", "manager", "cashier"] },
   { id: "kasir", label: "Kasir / POS", to: "/checkout", icon: "Checkout", roles: ["admin", "manager", "cashier"] },
-  { id: "penjualan", label: "Riwayat Transaksi", to: "/sales", icon: "Sales", roles: ["admin", "manager", "cashier"] },
+  { section: "Inventori" },
   { id: "katalog", label: "Katalog Produk", to: "/catalog", icon: "Catalog", roles: ["admin", "manager"] },
   { id: "inventori", label: "Manajemen Stok", to: "/inventory", icon: "Inventory", roles: ["admin", "manager"] },
+  { section: "Penjualan" },
+  { id: "penjualan", label: "Riwayat Transaksi", to: "/sales", icon: "Sales", roles: ["admin", "manager", "cashier"] },
+  { id: "laporan", label: "Laporan & Analitik", to: "/reports", icon: "Reports", roles: ["admin", "manager"] },
   { id: "event", label: "Event & Bazar", to: "/events", icon: "Events", roles: ["admin", "manager"] },
   { id: "promosi", label: "Promosi", to: "/promotions", icon: "Promotions", roles: ["admin", "manager"] },
-  { id: "laporan", label: "Laporan & Analitik", to: "/reports", icon: "Reports", roles: ["admin", "manager"] },
-  { id: "pengaturan", label: "Pengaturan", to: "/settings", icon: "Settings", roles: ["admin"] },
+  { section: "Sistem" },
   { id: "pengguna", label: "Pengguna", to: "/users", icon: "Users", roles: ["admin"] },
+  { id: "pengaturan", label: "Pengaturan", to: "/settings", icon: "Settings", roles: ["admin"] },
 ];
 
 const PAGE_TITLES = {
@@ -61,7 +65,7 @@ export function AppShell({ children }) {
   const isCheckoutRoute = location.pathname.startsWith("/checkout");
 
   const activeWorkspace = workspaces.find((w) => w.id === activeWorkspaceId);
-  const allowedItems = NAV_ITEMS.filter((item) => item.roles.includes(user.role));
+  const allowedItems = NAV_ITEMS.filter((item) => item.section || item.roles.includes(user.role));
   const pageTitle = getPageTitle(location.pathname);
 
   return (
@@ -84,20 +88,23 @@ export function AppShell({ children }) {
 
           {/* Nav */}
           <nav className="shell-nav">
-            <div className="shell-nav-section">Menu</div>
-            {allowedItems.map((item) => (
-              <NavLink
-                className={({ isActive }) => `shell-nav-item${isActive ? " active" : ""}`}
-                key={item.to}
-                to={item.to}
-                end={item.to !== "/sales"}
-              >
-                <span className="shell-nav-icon">
-                  <AppIcon name={getNavigationIconName(item.icon)} size={17} strokeWidth={1.8} />
-                </span>
-                <span>{item.label}</span>
-              </NavLink>
-            ))}
+            {allowedItems.map((item, i) =>
+              item.section ? (
+                <div key={`section-${i}`} className="shell-nav-section">{item.section}</div>
+              ) : (
+                <NavLink
+                  className={({ isActive }) => `shell-nav-item${isActive ? " active" : ""}`}
+                  key={item.to}
+                  to={item.to}
+                  end={item.to !== "/sales"}
+                >
+                  <span className="shell-nav-icon">
+                    <AppIcon name={getNavigationIconName(item.icon)} size={17} strokeWidth={1.8} />
+                  </span>
+                  <span>{item.label}</span>
+                </NavLink>
+              )
+            )}
           </nav>
         </div>
 
