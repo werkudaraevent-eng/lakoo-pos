@@ -14,11 +14,9 @@ import "../features/workspaces/workspace-picker.css";
 
 function getNextPath(locationState, user) {
   const requestedPath = typeof locationState?.from === "string" ? locationState.from : "";
-
   if (requestedPath && !requestedPath.startsWith("/workspace/select")) {
     return requestedPath;
   }
-
   return getRoleLandingPath(user?.role);
 }
 
@@ -27,19 +25,12 @@ function getUserInitial(user) {
   return source.charAt(0).toUpperCase();
 }
 
-function getStatusColor(status) {
-  if (status === "active" || status === "Active") return "var(--success)";
-  if (status === "draft" || status === "Draft") return "var(--warning)";
-  if (status === "closed" || status === "Closed") return "var(--danger)";
-  return "var(--text-soft)";
-}
-
 export function WorkspacePickerPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams] = useSearchParams();
   const { user, logout } = useAuth();
-  const { workspaces, loading, hasLoaded, loadError } = usePosData();
+  const { workspaces, sales, loading, hasLoaded, loadError } = usePosData();
   const { activeWorkspaceId, selectWorkspace, clearWorkspace } = useWorkspace();
   const accessibleWorkspaces = filterAccessibleWorkspaces(workspaces, user);
   const pickerOptions = buildWorkspacePickerOptions(accessibleWorkspaces, activeWorkspaceId);
@@ -63,13 +54,8 @@ export function WorkspacePickerPage() {
     if (loading || !autoWorkspaceId || accessibleWorkspaces.length !== 1) {
       return;
     }
-
     const workspace = accessibleWorkspaces.find((item) => item.id === autoWorkspaceId);
-
-    if (!workspace) {
-      return;
-    }
-
+    if (!workspace) return;
     selectWorkspace(workspace);
     navigate(nextPath, { replace: true });
   }, [accessibleWorkspaces, autoWorkspaceId, loading, navigate, nextPath, selectWorkspace]);
@@ -79,127 +65,132 @@ export function WorkspacePickerPage() {
     navigate(nextPath, { replace: true });
   }
 
+  // Count today's sales per workspace (simple heuristic)
+  const today = new Date().toISOString().slice(0, 10);
+  const todaySalesCount = (sales || []).filter(
+    (s) => s.createdAt && s.createdAt.slice(0, 10) === today
+  ).length;
+
   return (
     <div className="wsp-page">
-      {/* Sidebar brand */}
-      <aside className="wsp-sidebar">
-        <div className="wsp-sidebar-brand">
-          <div className="wsp-logo">L</div>
-          <span className="wsp-logo-text">Lakoo</span>
+      {/* Top bar */}
+      <header className="wsp-topbar">
+        <div className="wsp-topbar-brand">
+          <div className="wsp-topbar-logo">L</div>
+          <span className="wsp-topbar-name">Lakoo</span>
         </div>
-
-        <div className="wsp-sidebar-features">
-          <div className="wsp-sidebar-feature">
-            <span>⚡</span>
-            <span>Checkout cepat</span>
+        <div className="wsp-topbar-right">
+          <div className="wsp-topbar-user">
+            <div className="wsp-topbar-avatar">{getUserInitial(user)}</div>
+            <div className="wsp-topbar-user-info">
+              <span className="wsp-topbar-user-name">{user?.name || user?.username}</span>
+              <span className="wsp-topbar-user-role">{user?.role}</span>
+            </div>
           </div>
-          <div className="wsp-sidebar-feature">
-            <span>📊</span>
-            <span>Laporan real-time</span>
-          </div>
-          <div className="wsp-sidebar-feature">
-            <span>🏪</span>
-            <span>Multi-outlet</span>
-          </div>
-          <div className="wsp-sidebar-feature">
-            <span>🎪</span>
-            <span>Event management</span>
-          </div>
+          <button className="wsp-topbar-logout" onClick={logout} type="button">
+            Keluar
+          </button>
         </div>
-
-        <div className="wsp-sidebar-footer">
-          <p>© 2026 Lakoo POS</p>
-        </div>
-      </aside>
+      </header>
 
       {/* Main content */}
-      <main className="wsp-main">
-        <div className="wsp-content">
-          {/* User header */}
-          <div className="wsp-user-bar">
-            <div className="wsp-user-info">
-              <div className="wsp-avatar">{getUserInitial(user)}</div>
-              <div>
-                <p className="wsp-user-name">{user?.name || user?.username || "User"}</p>
-                <p className="wsp-user-role">{user?.role || "user"}</p>
-              </div>
+      <main className="wsp-center">
+        <div className="wsp-hero">
+          <h1>Selamat datang kembali 👋</h1>
+          <p>Pilih outlet atau event untuk memulai sesi kerja Anda.</p>
+        </div>
+
+        {/* Stats bar */}
+        <div className="wsp-stats-bar">
+          <div className="wsp-stat">
+            <span className="wsp-stat-value">{pickerOptions.length}</span>
+            <span className="wsp-stat-label">Workspace</span>
+          </div>
+          <div className="wsp-stat-divider" />
+          <div className="wsp-stat">
+            <span className="wsp-stat-value">{todaySalesCount}</span>
+            <span className="wsp-stat-label">Transaksi Hari Ini</span>
+          </div>
+          <div className="wsp-stat-divider" />
+          <div className="wsp-stat">
+            <span className="wsp-stat-value">
+              {pickerOptions.filter((w) => w.typeLabel === "Event").length}
+            </span>
+            <span className="wsp-stat-label">Event Aktif</span>
+          </div>
+        </div>
+
+        {/* Workspace grid */}
+        <div className="wsp-section">
+          {loading ? (
+            <div className="wsp-loading">
+              <div className="wsp-loading-spinner" />
+              <p>Memuat workspace...</p>
             </div>
-            <button className="wsp-logout-btn" onClick={logout} type="button">
-              Keluar
-            </button>
-          </div>
+          ) : null}
 
-          {/* Title */}
-          <div className="wsp-title-section">
-            <h1>Pilih Workspace</h1>
-            <p>Pilih toko atau event yang ingin Anda kelola saat ini.</p>
-          </div>
+          {!loading && loadError ? (
+            <div className="wsp-empty-state">
+              <div className="wsp-empty-icon">⚠️</div>
+              <h3>Gagal memuat</h3>
+              <p>{loadError}</p>
+            </div>
+          ) : null}
 
-          {/* Workspace list */}
-          <div className="wsp-list-section">
-            {loading ? (
-              <div className="wsp-empty">
-                <div className="wsp-empty-icon">⏳</div>
-                <p>Memuat workspace...</p>
-              </div>
-            ) : null}
+          {!loading && !loadError && pickerOptions.length === 0 ? (
+            <div className="wsp-empty-state">
+              <div className="wsp-empty-icon">📭</div>
+              <h3>Belum ada workspace</h3>
+              <p>Tidak ada workspace yang tersedia untuk akun Anda.</p>
+            </div>
+          ) : null}
 
-            {!loading && loadError ? (
-              <div className="wsp-empty wsp-empty-error">
-                <div className="wsp-empty-icon">⚠️</div>
-                <p>{loadError}</p>
-              </div>
-            ) : null}
+          {!loading && !loadError && pickerOptions.length > 0 ? (
+            <div className="wsp-grid">
+              {pickerOptions.map((workspace) => {
+                const isEvent = workspace.typeLabel === "Event";
+                const statusLower = (workspace.statusLabel || "").toLowerCase();
+                return (
+                  <button
+                    className={`wsp-tile${workspace.isCurrent ? " is-active" : ""}${isEvent ? " is-event" : ""}`}
+                    key={workspace.id}
+                    onClick={() => handleSelect(workspace.id)}
+                    type="button"
+                  >
+                    {workspace.isCurrent ? (
+                      <div className="wsp-tile-active-badge">Sesi Aktif</div>
+                    ) : null}
 
-            {!loading && !loadError && pickerOptions.length === 0 ? (
-              <div className="wsp-empty">
-                <div className="wsp-empty-icon">📭</div>
-                <p>Tidak ada workspace yang tersedia untuk akun Anda.</p>
-              </div>
-            ) : null}
-
-            {!loading && !loadError && pickerOptions.length > 0 ? (
-              <div className="wsp-grid">
-                {pickerOptions.map((workspace) => {
-                  const isEvent = workspace.typeLabel === "Event";
-                  return (
-                    <button
-                      className={`wsp-card${workspace.isCurrent ? " is-current" : ""}${isEvent ? " is-event" : ""}`}
-                      key={workspace.id}
-                      onClick={() => handleSelect(workspace.id)}
-                      type="button"
-                    >
-                      <div className="wsp-card-icon">
+                    <div className="wsp-tile-icon-wrap">
+                      <div className="wsp-tile-icon">
                         {isEvent ? "🎪" : "🏪"}
                       </div>
-                      <div className="wsp-card-body">
-                        <div className="wsp-card-head">
-                          <strong className="wsp-card-name">{workspace.name}</strong>
-                          {workspace.isCurrent ? (
-                            <span className="wsp-card-current">Aktif</span>
-                          ) : null}
-                        </div>
-                        <div className="wsp-card-meta">
-                          <span className={`wsp-card-type${isEvent ? " is-event" : ""}`}>
-                            {workspace.typeLabel}
+                    </div>
+
+                    <div className="wsp-tile-content">
+                      <h3 className="wsp-tile-name">{workspace.name}</h3>
+                      <div className="wsp-tile-tags">
+                        <span className={`wsp-tile-type${isEvent ? " is-event" : ""}`}>
+                          {isEvent ? "Event" : "Toko"}
+                        </span>
+                        {workspace.statusLabel ? (
+                          <span className={`wsp-tile-status status-${statusLower}`}>
+                            {workspace.statusLabel}
                           </span>
-                          {workspace.statusLabel ? (
-                            <span
-                              className="wsp-card-status"
-                              style={{ color: getStatusColor(workspace.statusLabel) }}
-                            >
-                              ● {workspace.statusLabel}
-                            </span>
-                          ) : null}
-                        </div>
+                        ) : null}
                       </div>
-                      <div className="wsp-card-arrow">→</div>
-                    </button>
-                  );
-                })}
-              </div>
-            ) : null}
-          </div>
+                    </div>
+
+                    <div className="wsp-tile-arrow">
+                      <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                        <path d="M7.5 5L12.5 10L7.5 15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          ) : null}
         </div>
       </main>
     </div>
