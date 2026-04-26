@@ -1,211 +1,87 @@
-import { useDeferredValue, useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
-import { Button } from "../components/ui/button";
-import { Badge } from "../components/ui/badge";
-import { Input } from "../components/ui/input";
 import { usePosData } from "../context/PosDataContext";
-import {
-  buildCatalogCsv,
-  buildCatalogStockSummary,
-  filterCatalogProducts,
-  paginateCatalogProducts,
-  sortCatalogProducts,
-} from "../features/catalog/catalogHelpers";
-import { AppIcon } from "../features/ui/AppIcon";
 import { formatCurrency } from "../utils/formatters";
-import "../features/catalog/catalog.css";
-
-const PAGE_SIZE = 8;
-
-function getProductMark(name) {
-  return String(name || "")
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((chunk) => chunk[0])
-    .join("")
-    .toUpperCase();
-}
-
-function downloadCatalogCsv(products) {
-  const csv = buildCatalogCsv(products);
-  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = "catalog-export.csv";
-  link.click();
-  URL.revokeObjectURL(url);
-}
+import "../features/dashboard/dashboard.css";
 
 export function CatalogPage() {
-  const { loadError, loading, products } = usePosData();
-  const [query, setQuery] = useState("");
-  const [stockFilter, setStockFilter] = useState("all");
-  const [sortBy, setSortBy] = useState("name-asc");
-  const [page, setPage] = useState(1);
-  const deferredQuery = useDeferredValue(query);
+  const { products, categories, settings, loading, loadError } = usePosData();
+  const [search, setSearch] = useState("");
+  const [cat, setCat] = useState("Semua");
 
-  const filteredProducts = useMemo(
-    () => filterCatalogProducts(products, { query: deferredQuery, stockFilter }),
-    [deferredQuery, products, stockFilter]
-  );
-  const sortedProducts = useMemo(
-    () => sortCatalogProducts(filteredProducts, sortBy),
-    [filteredProducts, sortBy]
-  );
-  const paginatedProducts = useMemo(
-    () => paginateCatalogProducts(sortedProducts, { page, pageSize: PAGE_SIZE }),
-    [page, sortedProducts]
-  );
+  const attr1Label = settings?.attribute1Label || "Size";
+  const attr2Label = settings?.attribute2Label || "Color";
 
-  useEffect(() => {
-    setPage(1);
-  }, [deferredQuery, stockFilter, sortBy]);
+  const catList = useMemo(() => {
+    const unique = [...new Set((categories || []).map((c) => c.name))].sort();
+    return ["Semua", ...unique];
+  }, [categories]);
+
+  const filtered = useMemo(() => {
+    return (products || []).filter((p) => {
+      const matchCat = cat === "Semua" || p.category === cat;
+      const q = search.toLowerCase();
+      const matchSearch = !q || p.name.toLowerCase().includes(q) || (p.variants || []).some((v) => (v.sku || "").toLowerCase().includes(q));
+      return matchCat && matchSearch;
+    });
+  }, [products, search, cat]);
+
+  function getTotalStock(product) {
+    return (product.variants || []).filter((v) => v.isActive !== false).reduce((sum, v) => sum + (v.quantityOnHand || 0), 0);
+  }
 
   return (
-    <div className="catalog-banani-page">
-      <div className="page-actions">
-        <div className="catalog-banani-header-actions">
-          <Button
-            className="catalog-banani-button is-outline"
-            onClick={() => downloadCatalogCsv(sortedProducts)}
-            size="lg"
-            type="button"
-            variant="outline"
-          >
-            <AppIcon name="Download" size={16} />
-            <span>Export CSV</span>
-          </Button>
-          <Button asChild className="catalog-banani-button is-primary" size="lg">
-            <Link to="/catalog/new">
-              <AppIcon name="Plus" size={16} />
-              <span>Add Product</span>
-            </Link>
-          </Button>
+    <div className="content">
+      {loading ? <p className="text-sm text-muted" style={{ padding: 16 }}>Memuat data...</p> : null}
+      {loadError ? <p style={{ padding: 16, color: "var(--danger)" }}>{loadError}</p> : null}
+
+      {/* Search + Add */}
+      <div style={{ display: "flex", gap: 10, marginBottom: 16, flexWrap: "wrap" }}>
+        <div className="input-wrap" style={{ flex: "1 1 200px" }}>
+          <span className="input-icon">
+            <svg width={14} height={14} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
+          </span>
+          <input className="input has-icon" placeholder="Cari produk..." value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
+        <Link to="/catalog/new" className="btn btn-primary" style={{ textDecoration: "none" }}>
+          + Tambah Produk
+        </Link>
       </div>
 
-      {loading ? <p className="info-text">Loading catalog...</p> : null}
-      {loadError ? <p className="error-text">{loadError}</p> : null}
+      {/* Category filter */}
+      <div className="cat-filter">
+        {catList.map((c) => (
+          <div key={c} className={`cat-chip${cat === c ? " active" : ""}`} onClick={() => setCat(c)}>{c}</div>
+        ))}
+      </div>
 
-      <section className="catalog-banani-toolbar">
-        <div className="catalog-banani-toolbar-group">
-          <label className="catalog-banani-search" htmlFor="catalog-search">
-            <span className="catalog-banani-search-icon" aria-hidden="true">
-              <AppIcon name="Search" size={16} />
-            </span>
-            <Input
-              className="catalog-banani-search-input"
-              id="catalog-search"
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search product, category, SKU"
-              value={query}
-            />
-          </label>
-
-          <label className="catalog-banani-select">
-            <select onChange={(event) => setStockFilter(event.target.value)} value={stockFilter}>
-              <option value="all">All stock</option>
-              <option value="high">Healthy stock</option>
-              <option value="low">Low stock</option>
-              <option value="none">Out of stock</option>
-            </select>
-            <span className="catalog-banani-select-icon" aria-hidden="true">
-              <AppIcon name="Filter" size={16} />
-            </span>
-          </label>
-
-          <label className="catalog-banani-select">
-            <select onChange={(event) => setSortBy(event.target.value)} value={sortBy}>
-              <option value="name-asc">Sort: Name</option>
-              <option value="price-low">Sort: Price low</option>
-              <option value="price-high">Sort: Price high</option>
-              <option value="stock-high">Sort: Stock high</option>
-            </select>
-            <span className="catalog-banani-select-icon" aria-hidden="true">
-              <AppIcon name="ArrowUpDown" size={16} />
-            </span>
-          </label>
-        </div>
-
-        <p className="catalog-banani-page-info">
-          Showing {paginatedProducts.items.length} of {filteredProducts.length} products
-        </p>
-      </section>
-
-      {paginatedProducts.items.length ? (
-        <section className="catalog-banani-grid">
-          {paginatedProducts.items.map((product) => {
-            const stock = buildCatalogStockSummary(product);
-
-            return (
-              <article className="catalog-banani-card" key={product.id}>
-                <div className="catalog-banani-media">
-                  <span className="catalog-banani-media-mark">{getProductMark(product.name)}</span>
-                  <div className="catalog-banani-overlay">
-                    <Badge className="catalog-banani-status" variant={product.isActive ? "secondary" : "outline"}>
-                      {product.isActive ? "Active" : "Inactive"}
-                    </Badge>
-                  </div>
-                </div>
-
-                <div className="catalog-banani-card-body">
-                  <div className="catalog-banani-meta">
-                    <span className="catalog-banani-category">{product.category || "Uncategorized"}</span>
-                    <h2 className="catalog-banani-name">{product.name}</h2>
-                    <p className="catalog-banani-price">{formatCurrency(product.basePrice)}</p>
-                  </div>
-
-                  <div className="catalog-banani-footer">
-                    <span className="catalog-banani-stock">
-                      <span className={`catalog-banani-stock-dot ${stock.tone}`} />
-                      {stock.label}
-                    </span>
-                    <Button asChild className="catalog-banani-card-link" size="sm" variant="outline">
-                      <Link to={`/catalog/${product.id}`}>Open</Link>
-                    </Button>
-                  </div>
-                </div>
-              </article>
-            );
-          })}
-        </section>
-      ) : (
-        <section className="catalog-banani-empty">
-          No products match the current search and filter state. Broaden the filter or add a new product.
-        </section>
-      )}
-
-      <footer className="catalog-banani-pagination">
-        <p className="catalog-banani-page-info">
-          Page {paginatedProducts.page} of {paginatedProducts.totalPages}
-        </p>
-
-        <div className="catalog-banani-page-controls">
-          <Button
-            className="catalog-banani-page-button"
-            disabled={paginatedProducts.page <= 1}
-            onClick={() => setPage((current) => Math.max(1, current - 1))}
-            size="icon-sm"
-            type="button"
-            variant="outline"
-          >
-            <AppIcon name="ChevronLeft" size={16} />
-          </Button>
-          <Button
-            className="catalog-banani-page-button"
-            disabled={paginatedProducts.page >= paginatedProducts.totalPages}
-            onClick={() => setPage((current) => Math.min(paginatedProducts.totalPages, current + 1))}
-            size="icon-sm"
-            type="button"
-            variant="outline"
-          >
-            <AppIcon name="ChevronRight" size={16} />
-          </Button>
-        </div>
-      </footer>
+      {/* Product grid */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 14, marginTop: 4 }}>
+        {filtered.map((p) => {
+          const stock = getTotalStock(p);
+          return (
+            <Link to={`/catalog/${p.id}`} key={p.id} className="card card-sm" style={{ cursor: "pointer", textDecoration: "none", color: "inherit" }}>
+              <div style={{ width: "100%", aspectRatio: "4/3", borderRadius: 8, background: "var(--surface)", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 12, fontSize: 24, fontWeight: 800, color: "var(--text-muted)" }}>
+                {p.name.charAt(0)}
+              </div>
+              <div style={{ fontSize: 13.5, fontWeight: 700, marginBottom: 3 }}>{p.name}</div>
+              <div style={{ fontSize: 12, color: "var(--text-soft)", marginBottom: 8 }}>
+                {(p.variants || []).length > 0 ? (p.variants[0].sku || "") : ""} · {p.category}
+              </div>
+              <div className="row-between">
+                <span style={{ fontWeight: 800, color: "var(--accent)", fontSize: 14 }}>{formatCurrency(p.basePrice)}</span>
+                <span className={`badge ${stock > 10 ? "badge-green" : stock > 0 ? "badge-amber" : "badge-red"}`}>
+                  {stock > 0 ? `${stock} stok` : "Habis"}
+                </span>
+              </div>
+            </Link>
+          );
+        })}
+        {!loading && filtered.length === 0 ? (
+          <div className="empty-state" style={{ gridColumn: "1 / -1" }}>Tidak ada produk ditemukan</div>
+        ) : null}
+      </div>
     </div>
   );
 }

@@ -1,255 +1,89 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { Link } from "react-router-dom";
 
-
-import { Badge } from "../components/ui/badge";
-import { Button } from "../components/ui/button";
-import { Input } from "../components/ui/input";
 import { usePosData } from "../context/PosDataContext";
-import { buildEventRowSummary, buildEventWorkspaceSummary } from "../features/events/eventWorkspace";
-import { AppIcon } from "../features/ui/AppIcon";
-import "../features/events/events.css";
+import { formatCurrency } from "../utils/formatters";
+import "../features/dashboard/dashboard.css";
 
-function sortEventsByStart(left, right) {
-  return new Date(right.startsAt || 0) - new Date(left.startsAt || 0);
-}
-
-function formatDateLabel(value) {
-  if (!value) {
-    return "-";
-  }
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return "-";
-  }
-
-  return new Intl.DateTimeFormat("id-ID", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  }).format(date);
-}
-
-function formatDateRange(startsAt, endsAt) {
-  const startLabel = formatDateLabel(startsAt);
-  const endLabel = formatDateLabel(endsAt);
-
-  if (startLabel === "-" && endLabel === "-") {
-    return "-";
-  }
-
-  return `${startLabel} - ${endLabel}`;
-}
-
-function formatStatusLabel(status) {
-  if (!status) {
-    return "Unknown";
-  }
-
-  return status.charAt(0).toUpperCase() + status.slice(1);
-}
-
-function getStatusTone(status) {
-  if (status === "active") {
-    return "status-active";
-  }
-
-  if (status === "draft") {
-    return "status-draft";
-  }
-
-  return "status-closed";
-}
-
-function getEventRevenueValue(event) {
-  const candidates = [event?.revenueTotal, event?.totalRevenue, event?.revenue];
-
-  for (const candidate of candidates) {
-    const parsed = Number(candidate);
-    if (Number.isFinite(parsed)) {
-      return parsed;
-    }
-  }
-
-  return null;
-}
-
-function formatCurrencyCell(value) {
-  if (!Number.isFinite(value)) {
-    return "-";
-  }
-
-  return new Intl.NumberFormat("id-ID", {
-    style: "currency",
-    currency: "IDR",
-    maximumFractionDigits: 0,
-  }).format(value);
-}
-
-function getEventStockSnapshot(event) {
-  const candidates = [event?.allocatedStock, event?.allocatedItems, event?.stockAllocated];
-
-  for (const candidate of candidates) {
-    const parsed = Number(candidate);
-    if (Number.isFinite(parsed)) {
-      return `${parsed} items`;
-    }
-  }
-
-  return event?.stockMode === "allocate" ? "Allocated flow" : "Manual flow";
-}
+const statusMeta = {
+  draft: { label: "Draft", cls: "badge-gray" },
+  active: { label: "Aktif", cls: "badge-green" },
+  closed: { label: "Selesai", cls: "badge-gray" },
+  archived: { label: "Arsip", cls: "badge-gray" },
+};
 
 export function EventsPage() {
-  const { loadError, loading, workspaces } = usePosData();
-  const [query, setQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
+  const { workspaces, sales, loading, loadError } = usePosData();
 
-  const events = useMemo(
-    () => workspaces.filter((workspace) => workspace.type === "event").sort(sortEventsByStart),
-    [workspaces]
-  );
-
-  const filteredEvents = useMemo(() => {
-    const keyword = query.trim().toLowerCase();
-
-    return events.filter((event) => {
-      const matchesStatus = statusFilter === "all" || event.status === statusFilter;
-      if (!matchesStatus) {
-        return false;
-      }
-
-      if (!keyword) {
-        return true;
-      }
-
-      const haystack = `${event.name} ${event.locationLabel} ${event.code} ${event.status}`.toLowerCase();
-      return haystack.includes(keyword);
-    });
-  }, [events, query, statusFilter]);
-
-  const summary = useMemo(() => buildEventWorkspaceSummary({ events }), [events]);
-  const ytdRevenue = useMemo(
-    () => events.reduce((sum, event) => sum + (getEventRevenueValue(event) ?? 0), 0),
-    [events]
-  );
+  const events = useMemo(() => {
+    return (workspaces || [])
+      .filter((w) => w.type === "event")
+      .map((ev) => {
+        const evSales = (sales || []).filter((s) => s.workspaceId === ev.id);
+        const revenue = evSales.reduce((sum, s) => sum + (s.grandTotal || 0), 0);
+        return { ...ev, revenue, transactions: evSales.length };
+      });
+  }, [workspaces, sales]);
 
   return (
-    <div className="events-banani-page">
-      <div className="page-actions">
-        <div className="events-banani-metrics">
-          <div className="events-banani-metric">
-            <span className="events-banani-metric-label">Active Events</span>
-            <span className="events-banani-metric-value">{summary.activeEvents}</span>
-          </div>
-          <div className="events-banani-metric">
-            <span className="events-banani-metric-label">Upcoming</span>
-            <span className="events-banani-metric-value">{summary.draftEvents}</span>
-          </div>
-          <div className="events-banani-metric is-primary">
-            <span className="events-banani-metric-label">YTD Event Revenue</span>
-            <span className="events-banani-metric-value">{formatCurrencyCell(ytdRevenue)}</span>
-          </div>
+    <div className="content">
+      {loading ? <p className="text-sm text-muted" style={{ padding: 16 }}>Memuat data...</p> : null}
+      {loadError ? <p style={{ padding: 16, color: "var(--danger)" }}>{loadError}</p> : null}
+
+      {/* Header */}
+      <div className="row-between mb-16">
+        <div>
+          <div style={{ fontSize: 13, color: "var(--text-soft)" }}>{events.length} event terdaftar</div>
         </div>
+        <Link to="/events/new" className="btn btn-primary" style={{ textDecoration: "none" }}>
+          + Buat Event Baru
+        </Link>
       </div>
 
-      {loading ? <p className="info-text">Loading events...</p> : null}
-      {loadError ? <p className="error-text">{loadError}</p> : null}
-
-      <section className="events-banani-card">
-        <div className="events-banani-toolbar">
-          <label className="events-banani-search" htmlFor="events-search">
-            <span className="events-banani-search-icon" aria-hidden="true">
-              <AppIcon name="Search" size={16} strokeWidth={1.9} />
-            </span>
-            <Input
-              className="events-banani-search-input"
-              id="events-search"
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search event name or location"
-              value={query}
-            />
-          </label>
-
-          <label className="events-banani-filter">
-            <span className="events-banani-filter-icon" aria-hidden="true">
-              <AppIcon name="Filter" size={16} strokeWidth={1.9} />
-            </span>
-            <select onChange={(event) => setStatusFilter(event.target.value)} value={statusFilter}>
-              <option value="all">All status</option>
-              <option value="draft">Upcoming</option>
-              <option value="active">Active</option>
-              <option value="closed">Completed</option>
-              <option value="archived">Archived</option>
-            </select>
-            <span className="events-banani-filter-chevron" aria-hidden="true">
-              <AppIcon name="ChevronDown" size={16} strokeWidth={1.9} />
-            </span>
-          </label>
-
-          <div className="events-banani-toolbar-spacer" />
-
-          <Button asChild className="events-banani-new" size="sm" variant="default">
-            <Link to="/events/new">
-              <AppIcon name="Plus" size={16} strokeWidth={2} />
-              <span>New Event</span>
+      {/* Event list */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        {events.map((ev) => {
+          const meta = statusMeta[ev.status] || statusMeta.draft;
+          return (
+            <Link
+              to={`/events/${ev.id}`}
+              key={ev.id}
+              className="card"
+              style={{ display: "flex", alignItems: "center", gap: 20, padding: "18px 20px", cursor: "pointer", textDecoration: "none", color: "inherit", transition: "box-shadow 0.15s" }}
+            >
+              <div style={{ width: 48, height: 48, borderRadius: 12, background: "var(--accent-soft)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                <svg width="22" height="22" fill="none" stroke="var(--accent)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+                  <rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
+                </svg>
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 3 }}>
+                  <span style={{ fontWeight: 800, fontSize: 15 }}>{ev.name}</span>
+                  <span className={`badge ${meta.cls}`}>{meta.label}</span>
+                </div>
+                <div style={{ fontSize: 13, color: "var(--text-soft)" }}>
+                  {ev.locationLabel || "Lokasi belum ditentukan"}
+                  {ev.startsAt ? ` · ${new Date(ev.startsAt).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })}` : ""}
+                  {ev.endsAt ? ` – ${new Date(ev.endsAt).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })}` : ""}
+                </div>
+              </div>
+              <div style={{ textAlign: "right", flexShrink: 0 }}>
+                <div style={{ fontWeight: 800, fontSize: 15 }}>{formatCurrency(ev.revenue)}</div>
+                <div style={{ fontSize: 12, color: "var(--text-soft)", marginTop: 2 }}>{ev.transactions} transaksi</div>
+              </div>
+              <div style={{ color: "var(--text-muted)", marginLeft: 4 }}>
+                <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6" /></svg>
+              </div>
             </Link>
-          </Button>
-        </div>
-
-        <div className="events-banani-table-wrap">
-          <table className="events-banani-table">
-            <thead>
-              <tr>
-                <th>Event Name</th>
-                <th>Dates</th>
-                <th>Location</th>
-                <th>Status</th>
-                <th>Stock Flow</th>
-                <th>Total Revenue</th>
-                <th>Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredEvents.length > 0 ? (
-                filteredEvents.map((event) => {
-                  const row = buildEventRowSummary(event);
-                  return (
-                    <tr key={event.id}>
-                      <td>
-                        <div className="events-banani-name">
-                          <strong>{row.title}</strong>
-                          <span className="events-banani-subtitle">{event.code || row.stockModeLabel}</span>
-                        </div>
-                      </td>
-                      <td className="events-banani-muted">{formatDateRange(event.startsAt, event.endsAt)}</td>
-                      <td className="events-banani-muted">{event.locationLabel || "-"}</td>
-                      <td>
-                        <Badge className={`events-banani-badge ${getStatusTone(event.status)}`} variant="secondary">
-                          {formatStatusLabel(event.status)}
-                        </Badge>
-                      </td>
-                      <td className="events-banani-muted">{getEventStockSnapshot(event)}</td>
-                      <td className="events-banani-revenue">{formatCurrencyCell(getEventRevenueValue(event))}</td>
-                      <td>
-                        <Button asChild className="events-banani-open" size="sm" variant="outline">
-                          <Link to={`/events/${event.id}`}>Open detail</Link>
-                        </Button>
-                      </td>
-                    </tr>
-                  );
-                })
-              ) : (
-                <tr className="events-banani-empty-row">
-                  <td colSpan={7}>
-                    <div className="events-banani-empty">No event matches this filter yet.</div>
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </section>
+          );
+        })}
+        {!loading && events.length === 0 ? (
+          <div className="empty-state">
+            <p style={{ marginBottom: 8 }}>Belum ada event</p>
+            <Link to="/events/new" className="btn btn-primary" style={{ textDecoration: "none" }}>+ Buat Event Baru</Link>
+          </div>
+        ) : null}
+      </div>
     </div>
   );
 }

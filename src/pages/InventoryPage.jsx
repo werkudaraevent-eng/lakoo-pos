@@ -1,254 +1,111 @@
-import { useDeferredValue, useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
-import { Button } from "../components/ui/button";
-import { Input } from "../components/ui/input";
 import { usePosData } from "../context/PosDataContext";
-import {
-  buildInventoryCsv,
-  buildInventoryProductRows,
-  filterInventoryProductRows,
-  paginateInventoryRows,
-} from "../features/inventory/inventoryWorkspace";
-import { AppIcon } from "../features/ui/AppIcon";
-import "../features/inventory/inventory.css";
-
-const PAGE_SIZE = 8;
-
-function downloadInventoryCsv(rows) {
-  const csv = buildInventoryCsv(rows);
-  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = "inventory-export.csv";
-  link.click();
-  URL.revokeObjectURL(url);
-}
-
-function getProductMark(name) {
-  return String(name || "")
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((chunk) => chunk[0])
-    .join("")
-    .toUpperCase();
-}
+import "../features/dashboard/dashboard.css";
 
 export function InventoryPage() {
-  const { categories, loadError, loading, products, workspaces } = usePosData();
-  const [query, setQuery] = useState("");
-  const [category, setCategory] = useState("all");
-  const [status, setStatus] = useState("all");
-  const [location, setLocation] = useState("all");
-  const [page, setPage] = useState(1);
-  const deferredQuery = useDeferredValue(query);
+  const { products, settings, loading, loadError } = usePosData();
+  const [search, setSearch] = useState("");
 
-  const locationOptions = useMemo(
-    () =>
-      workspaces
-        .filter((workspace) => workspace.type === "event" && workspace.isVisible !== false)
-        .map((workspace) => workspace.name),
-    [workspaces]
-  );
-  const selectedWorkspace =
-    location === "all"
-      ? null
-      : workspaces.find((workspace) => workspace.name === location) ?? null;
-  const inventoryRows = useMemo(
-    () => buildInventoryProductRows(products, { activeWorkspace: selectedWorkspace }),
-    [products, selectedWorkspace]
-  );
-  const filteredRows = useMemo(
-    () => filterInventoryProductRows(inventoryRows, { query: deferredQuery, category, status }),
-    [category, deferredQuery, inventoryRows, status]
-  );
-  const paginatedRows = useMemo(
-    () => paginateInventoryRows(filteredRows, { page, pageSize: PAGE_SIZE }),
-    [filteredRows, page]
-  );
+  const attr1Label = settings?.attribute1Label || "Size";
+  const attr2Label = settings?.attribute2Label || "Color";
 
-  useEffect(() => {
-    setPage(1);
-  }, [deferredQuery, category, status, location]);
+  const filtered = useMemo(() => {
+    return (products || []).filter((p) => {
+      const q = search.toLowerCase();
+      return !q || p.name.toLowerCase().includes(q) || (p.variants || []).some((v) => (v.sku || "").toLowerCase().includes(q));
+    });
+  }, [products, search]);
+
+  function getTotalStock(product) {
+    return (product.variants || []).filter((v) => v.isActive !== false).reduce((sum, v) => sum + (v.quantityOnHand || 0), 0);
+  }
+
+  function getStockStatus(total) {
+    if (total === 0) return { label: "Habis", cls: "badge-red" };
+    if (total <= 5) return { label: "Hampir Habis", cls: "badge-red" };
+    if (total <= 10) return { label: "Terbatas", cls: "badge-amber" };
+    return { label: "Tersedia", cls: "badge-green" };
+  }
 
   return (
-    <div className="inventory-banani-page">
-      <div className="page-actions">
-        <div className="inventory-banani-actions">
-          <Button
-            className="inventory-banani-button"
-            onClick={() => downloadInventoryCsv(filteredRows)}
-            size="lg"
-            type="button"
-            variant="outline"
-          >
-            <AppIcon name="Download" size={16} />
-            <span>Export CSV</span>
-          </Button>
-          <Button className="inventory-banani-button" disabled size="lg" type="button" variant="outline">
-            <AppIcon name="ArrowRightLeft" size={16} />
-            <span>Transfer Stock</span>
-          </Button>
-          <Button asChild className="inventory-banani-button is-primary" size="lg">
-            <Link to="/inventory/receive">
-              <AppIcon name="PackagePlus" size={16} />
-              <span>Receive Stock</span>
-            </Link>
-          </Button>
+    <div className="content">
+      {loading ? <p className="text-sm text-muted" style={{ padding: 16 }}>Memuat data...</p> : null}
+      {loadError ? <p style={{ padding: 16, color: "var(--danger)" }}>{loadError}</p> : null}
+
+      {/* Search + actions */}
+      <div style={{ display: "flex", gap: 10, marginBottom: 16 }}>
+        <div className="input-wrap" style={{ flex: 1 }}>
+          <span className="input-icon">
+            <svg width={14} height={14} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
+          </span>
+          <input className="input has-icon" placeholder="Cari produk..." value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
+        <Link to="/inventory/receive" className="btn btn-primary" style={{ textDecoration: "none" }}>
+          + Tambah Stok
+        </Link>
       </div>
 
-      {loading ? <p className="info-text">Loading inventory...</p> : null}
-      {loadError ? <p className="error-text">{loadError}</p> : null}
-      {location !== "all" ? (
-        <p className="info-text">
-          Workspace split is shown for <strong>{location}</strong>. Warehouse values outside that context remain hidden
-          because the current model does not expose full multi-location stock.
-        </p>
-      ) : null}
-
-      <section className="inventory-banani-toolbar">
-        <div className="inventory-banani-toolbar-group">
-          <label className="inventory-banani-search" htmlFor="inventory-search">
-            <AppIcon name="Search" size={16} />
-            <Input
-              className="inventory-banani-search-input"
-              id="inventory-search"
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search product, SKU or tags"
-              value={query}
-            />
-          </label>
-
-          <label className="inventory-banani-select">
-            <select onChange={(event) => setLocation(event.target.value)} value={location}>
-              <option value="all">Location: All</option>
-              {locationOptions.map((option) => (
-                <option key={option} value={option}>
-                  {option}
-                </option>
-              ))}
-            </select>
-            <span className="inventory-banani-select-icon" aria-hidden="true">
-              <AppIcon name="MapPin" size={16} />
-            </span>
-          </label>
-
-          <label className="inventory-banani-select">
-            <select onChange={(event) => setCategory(event.target.value)} value={category}>
-              <option value="all">Category: All</option>
-              {categories.map((item) => (
-                <option key={item.id} value={item.name}>
-                  {item.name}
-                </option>
-              ))}
-            </select>
-            <span className="inventory-banani-select-icon" aria-hidden="true">
-              <AppIcon name="Tag" size={16} />
-            </span>
-          </label>
-
-          <label className="inventory-banani-select">
-            <select onChange={(event) => setStatus(event.target.value)} value={status}>
-              <option value="all">Status: All</option>
-              <option value="stable">In stock</option>
-              <option value="warning">Low stock</option>
-              <option value="none">Out of stock</option>
-            </select>
-            <span className="inventory-banani-select-icon" aria-hidden="true">
-              <AppIcon name="Filter" size={16} />
-            </span>
-          </label>
-        </div>
-
-        <p className="inventory-banani-page-info">
-          Showing {paginatedRows.items.length} of {filteredRows.length} products
-        </p>
-      </section>
-
-      <section className="inventory-banani-table-card">
-        {paginatedRows.items.length ? (
-          <>
-            <div className="inventory-banani-table-wrap">
-              <table className="inventory-banani-table">
-                <thead>
-                  <tr>
-                    <th>Product</th>
-                    <th>Category</th>
-                    <th>Total Stock</th>
-                    <th>Warehouse</th>
-                    <th>{selectedWorkspace?.name || "Active Workspace"}</th>
-                    <th>Status</th>
-                    <th>Action</th>
+      {/* Table */}
+      <div className="card" style={{ padding: 0, overflow: "hidden" }}>
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Produk</th>
+                <th>SKU</th>
+                <th>Kategori</th>
+                <th>Varian & Stok</th>
+                <th>Total Stok</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((p) => {
+                const total = getTotalStock(p);
+                const status = getStockStatus(total);
+                const variants = (p.variants || []).filter((v) => v.isActive !== false);
+                return (
+                  <tr key={p.id}>
+                    <td><span style={{ fontWeight: 700 }}>{p.name}</span></td>
+                    <td>
+                      {variants.length > 0 ? <span className="tag">{variants[0].sku}</span> : "-"}
+                    </td>
+                    <td className="text-muted">{p.category}</td>
+                    <td>
+                      <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
+                        {variants.map((v) => {
+                          const qty = v.quantityOnHand || 0;
+                          const label = [v.attribute1Value, v.attribute2Value].filter(Boolean).join("/") || v.sku;
+                          return (
+                            <span key={v.id} style={{
+                              fontSize: 11.5, padding: "2px 7px", borderRadius: 4, fontWeight: 600,
+                              background: qty === 0 ? "var(--danger-soft)" : qty <= 3 ? "var(--accent-soft)" : "var(--surface)",
+                              color: qty === 0 ? "var(--danger)" : qty <= 3 ? "var(--accent)" : "var(--text-soft)",
+                            }}>
+                              {label}: {qty}
+                            </span>
+                          );
+                        })}
+                      </div>
+                    </td>
+                    <td><span style={{ fontWeight: 700 }}>{total}</span></td>
+                    <td><span className={`badge ${status.cls}`}>{status.label}</span></td>
                   </tr>
-                </thead>
-                <tbody>
-                  {paginatedRows.items.map((row) => (
-                    <tr key={row.id}>
-                      <td>
-                        <div className="inventory-banani-product">
-                          <span className="inventory-banani-avatar">{getProductMark(row.name)}</span>
-                          <div className="inventory-banani-product-copy">
-                            <strong>{row.name}</strong>
-                            <span className="inventory-banani-subtle">{row.sku}</span>
-                          </div>
-                        </div>
-                      </td>
-                      <td>{row.category || "-"}</td>
-                      <td className="inventory-banani-qty">{row.totalStock}</td>
-                      <td className="inventory-banani-qty">{row.warehouseStock == null ? "-" : row.warehouseStock}</td>
-                      <td className="inventory-banani-qty">{row.workspaceStock == null ? "-" : row.workspaceStock}</td>
-                      <td>
-                        <span className={`inventory-banani-status ${row.status.tone}`}>
-                          <span className="dot" />
-                          {row.status.label}
-                        </span>
-                      </td>
-                      <td>
-                        <Button asChild size="sm" variant="outline">
-                          <Link to={`/catalog/${row.id}`}>Open detail</Link>
-                        </Button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            <footer className="inventory-banani-table-footer">
-              <p className="inventory-banani-page-info">
-                Page {paginatedRows.page} of {paginatedRows.totalPages}
-              </p>
-              <div className="inventory-banani-page-controls">
-                <Button
-                  disabled={paginatedRows.page <= 1}
-                  onClick={() => setPage((current) => Math.max(1, current - 1))}
-                  size="icon-sm"
-                  type="button"
-                  variant="outline"
-                >
-                  <AppIcon name="ChevronLeft" size={16} />
-                </Button>
-                <Button
-                  disabled={paginatedRows.page >= paginatedRows.totalPages}
-                  onClick={() => setPage((current) => Math.min(paginatedRows.totalPages, current + 1))}
-                  size="icon-sm"
-                  type="button"
-                  variant="outline"
-                >
-                  <AppIcon name="ChevronRight" size={16} />
-                </Button>
-              </div>
-            </footer>
-          </>
-        ) : (
-          <div className="inventory-banani-empty">
-            No products match the current filter state. Broaden the filters or change location context.
-          </div>
-        )}
-      </section>
+                );
+              })}
+              {!loading && filtered.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="text-muted text-sm" style={{ textAlign: "center", padding: 32 }}>
+                    Tidak ada produk ditemukan
+                  </td>
+                </tr>
+              ) : null}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   );
 }

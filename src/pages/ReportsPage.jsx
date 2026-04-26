@@ -1,175 +1,191 @@
 import { useMemo, useState } from "react";
 
-import { Button } from "../components/ui/button";
 import { usePosData } from "../context/PosDataContext";
-import {
-  buildRecentTransactions,
-  buildReportsCsv,
-  buildReportsSummary,
-  buildSalesOverTime,
-  buildTopCategories,
-  filterSalesByPeriod,
-} from "../features/reports/reportsWorkspace";
-import { AppIcon } from "../features/ui/AppIcon";
-import { formatCurrency, formatDate } from "../utils/formatters";
-import "../features/reports/reports.css";
-
-function downloadReportsCsv(sales) {
-  const csv = buildReportsCsv(sales);
-  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = "reports-export.csv";
-  link.click();
-  URL.revokeObjectURL(url);
-}
+import { formatCurrency } from "../utils/formatters";
+import "../features/dashboard/dashboard.css";
 
 export function ReportsPage() {
-  const { sales, loading, loadError, products } = usePosData();
-  const [period, setPeriod] = useState("7d");
+  const { sales, loading, loadError } = usePosData();
+  const [period, setPeriod] = useState("30d");
 
-  const scopedSales = useMemo(() => filterSalesByPeriod(sales, period), [period, sales]);
-  const summary = useMemo(() => buildReportsSummary(scopedSales), [scopedSales]);
-  const salesOverTime = useMemo(() => buildSalesOverTime(scopedSales, period), [period, scopedSales]);
-  const topCategories = useMemo(() => buildTopCategories(scopedSales, products), [products, scopedSales]);
-  const recentTransactions = useMemo(() => buildRecentTransactions(scopedSales), [scopedSales]);
+  const periodDays = period === "7d" ? 7 : period === "30d" ? 30 : 90;
+
+  const filteredSales = useMemo(() => {
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - periodDays);
+    return (sales || []).filter((s) => new Date(s.createdAt) >= cutoff);
+  }, [sales, periodDays]);
+
+  const totalRev = filteredSales.reduce((s, t) => s + (t.grandTotal || 0), 0);
+  const totalItems = filteredSales.reduce((s, t) => s + (t.items?.length || 0), 0);
+
+  // Weekly data
+  const weeklyData = useMemo(() => {
+    const days = ["Min", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab"];
+    const now = new Date();
+    const result = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(now);
+      d.setDate(d.getDate() - i);
+      const dayStr = d.toISOString().slice(0, 10);
+      const rev = (sales || [])
+        .filter((s) => s.createdAt && s.createdAt.slice(0, 10) === dayStr)
+        .reduce((sum, s) => sum + (s.grandTotal || 0), 0);
+      result.push({ day: days[d.getDay()], rev });
+    }
+    return result;
+  }, [sales]);
+
+  const maxRev = Math.max(...weeklyData.map((d) => d.rev), 1);
+  const totalWeek = weeklyData.reduce((s, d) => s + d.rev, 0);
+
+  // Payment method breakdown
+  const methodBreakdown = useMemo(() => {
+    const counts = {};
+    filteredSales.forEach((s) => {
+      const m = s.paymentMethod || "cash";
+      counts[m] = (counts[m] || 0) + 1;
+    });
+    const total = filteredSales.length || 1;
+    const labels = { cash: "Cash", card: "Card", qris: "QRIS", transfer: "Transfer", ewallet: "E-Wallet" };
+    const colors = { cash: "var(--blue)", card: "var(--accent)", qris: "var(--success)", transfer: "#8b5cf6", ewallet: "#e67e22" };
+    return Object.entries(counts)
+      .map(([key, count]) => ({ label: labels[key] || key, pct: Math.round((count / total) * 100), color: colors[key] || "var(--accent)" }))
+      .sort((a, b) => b.pct - a.pct);
+  }, [filteredSales]);
+
+  // Top products
+  const topProducts = useMemo(() => {
+    const map = {};
+    filteredSales.forEach((s) => {
+      (s.items || []).forEach((item) => {
+        const name = item.productNameSnapshot || "Unknown";
+        if (!map[name]) map[name] = { name, sold: 0, rev: 0 };
+        map[name].sold += item.qty || 0;
+        map[name].rev += item.lineTotal || 0;
+      });
+    });
+    return Object.values(map).sort((a, b) => b.rev - a.rev).slice(0, 5);
+  }, [filteredSales]);
+
+  const totalProductRev = topProducts.reduce((s, p) => s + p.rev, 0) || 1;
 
   return (
-    <div className="reports-banani-page">
-      <div className="page-actions">
-        <div className="reports-banani-actions">
-          <label className="reports-banani-select">
-            <select onChange={(event) => setPeriod(event.target.value)} value={period}>
-              <option value="7d">Last 7 Days</option>
-              <option value="30d">Last 30 Days</option>
-            </select>
-            <span className="reports-banani-select-icon" aria-hidden="true">
-              <AppIcon name="CalendarDays" size={16} />
-            </span>
-          </label>
-          <Button className="reports-banani-button is-primary" onClick={() => downloadReportsCsv(scopedSales)} size="lg" type="button">
-            <AppIcon name="Download" size={16} />
-            <span>Export Report</span>
-          </Button>
+    <div className="content">
+      {loading ? <p className="text-sm text-muted" style={{ padding: 16 }}>Memuat data...</p> : null}
+      {loadError ? <p style={{ padding: 16, color: "var(--danger)" }}>{loadError}</p> : null}
+
+      {/* Period selector */}
+      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 16 }}>
+        <div className="cat-filter" style={{ margin: 0 }}>
+          {[{ key: "7d", label: "7 Hari" }, { key: "30d", label: "30 Hari" }, { key: "90d", label: "90 Hari" }].map((p) => (
+            <div key={p.key} className={`cat-chip${period === p.key ? " active" : ""}`} onClick={() => setPeriod(p.key)}>{p.label}</div>
+          ))}
         </div>
       </div>
 
-      {loading ? <p className="info-text">Loading reports...</p> : null}
-      {loadError ? <p className="error-text">{loadError}</p> : null}
-
-      <section className="reports-banani-metrics">
-        <article className="reports-banani-metric-card">
-          <div className="reports-banani-metric-head">
-            <span className="reports-banani-metric-title">Gross Sales</span>
-            <AppIcon name="Banknote" size={18} />
-          </div>
-          <strong className="reports-banani-metric-value">{formatCurrency(summary.grossSales)}</strong>
-        </article>
-
-        <article className="reports-banani-metric-card">
-          <div className="reports-banani-metric-head">
-            <span className="reports-banani-metric-title">Total Orders</span>
-            <AppIcon name="ShoppingBag" size={18} />
-          </div>
-          <strong className="reports-banani-metric-value">{summary.totalOrders}</strong>
-        </article>
-
-        <article className="reports-banani-metric-card">
-          <div className="reports-banani-metric-head">
-            <span className="reports-banani-metric-title">Avg. Order Value</span>
-            <AppIcon name="Receipt" size={18} />
-          </div>
-          <strong className="reports-banani-metric-value">{formatCurrency(summary.avgOrderValue)}</strong>
-        </article>
-
-        <article className="reports-banani-metric-card">
-          <div className="reports-banani-metric-head">
-            <span className="reports-banani-metric-title">Items Sold</span>
-            <AppIcon name="Tag" size={18} />
-          </div>
-          <strong className="reports-banani-metric-value">{summary.itemsSold}</strong>
-        </article>
-      </section>
-
-      <section className="reports-banani-charts">
-        <article className="reports-banani-chart-card">
-          <div className="reports-banani-chart-head">
-            <h2>Sales Over Time</h2>
-          </div>
-          <div className="reports-banani-bars">
-            {salesOverTime.map((bucket) => (
-              <div className="reports-banani-bar-group" key={bucket.key}>
-                <div className="reports-banani-bar-track">
-                  <div className="reports-banani-bar" style={{ height: `${Math.max(bucket.heightRatio * 100, bucket.total ? 6 : 0)}%` }} />
-                </div>
-                <span className="reports-banani-bar-label">{bucket.label}</span>
-              </div>
-            ))}
-          </div>
-        </article>
-
-        <article className="reports-banani-chart-card">
-          <div className="reports-banani-chart-head">
-            <h2>Top Categories</h2>
-          </div>
-          <div className="reports-banani-horizontal-list">
-            {topCategories.length ? (
-              topCategories.map((item) => (
-                <div className="reports-banani-horizontal-row" key={item.label}>
-                  <div className="reports-banani-horizontal-head">
-                    <span>{item.label}</span>
-                    <span>{formatCurrency(item.total)}</span>
-                  </div>
-                  <div className="reports-banani-horizontal-track">
-                    <div className="reports-banani-horizontal-fill" style={{ width: `${item.ratio * 100}%` }} />
-                  </div>
-                </div>
-              ))
-            ) : (
-              <div className="reports-banani-empty">No category trend is available for the selected period.</div>
-            )}
-          </div>
-        </article>
-      </section>
-
-      <section className="reports-banani-table-card">
-        <div className="reports-banani-table-head">
-          <h2>Recent Transactions</h2>
+      {/* KPIs */}
+      <div className="grid-3 mb-16">
+        <div className="card">
+          <div className="kpi-label">Pendapatan Periode Ini</div>
+          <div className="kpi-value" style={{ fontSize: 22 }}>{formatCurrency(totalRev)}</div>
         </div>
-        {recentTransactions.length ? (
-          <div className="reports-banani-table-wrap">
-            <table className="reports-banani-table">
-              <thead>
-                <tr>
-                  <th>Time</th>
-                  <th>Order ID</th>
-                  <th>Customer</th>
-                  <th>Items</th>
-                  <th>Status</th>
-                  <th className="is-right">Total</th>
-                </tr>
-              </thead>
-              <tbody>
-                {recentTransactions.map((sale) => (
-                  <tr key={sale.id}>
-                    <td>{sale.time ? formatDate(sale.time.toISOString()) : "-"}</td>
-                    <td>{sale.orderId}</td>
-                    <td>{sale.customer}</td>
-                    <td>{sale.items}</td>
-                    <td>
-                      <span className="reports-banani-status">{sale.status}</span>
-                    </td>
-                    <td className="is-right">{formatCurrency(sale.total)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+        <div className="card">
+          <div className="kpi-label">Total Transaksi</div>
+          <div className="kpi-value" style={{ fontSize: 22 }}>{filteredSales.length}</div>
+        </div>
+        <div className="card">
+          <div className="kpi-label">Produk Terjual</div>
+          <div className="kpi-value" style={{ fontSize: 22 }}>{totalItems} item</div>
+        </div>
+      </div>
+
+      <div className="grid-2" style={{ marginBottom: 16 }}>
+        {/* Weekly chart */}
+        <div className="card">
+          <div className="section-title">Pendapatan Mingguan</div>
+          <svg width="100%" viewBox={`0 0 ${weeklyData.length * 60} 110`} style={{ overflow: "visible" }}>
+            {weeklyData.map((d, i) => {
+              const bh = maxRev > 0 ? (d.rev / maxRev) * 80 : 0;
+              const x = i * 60 + 16;
+              return (
+                <g key={i}>
+                  <rect x={x} y={80 - bh} width={28} height={Math.max(bh, 2)} rx={4} fill="var(--accent)" opacity={0.85} />
+                  <text x={x + 14} y={98} textAnchor="middle" fontSize={11} fill="var(--text-soft)" fontWeight={600} style={{ fontFamily: "inherit" }}>{d.day}</text>
+                  {d.rev > 0 ? (
+                    <text x={x + 14} y={80 - bh - 6} textAnchor="middle" fontSize={10} fill="var(--text-soft)" style={{ fontFamily: "inherit" }}>
+                      {(d.rev / 1000000).toFixed(1)}M
+                    </text>
+                  ) : null}
+                </g>
+              );
+            })}
+          </svg>
+          <div className="divider" />
+          <div className="row-between text-sm">
+            <span className="text-muted">Total minggu ini</span>
+            <span className="font-bold">{formatCurrency(totalWeek)}</span>
           </div>
-        ) : (
-          <div className="reports-banani-empty">No transactions are available for the selected period.</div>
-        )}
-      </section>
+        </div>
+
+        {/* Payment methods */}
+        <div className="card">
+          <div className="section-title">Metode Pembayaran</div>
+          {methodBreakdown.length > 0 ? methodBreakdown.map((m, i) => (
+            <div key={i} style={{ marginBottom: 16 }}>
+              <div className="row-between" style={{ marginBottom: 6 }}>
+                <span style={{ fontSize: 13.5, fontWeight: 600 }}>{m.label}</span>
+                <span style={{ fontSize: 13.5, fontWeight: 800 }}>{m.pct}%</span>
+              </div>
+              <div style={{ height: 8, background: "var(--surface-2)", borderRadius: 8 }}>
+                <div style={{ height: "100%", width: `${m.pct}%`, background: m.color, borderRadius: 8 }} />
+              </div>
+            </div>
+          )) : (
+            <div className="text-sm text-muted" style={{ padding: "24px 0", textAlign: "center" }}>Belum ada data</div>
+          )}
+          <div className="divider" />
+          <div className="text-sm text-muted">Berdasarkan {filteredSales.length} transaksi</div>
+        </div>
+      </div>
+
+      {/* Top products table */}
+      <div className="card" style={{ padding: 0, overflow: "hidden" }}>
+        <div style={{ padding: "16px 20px", borderBottom: "1px solid var(--line)" }}>
+          <div className="section-title" style={{ marginBottom: 0 }}>Produk Terlaris</div>
+        </div>
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr><th>#</th><th>Produk</th><th>Terjual</th><th>Pendapatan</th><th>% dari Total</th></tr>
+            </thead>
+            <tbody>
+              {topProducts.map((p, i) => {
+                const pct = ((p.rev / totalProductRev) * 100).toFixed(1);
+                return (
+                  <tr key={i}>
+                    <td><span style={{ fontWeight: 800, color: "var(--text-soft)" }}>{i + 1}</span></td>
+                    <td><span style={{ fontWeight: 700 }}>{p.name}</span></td>
+                    <td>{p.sold} item</td>
+                    <td><span style={{ fontWeight: 800 }}>{formatCurrency(p.rev)}</span></td>
+                    <td>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <div style={{ flex: 1, height: 5, background: "var(--surface-2)", borderRadius: 4 }}>
+                          <div style={{ height: "100%", width: `${pct}%`, background: "var(--accent)", borderRadius: 4 }} />
+                        </div>
+                        <span style={{ fontSize: 12, fontWeight: 600, minWidth: 32 }}>{pct}%</span>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+              {topProducts.length === 0 ? (
+                <tr><td colSpan={5} className="text-muted text-sm" style={{ textAlign: "center", padding: 32 }}>Belum ada data</td></tr>
+              ) : null}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   );
 }
