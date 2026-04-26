@@ -214,8 +214,10 @@ const PROMOS_DATA = [
 const Promosi = () => {
   const [promos, setPromos] = React.useState(PROMOS_DATA);
   const [showCreate, setShowCreate] = React.useState(false);
+  const [editPromo, setEditPromo] = React.useState(null);
   const [filter, setFilter] = React.useState('Semua');
-  const [form, setForm] = React.useState({ name:'', type:'persen', value:'', scope:'all', scopeVal:'', dateStart:'', dateEnd:'' });
+  const emptyForm = { name:'', type:'persen', value:'', scope:'all', scopeVal:'', dateStart:'', dateEnd:'' };
+  const [form, setForm] = React.useState(emptyForm);
 
   const statusMeta = { active:{label:'Aktif',cls:'badge-green'}, upcoming:{label:'Mendatang',cls:'badge-blue'}, ended:{label:'Selesai',cls:'badge-gray'} };
   const typeMeta = { persen:'Diskon %', nominal:'Diskon Rp', bogo:'Gratis Produk' };
@@ -223,12 +225,20 @@ const Promosi = () => {
   const filters = ['Semua','Aktif','Mendatang','Selesai'];
   const filtered = promos.filter(p=>filter==='Semua'||statusMeta[p.status].label===filter);
 
-  const handleCreate = () => {
+  const openEdit = p => { setEditPromo(p); setForm({ name:p.name, type:p.type, value:p.value, scope:p.scope, scopeVal:p.scopeVal||'', dateStart:p.dateStart, dateEnd:p.dateEnd||'' }); setShowCreate(true); };
+  const openCreate = () => { setEditPromo(null); setForm(emptyForm); setShowCreate(true); };
+
+  const handleSave = () => {
     if(!form.name||!form.dateStart) return;
-    setPromos(prev=>[...prev,{...form,id:'promo-'+Date.now(),status:'upcoming',used:0,value:Number(form.value)||0}]);
-    setForm({name:'',type:'persen',value:'',scope:'all',scopeVal:'',dateStart:'',dateEnd:''});
+    if(editPromo) {
+      setPromos(prev=>prev.map(p=>p.id===editPromo.id?{...p,...form,value:Number(form.value)||0}:p));
+    } else {
+      setPromos(prev=>[...prev,{...form,id:'promo-'+Date.now(),status:'upcoming',used:0,value:Number(form.value)||0}]);
+    }
     setShowCreate(false);
   };
+
+  const handleDelete = id => { setPromos(prev=>prev.filter(p=>p.id!==id)); setShowCreate(false); };
 
   return (
     <div className="content">
@@ -236,7 +246,7 @@ const Promosi = () => {
         <div className="cat-filter" style={{margin:0}}>
           {filters.map(f=><div key={f} className={`cat-chip${filter===f?' active':''}`} onClick={()=>setFilter(f)}>{f}</div>)}
         </div>
-        <button className="btn btn-primary" onClick={()=>setShowCreate(true)}><Icon name="plus" size={14}/> Buat Promo</button>
+        <button className="btn btn-primary" onClick={openCreate}><Icon name="plus" size={14}/> Buat Promo</button>
       </div>
 
       <div style={{display:'flex',flexDirection:'column',gap:10}}>
@@ -264,18 +274,21 @@ const Promosi = () => {
               <div style={{fontSize:12,color:'var(--text-2)'}}>digunakan</div>
             </div>
             <div style={{display:'flex',gap:6,marginLeft:8}}>
-              <button className="btn btn-secondary btn-sm"><Icon name="edit" size={12}/> Edit</button>
-              {p.status!=='ended'&&<button className="btn btn-ghost btn-sm" style={{color:'var(--red)'}}><Icon name="trash" size={13}/></button>}
+              <button className="btn btn-secondary btn-sm" onClick={()=>openEdit(p)}><Icon name="edit" size={12}/> Edit</button>
+              {p.status!=='ended'&&<button className="btn btn-ghost btn-sm" style={{color:'var(--red)'}} onClick={()=>handleDelete(p.id)}><Icon name="trash" size={13}/></button>}
             </div>
           </div>
         ))}
       </div>
 
-      {/* Create Modal */}
+      {/* Create / Edit Modal */}
       {showCreate&&(
         <div className="modal-overlay" onClick={()=>setShowCreate(false)}>
           <div className="modal" style={{width:480}} onClick={e=>e.stopPropagation()}>
-            <div className="modal-title">Buat Promo Baru</div>
+            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:20}}>
+              <div className="modal-title" style={{marginBottom:0}}>{editPromo?'Edit Promo':'Buat Promo Baru'}</div>
+              <button className="btn btn-ghost btn-icon" onClick={()=>setShowCreate(false)}><Icon name="x" size={15}/></button>
+            </div>
             <div style={{display:'flex',flexDirection:'column',gap:14}}>
               <div>
                 <label style={{fontSize:12,fontWeight:700,color:'var(--text-2)',display:'block',marginBottom:6,textTransform:'uppercase',letterSpacing:'0.5px'}}>Nama Promo *</label>
@@ -323,8 +336,10 @@ const Promosi = () => {
                 </div>
               </div>
               <div style={{display:'flex',gap:8,marginTop:4}}>
-                <button className="btn btn-secondary" style={{flex:1}} onClick={()=>setShowCreate(false)}>Batal</button>
-                <button className="btn btn-primary" style={{flex:2}} onClick={handleCreate}>Simpan Promo</button>
+                {editPromo&&<button className="btn btn-ghost btn-sm" style={{color:'var(--red)'}} onClick={()=>handleDelete(editPromo.id)}><Icon name="trash" size={13}/> Hapus</button>}
+                <div style={{flex:1}}></div>
+                <button className="btn btn-secondary" onClick={()=>setShowCreate(false)}>Batal</button>
+                <button className="btn btn-primary" onClick={handleSave}>{editPromo?'Simpan Perubahan':'Buat Promo'}</button>
               </div>
             </div>
           </div>
@@ -492,24 +507,33 @@ const ROLE_PERMS = {
 
 const Pengguna = () => {
   const [users, setUsers] = React.useState(USERS_DATA);
-  const [showCreate, setShowCreate] = React.useState(false);
-  const [selected, setSelected] = React.useState(null);
-  const [form, setForm] = React.useState({ name:'', username:'', role:'Kasir', password:'' });
+  const [modalMode, setModalMode] = React.useState(null); // null | 'create' | 'edit'
+  const [editUser, setEditUser] = React.useState(null);
+  const emptyForm = { name:'', username:'', role:'Kasir', password:'' };
+  const [form, setForm] = React.useState(emptyForm);
 
-  const handleCreate = () => {
+  const openCreate = () => { setEditUser(null); setForm(emptyForm); setModalMode('create'); };
+  const openEdit = u => { setEditUser(u); setForm({ name:u.name, username:u.username, role:u.role, password:'' }); setModalMode('edit'); };
+  const closeModal = () => { setModalMode(null); setEditUser(null); };
+
+  const handleSave = () => {
     if(!form.name||!form.username) return;
-    setUsers(prev=>[...prev,{...form,id:'usr-'+Date.now(),status:'active',avatar:form.name[0].toUpperCase(),lastLogin:'Belum login',sessions:[]}]);
-    setForm({name:'',username:'',role:'Kasir',password:''});
-    setShowCreate(false);
+    if(modalMode==='edit') {
+      setUsers(prev=>prev.map(u=>u.id===editUser.id?{...u,name:form.name,username:form.username,role:form.role,avatar:form.name[0].toUpperCase()}:u));
+    } else {
+      setUsers(prev=>[...prev,{...form,id:'usr-'+Date.now(),status:'active',avatar:form.name[0].toUpperCase(),lastLogin:'Belum login',sessions:[]}]);
+    }
+    closeModal();
   };
 
   const toggleStatus = id => setUsers(prev=>prev.map(u=>u.id===id?{...u,status:u.status==='active'?'inactive':'active'}:u));
+  const deleteUser = id => { setUsers(prev=>prev.filter(u=>u.id!==id)); closeModal(); };
 
   return (
     <div className="content">
       <div className="row-between mb-16">
         <div style={{fontSize:13,color:'var(--text-2)'}}>{users.filter(u=>u.status==='active').length} pengguna aktif</div>
-        <button className="btn btn-primary" onClick={()=>setShowCreate(true)}><Icon name="plus" size={14}/> Tambah Pengguna</button>
+        <button className="btn btn-primary" onClick={openCreate}><Icon name="plus" size={14}/> Tambah Pengguna</button>
       </div>
 
       <div style={{display:'flex',flexDirection:'column',gap:10,marginBottom:24}}>
@@ -527,10 +551,10 @@ const Pengguna = () => {
               <div style={{fontSize:12.5,color:'var(--text-2)'}}>@{u.username} · Login terakhir: {u.lastLogin}</div>
             </div>
             <div style={{fontSize:12.5,color:'var(--text-2)',maxWidth:180,textAlign:'right'}}>
-              {u.sessions.length>0 ? u.sessions.join(', ') : <span style={{fontStyle:'italic'}}>Belum ada sesi</span>}
+              {u.sessions.length>0?u.sessions.join(', '):<span style={{fontStyle:'italic'}}>Belum ada sesi</span>}
             </div>
             <div style={{display:'flex',gap:6,marginLeft:8}}>
-              <button className="btn btn-secondary btn-sm" onClick={()=>setSelected(u.id===selected?null:u.id)}><Icon name="edit" size={12}/> Edit</button>
+              <button className="btn btn-secondary btn-sm" onClick={()=>openEdit(u)}><Icon name="edit" size={12}/> Edit</button>
               {u.role!=='Admin Utama'&&(
                 <button className="btn btn-ghost btn-sm" style={{color:u.status==='active'?'var(--red)':'var(--green)'}} onClick={()=>toggleStatus(u.id)}>
                   {u.status==='active'?'Nonaktifkan':'Aktifkan'}
@@ -555,15 +579,12 @@ const Pengguna = () => {
               </tr>
             </thead>
             <tbody>
-              {['Dashboard','Kasir','Katalog','Stok','Riwayat','Laporan','Event & Bazar','Promosi','Pengaturan','Pengguna'].map((feat,i)=>(
+              {['Dashboard','Kasir','Katalog','Stok','Riwayat','Laporan','Event & Bazar','Promosi','Pengaturan','Pengguna'].map((feat)=>(
                 <tr key={feat} style={{borderBottom:'1px solid var(--border)'}}>
                   <td style={{padding:'10px 12px',fontWeight:600}}>{feat}</td>
                   {Object.entries(ROLE_PERMS).map(([role,perms])=>(
                     <td key={role} style={{padding:'10px 12px',textAlign:'center'}}>
-                      {perms.includes(feat)
-                        ? <span style={{color:'var(--green)',fontSize:16}}>✓</span>
-                        : <span style={{color:'var(--text-3)',fontSize:14}}>—</span>
-                      }
+                      {perms.includes(feat)?<span style={{color:'var(--green)',fontSize:16}}>✓</span>:<span style={{color:'var(--text-3)',fontSize:14}}>—</span>}
                     </td>
                   ))}
                 </tr>
@@ -573,11 +594,24 @@ const Pengguna = () => {
         </div>
       </div>
 
-      {/* Create Modal */}
-      {showCreate&&(
-        <div className="modal-overlay" onClick={()=>setShowCreate(false)}>
-          <div className="modal" style={{width:420}} onClick={e=>e.stopPropagation()}>
-            <div className="modal-title">Tambah Pengguna</div>
+      {/* Create / Edit Modal */}
+      {modalMode&&(
+        <div className="modal-overlay" onClick={closeModal}>
+          <div className="modal" style={{width:440}} onClick={e=>e.stopPropagation()}>
+            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:20}}>
+              <div className="modal-title" style={{marginBottom:0}}>{modalMode==='edit'?`Edit: ${editUser?.name}`:'Tambah Pengguna'}</div>
+              <button className="btn btn-ghost btn-icon" onClick={closeModal}><Icon name="x" size={15}/></button>
+            </div>
+            {modalMode==='edit'&&(
+              <div style={{display:'flex',alignItems:'center',gap:12,padding:'12px 14px',background:'var(--surface)',borderRadius:10,marginBottom:20}}>
+                <div style={{width:40,height:40,borderRadius:'50%',background:'var(--accent)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:16,fontWeight:800,color:'#fff',flexShrink:0}}>{editUser?.avatar}</div>
+                <div>
+                  <div style={{fontWeight:700,fontSize:13.5}}>{editUser?.name}</div>
+                  <div style={{fontSize:12,color:'var(--text-2)'}}>Login terakhir: {editUser?.lastLogin}</div>
+                </div>
+                <span className={`badge ${editUser?.status==='active'?'badge-green':'badge-red'}`} style={{marginLeft:'auto'}}>{editUser?.status==='active'?'Aktif':'Nonaktif'}</span>
+              </div>
+            )}
             <div style={{display:'flex',flexDirection:'column',gap:14}}>
               <div>
                 <label style={{fontSize:12,fontWeight:700,color:'var(--text-2)',display:'block',marginBottom:6,textTransform:'uppercase',letterSpacing:'0.5px'}}>Nama Lengkap *</label>
@@ -588,7 +622,7 @@ const Pengguna = () => {
                 <input className="input" placeholder="username login" value={form.username} onChange={e=>setForm({...form,username:e.target.value})} />
               </div>
               <div>
-                <label style={{fontSize:12,fontWeight:700,color:'var(--text-2)',display:'block',marginBottom:6,textTransform:'uppercase',letterSpacing:'0.5px'}}>Password</label>
+                <label style={{fontSize:12,fontWeight:700,color:'var(--text-2)',display:'block',marginBottom:6,textTransform:'uppercase',letterSpacing:'0.5px'}}>{modalMode==='edit'?'Password Baru (kosongkan jika tidak diubah)':'Password'}</label>
                 <input className="input" type="password" placeholder="Minimal 6 karakter" value={form.password} onChange={e=>setForm({...form,password:e.target.value})} />
               </div>
               <div>
@@ -603,8 +637,14 @@ const Pengguna = () => {
                 <strong>Akses {form.role}:</strong> {ROLE_PERMS[form.role]?.join(', ')}
               </div>
               <div style={{display:'flex',gap:8,marginTop:4}}>
-                <button className="btn btn-secondary" style={{flex:1}} onClick={()=>setShowCreate(false)}>Batal</button>
-                <button className="btn btn-primary" style={{flex:2}} onClick={handleCreate}>Tambah Pengguna</button>
+                {modalMode==='edit'&&editUser?.role!=='Admin Utama'&&(
+                  <button className="btn btn-ghost btn-sm" style={{color:'var(--red)'}} onClick={()=>deleteUser(editUser.id)}>
+                    <Icon name="trash" size={13}/> Hapus
+                  </button>
+                )}
+                <div style={{flex:1}}></div>
+                <button className="btn btn-secondary" onClick={closeModal}>Batal</button>
+                <button className="btn btn-primary" onClick={handleSave}>{modalMode==='edit'?'Simpan Perubahan':'Tambah Pengguna'}</button>
               </div>
             </div>
           </div>
