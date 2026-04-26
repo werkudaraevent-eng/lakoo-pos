@@ -1,17 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 
-import { Button } from "../components/ui/button";
 import { usePosData } from "../context/PosDataContext";
-import {
-  buildCatalogStockSummary,
-  createEmptyProductDraft,
-  createEmptyVariantDraft,
-  normalizeProductPayload,
-  normalizeVariantPayload,
-} from "../features/catalog/catalogHelpers";
 import { formatCurrency } from "../utils/formatters";
-import "../features/catalog/catalog.css";
+import "../features/dashboard/dashboard.css";
 
 export function CatalogManagePage() {
   const navigate = useNavigate();
@@ -20,349 +12,300 @@ export function CatalogManagePage() {
     categories,
     createProduct,
     createVariant,
-    loadError,
     products,
     settings,
     updateProduct,
     updateVariant,
   } = usePosData();
-  const attr1Label = settings.attribute1Label || "Attribute 1";
-  const attr2Label = settings.attribute2Label || "Attribute 2";
-  const [productDraft, setProductDraft] = useState(createEmptyProductDraft);
-  const [variantDraft, setVariantDraft] = useState(createEmptyVariantDraft);
-  const [editingVariantId, setEditingVariantId] = useState(null);
-  const [message, setMessage] = useState("");
+
+  const isNew = !productId;
+  const product = products.find((p) => p.id === productId) || null;
+  const attr1Label = settings?.attribute1Label || "Size";
+
+  const catList = useMemo(() => [...new Set((categories || []).map((c) => c.name))].sort(), [categories]);
+
+  // Form state
+  const [form, setForm] = useState({
+    name: "",
+    category: catList[0] || "",
+    description: "",
+    basePrice: "",
+  });
+
+  // Variants state
+  const [variants, setVariants] = useState([
+    { label: "S", qty: 0, sku: "" },
+    { label: "M", qty: 0, sku: "" },
+    { label: "L", qty: 0, sku: "" },
+  ]);
+  const [newSize, setNewSize] = useState("");
+  const [saved, setSaved] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState(false);
 
-  const isCreateMode = !productId;
-  const selectedProduct = useMemo(
-    () => products.find((product) => product.id === productId) ?? null,
-    [productId, products]
-  );
-
+  // Load product data for edit
   useEffect(() => {
-    if (!selectedProduct) {
-      setProductDraft(createEmptyProductDraft());
-      return;
-    }
-
-    setProductDraft({
-      name: selectedProduct.name,
-      category: selectedProduct.category,
-      description: selectedProduct.description,
-      basePrice: String(selectedProduct.basePrice),
-      isActive: selectedProduct.isActive,
+    if (!product) return;
+    setForm({
+      name: product.name || "",
+      category: product.category || "",
+      description: product.description || "",
+      basePrice: String(product.basePrice || ""),
     });
-  }, [selectedProduct]);
+    setVariants(
+      (product.variants || []).map((v) => ({
+        id: v.id,
+        label: v.attribute1Value || v.sku,
+        qty: v.quantityOnHand || 0,
+        sku: v.sku || "",
+        attribute1Value: v.attribute1Value || "",
+        attribute2Value: v.attribute2Value || "",
+        priceOverride: v.priceOverride,
+        lowStockThreshold: v.lowStockThreshold || 0,
+      }))
+    );
+  }, [product]);
 
-  useEffect(() => {
-    if (!editingVariantId || !selectedProduct) {
-      setVariantDraft(createEmptyVariantDraft());
-      return;
-    }
+  const totalStock = variants.reduce((s, v) => s + (parseInt(v.qty) || 0), 0);
 
-    const target = selectedProduct.variants.find((variant) => variant.id === editingVariantId);
-    if (!target) {
-      setVariantDraft(createEmptyVariantDraft());
-      return;
-    }
-
-    setVariantDraft({
-      sku: target.sku,
-      attribute1Value: target.attribute1Value,
-      attribute2Value: target.attribute2Value,
-      priceOverride: target.priceOverride == null ? "" : String(target.priceOverride),
-      quantityOnHand: String(target.quantityOnHand),
-      lowStockThreshold: String(target.lowStockThreshold),
-      isActive: target.isActive,
-    });
-  }, [editingVariantId, selectedProduct]);
-
-  async function handleProductSubmit(event) {
-    event.preventDefault();
-    setSubmitting(true);
-    setMessage("");
-
-    try {
-      const payload = normalizeProductPayload(productDraft);
-
-      if (selectedProduct) {
-        await updateProduct(selectedProduct.id, payload);
-        setMessage("Product updated.");
-      } else {
-        await createProduct({ ...payload, variants: [] });
-        navigate("/catalog");
-        return;
-      }
-    } catch (error) {
-      setMessage(error.message);
-    } finally {
-      setSubmitting(false);
-    }
+  function addSize() {
+    const label = newSize.trim().toUpperCase();
+    if (!label || variants.find((v) => v.label === label)) return;
+    setVariants((prev) => [...prev, { label, qty: 0, sku: "" }]);
+    setNewSize("");
   }
 
-  async function handleVariantSubmit(event) {
-    event.preventDefault();
+  function removeSize(label) {
+    setVariants((prev) => prev.filter((v) => v.label !== label));
+  }
 
-    if (!selectedProduct) {
-      setMessage("Create the product first, then add variants.");
-      return;
-    }
+  function setQty(label, val) {
+    setVariants((prev) => prev.map((v) => v.label === label ? { ...v, qty: Math.max(0, parseInt(val) || 0) } : v));
+  }
 
+  async function handleSave() {
+    if (!form.name || !form.basePrice) return;
     setSubmitting(true);
-    setMessage("");
-
     try {
-      const payload = normalizeVariantPayload(variantDraft);
-
-      if (editingVariantId) {
-        await updateVariant(editingVariantId, payload);
-        setMessage("Variant updated.");
+      if (isNew) {
+        await createProduct({
+          ...form,
+          basePrice: parseInt(String(form.basePrice).replace(/\D/g, "")) || 0,
+          isActive: true,
+          variants: variants.map((v) => ({
+            sku: v.sku || `${form.name.substring(0, 3).toUpperCase()}-${v.label}`,
+            attribute1Value: v.label,
+            attribute2Value: "",
+            quantityOnHand: parseInt(v.qty) || 0,
+            lowStockThreshold: 3,
+            isActive: true,
+          })),
+        });
       } else {
-        await createVariant(selectedProduct.id, payload);
-        setMessage("Variant created.");
+        await updateProduct(productId, {
+          ...form,
+          basePrice: parseInt(String(form.basePrice).replace(/\D/g, "")) || 0,
+          isActive: true,
+        });
+        // Update existing variants
+        for (const v of variants) {
+          if (v.id) {
+            await updateVariant(v.id, {
+              sku: v.sku,
+              attribute1Value: v.attribute1Value || v.label,
+              attribute2Value: v.attribute2Value || "",
+              quantityOnHand: parseInt(v.qty) || 0,
+              lowStockThreshold: v.lowStockThreshold || 3,
+              isActive: true,
+            });
+          } else {
+            await createVariant(productId, {
+              sku: v.sku || `${form.name.substring(0, 3).toUpperCase()}-${v.label}`,
+              attribute1Value: v.label,
+              attribute2Value: "",
+              quantityOnHand: parseInt(v.qty) || 0,
+              lowStockThreshold: 3,
+              isActive: true,
+            });
+          }
+        }
       }
-
-      setEditingVariantId(null);
-      setVariantDraft(createEmptyVariantDraft());
-    } catch (error) {
-      setMessage(error.message);
+      setSaved(true);
+      setTimeout(() => { setSaved(false); navigate("/catalog"); }, 1200);
     } finally {
       setSubmitting(false);
     }
   }
 
   return (
-    <div className="catalog-manage-page">
-      <section className="page-header-card">
-        <p className="eyebrow">Catalog</p>
-        <h1>{isCreateMode ? "Add product" : "Manage product"}</h1>
-        <p className="muted-text">
-          {isCreateMode
-            ? "Create a product first. Variants come after the product exists."
-            : "Edit the product, maintain variants, and control stock without polluting the browse page."}
-        </p>
-        <div className="catalog-manage-actions">
-          <Button asChild size="sm" variant="outline">
-            <Link to="/catalog">Back to catalog</Link>
-          </Button>
+    <div className="content" style={{ maxWidth: 860 }}>
+      {/* Header */}
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 24, flexWrap: "wrap" }}>
+        <button className="btn btn-ghost btn-sm" onClick={() => navigate("/catalog")}>← Kembali</button>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 18, fontWeight: 800 }}>{isNew ? "Tambah Produk Baru" : `Edit: ${product?.name || ""}`}</div>
+          {!isNew && product ? <div style={{ fontSize: 12.5, color: "var(--text-soft)", marginTop: 2 }}>SKU {(product.variants || [])[0]?.sku || "-"}</div> : null}
         </div>
-      </section>
+        {!isNew ? (
+          <button className="btn btn-ghost btn-sm" style={{ color: "var(--danger)" }} onClick={() => setDeleteConfirm(true)}>
+            <svg width={13} height={13} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14H6L5 6" /><path d="M10 11v6M14 11v6" /></svg>
+            {" "}Hapus Produk
+          </button>
+        ) : null}
+        <button className="btn btn-primary" style={{ minWidth: 140, height: 40 }} onClick={handleSave} disabled={submitting}>
+          {saved ? "✓ Tersimpan!" : submitting ? "Menyimpan..." : "Simpan Perubahan"}
+        </button>
+      </div>
 
-      {loadError ? <p className="error-text">{loadError}</p> : null}
-      {message ? <p className="info-text">{message}</p> : null}
-      {!isCreateMode && !selectedProduct ? <p className="error-text">Product not found.</p> : null}
-
-      <section className="catalog-manage-grid">
-        <article className="panel-card">
-          <div className="panel-head">
-            <h2>{isCreateMode ? "Create product" : "Edit product"}</h2>
-          </div>
-
-          <form className="form-stack" onSubmit={handleProductSubmit}>
-            <label className="field">
-              <span>Name</span>
-              <input
-                onChange={(event) => setProductDraft((current) => ({ ...current, name: event.target.value }))}
-                value={productDraft.name}
-              />
-            </label>
-
-            <label className="field">
-              <span>Category</span>
-              <input
-                list="catalog-manage-categories"
-                onChange={(event) => setProductDraft((current) => ({ ...current, category: event.target.value }))}
-                placeholder="Shirts"
-                value={productDraft.category}
-              />
-              <datalist id="catalog-manage-categories">
-                {categories.map((category) => (
-                  <option key={category.id} value={category.name} />
-                ))}
-              </datalist>
-            </label>
-
-            <label className="field">
-              <span>Description</span>
-              <textarea
-                onChange={(event) =>
-                  setProductDraft((current) => ({ ...current, description: event.target.value }))
-                }
-                value={productDraft.description}
-              />
-            </label>
-
-            <label className="field">
-              <span>Base price</span>
-              <input
-                inputMode="numeric"
-                onChange={(event) => setProductDraft((current) => ({ ...current, basePrice: event.target.value }))}
-                value={productDraft.basePrice}
-              />
-            </label>
-
-            <label className="checkbox-inline">
-              <input
-                checked={productDraft.isActive}
-                onChange={(event) =>
-                  setProductDraft((current) => ({ ...current, isActive: event.target.checked }))
-                }
-                type="checkbox"
-              />
-              Product active
-            </label>
-
-            <div className="inline-actions">
-              <Button disabled={submitting} type="submit">
-                {isCreateMode ? "Create product" : "Save product"}
-              </Button>
-            </div>
-          </form>
-        </article>
-
-        <article className="panel-card">
-          <div className="panel-head">
-            <h2>{editingVariantId ? "Edit variant" : "Create variant"}</h2>
-            <span className="badge-soft">{selectedProduct ? selectedProduct.name : "Save product first"}</span>
-          </div>
-
-          <form className="form-stack" onSubmit={handleVariantSubmit}>
-            <div className="dual-fields">
-              <label className="field">
-                <span>SKU</span>
-                <input
-                  onChange={(event) => setVariantDraft((current) => ({ ...current, sku: event.target.value }))}
-                  value={variantDraft.sku}
-                />
-              </label>
-
-              <label className="field">
-                <span>Price override</span>
-                <input
-                  inputMode="numeric"
-                  onChange={(event) =>
-                    setVariantDraft((current) => ({ ...current, priceOverride: event.target.value }))
-                  }
-                  placeholder="Leave empty to use base price"
-                  value={variantDraft.priceOverride}
-                />
-              </label>
-            </div>
-
-            <div className="dual-fields">
-              <label className="field">
-                <span>{attr1Label}</span>
-                <input
-                  onChange={(event) => setVariantDraft((current) => ({ ...current, attribute1Value: event.target.value }))}
-                  value={variantDraft.attribute1Value}
-                />
-              </label>
-
-              <label className="field">
-                <span>{attr2Label}</span>
-                <input
-                  onChange={(event) => setVariantDraft((current) => ({ ...current, attribute2Value: event.target.value }))}
-                  value={variantDraft.attribute2Value}
-                />
-              </label>
-            </div>
-
-            <div className="dual-fields">
-              <label className="field">
-                <span>Quantity on hand</span>
-                <input
-                  inputMode="numeric"
-                  onChange={(event) =>
-                    setVariantDraft((current) => ({ ...current, quantityOnHand: event.target.value }))
-                  }
-                  value={variantDraft.quantityOnHand}
-                />
-              </label>
-
-              <label className="field">
-                <span>Low stock threshold</span>
-                <input
-                  inputMode="numeric"
-                  onChange={(event) =>
-                    setVariantDraft((current) => ({ ...current, lowStockThreshold: event.target.value }))
-                  }
-                  value={variantDraft.lowStockThreshold}
-                />
-              </label>
-            </div>
-
-            <label className="checkbox-inline">
-              <input
-                checked={variantDraft.isActive}
-                onChange={(event) =>
-                  setVariantDraft((current) => ({ ...current, isActive: event.target.checked }))
-                }
-                type="checkbox"
-              />
-              Variant active
-            </label>
-
-            <div className="inline-actions">
-              <Button disabled={submitting || !selectedProduct} type="submit">
-                {editingVariantId ? "Save variant" : "Create variant"}
-              </Button>
-              {editingVariantId ? (
-                <Button
-                  onClick={() => {
-                    setEditingVariantId(null);
-                    setVariantDraft(createEmptyVariantDraft());
-                  }}
-                  type="button"
-                  variant="outline"
-                >
-                  Cancel
-                </Button>
-              ) : null}
-            </div>
-          </form>
-        </article>
-      </section>
-
-      {selectedProduct ? (
-        <article className="panel-card">
-          <div className="panel-head">
-            <h2>Variants</h2>
-            <span className="badge-soft">
-              {buildCatalogStockSummary(selectedProduct).label} · {selectedProduct.variants.length} variants
-            </span>
-          </div>
-
-          <div className="catalog-manage-variant-list">
-            {selectedProduct.variants.map((variant) => {
-              const quantityOnHand = Number(variant.quantityOnHand) || 0;
-              const threshold = Number(variant.lowStockThreshold) || 0;
-              const tone = quantityOnHand <= 0 ? "none" : quantityOnHand <= threshold ? "low" : "high";
-
-              return (
-                <div className="catalog-manage-variant-row" key={variant.id}>
-                  <div className="catalog-manage-variant-meta">
-                    <strong>
-                      {variant.attribute1Value} / {variant.attribute2Value}
-                    </strong>
-                    <span className="muted-text">{variant.sku}</span>
-                    <span className="muted-text">
-                      {formatCurrency(variant.priceOverride ?? selectedProduct.basePrice)}
-                    </span>
-                  </div>
-
-                  <div className="catalog-manage-variant-actions">
-                    <span className={`catalog-manage-stock-pill ${tone}`}>{quantityOnHand} pcs</span>
-                    <Button onClick={() => setEditingVariantId(variant.id)} size="sm" type="button" variant="outline">
-                      Edit
-                    </Button>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 320px", gap: 16, alignItems: "start" }}>
+        {/* Left column */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          {/* Info Produk */}
+          <div className="card">
+            <div style={{ fontSize: 11, fontWeight: 800, color: "var(--text-soft)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 16 }}>INFORMASI PRODUK</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              <div>
+                <label style={{ fontSize: 12, fontWeight: 700, color: "var(--text-soft)", display: "block", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.5px" }}>Nama Produk *</label>
+                <input className="input" placeholder="mis: T-Shirt Basic White" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} style={{ fontSize: 14, fontWeight: 600 }} />
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                <div>
+                  <label style={{ fontSize: 12, fontWeight: 700, color: "var(--text-soft)", display: "block", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.5px" }}>Kategori</label>
+                  <select className="input" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} style={{ appearance: "auto" }}>
+                    {catList.map((c) => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label style={{ fontSize: 12, fontWeight: 700, color: "var(--text-soft)", display: "block", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.5px" }}>Harga Jual (Rp) *</label>
+                  <div style={{ position: "relative" }}>
+                    <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", fontSize: 13.5, fontWeight: 600, color: "var(--text-soft)" }}>Rp</span>
+                    <input className="input" placeholder="85.000" value={form.basePrice ? Number(form.basePrice).toLocaleString("id-ID") : ""} onChange={(e) => setForm({ ...form, basePrice: e.target.value.replace(/\D/g, "") })} style={{ paddingLeft: 36, fontSize: 14, fontWeight: 700 }} />
                   </div>
                 </div>
-              );
-            })}
+              </div>
+              <div>
+                <label style={{ fontSize: 12, fontWeight: 700, color: "var(--text-soft)", display: "block", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.5px" }}>Deskripsi</label>
+                <textarea className="input" rows={3} placeholder="Deskripsi singkat produk..." value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} style={{ resize: "vertical", lineHeight: 1.5 }} />
+              </div>
+            </div>
           </div>
-        </article>
+
+          {/* Ukuran & Stok */}
+          <div className="card">
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+              <div style={{ fontSize: 11, fontWeight: 800, color: "var(--text-soft)", textTransform: "uppercase", letterSpacing: "0.5px" }}>UKURAN & STOK</div>
+              <span style={{ fontSize: 12.5, color: "var(--text-soft)" }}>Total: <strong style={{ color: "var(--text)" }}>{totalStock} unit</strong></span>
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 14 }}>
+              {variants.map((sz) => (
+                <div key={sz.label} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", background: "var(--surface)", borderRadius: 8 }}>
+                  <div style={{ width: 44, height: 32, borderRadius: 6, background: "#fff", border: "1px solid var(--line)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 13, flexShrink: 0 }}>{sz.label}</div>
+                  <div style={{ flex: 1, fontSize: 13, color: "var(--text-soft)", fontWeight: 500 }}>Stok tersedia</div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <div className="qty-btn" style={{ width: 28, height: 28 }} onClick={() => setQty(sz.label, sz.qty - 1)}>−</div>
+                    <input type="number" min={0} value={sz.qty} onChange={(e) => setQty(sz.label, e.target.value)} style={{ width: 60, textAlign: "center", padding: "4px 6px", border: "1px solid var(--line)", borderRadius: 6, fontFamily: "inherit", fontWeight: 700, fontSize: 14 }} />
+                    <div className="qty-btn" style={{ width: 28, height: 28 }} onClick={() => setQty(sz.label, sz.qty + 1)}>+</div>
+                  </div>
+                  <div style={{ width: 48, textAlign: "right" }}>
+                    <span className={`badge ${sz.qty === 0 ? "badge-red" : sz.qty <= 3 ? "badge-amber" : "badge-green"}`} style={{ fontSize: 10.5 }}>
+                      {sz.qty === 0 ? "Habis" : sz.qty <= 3 ? "Hampir" : "OK"}
+                    </span>
+                  </div>
+                  <button onClick={() => removeSize(sz.label)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-muted)", padding: 4, display: "flex", alignItems: "center" }}>
+                    <svg width={14} height={14} fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <input className="input" placeholder="Tambah ukuran (mis: XS, XXL, 30...)" value={newSize} onChange={(e) => setNewSize(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addSize()} style={{ flex: 1, fontSize: 13 }} />
+              <button className="btn btn-secondary btn-sm" style={{ flexShrink: 0 }} onClick={addSize}>
+                <svg width={13} height={13} fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+                {" "}Tambah
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Right column */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          {/* Image upload */}
+          <div className="card" style={{ padding: 0, overflow: "hidden" }}>
+            <div style={{ aspectRatio: "1", background: "var(--surface)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 10, cursor: "pointer" }}>
+              <svg width={48} height={48} fill="none" stroke="var(--text-muted)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="8.5" cy="8.5" r="1.5" /><polyline points="21 15 16 10 5 21" /></svg>
+              <div style={{ fontSize: 13, color: "var(--text-soft)", fontWeight: 600 }}>Upload Foto Produk</div>
+              <div style={{ fontSize: 11.5, color: "var(--text-muted)" }}>JPG, PNG — maks 5 MB</div>
+            </div>
+            <div style={{ padding: "12px 14px", borderTop: "1px solid var(--line)" }}>
+              <button className="btn btn-secondary btn-sm w-full">Pilih Foto</button>
+            </div>
+          </div>
+
+          {/* Status */}
+          <div className="card">
+            <div style={{ fontSize: 11, fontWeight: 800, color: "var(--text-soft)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 14 }}>STATUS PRODUK</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              <StatusToggle label="Tampilkan di Katalog" desc="Produk bisa dilihat & dijual" defaultOn />
+              <StatusToggle label="Tersedia di Bazar" desc="Bisa dialokasikan ke event" defaultOn />
+            </div>
+          </div>
+
+          {/* Summary */}
+          <div className="card" style={{ background: "var(--accent-light)", border: "1px solid var(--accent-soft)" }}>
+            <div style={{ fontSize: 11, fontWeight: 800, color: "var(--accent)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 12 }}>RINGKASAN</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {[
+                { label: "Harga", value: form.basePrice ? formatCurrency(Number(form.basePrice)) : "—" },
+                { label: "Total Stok", value: `${totalStock} unit` },
+                { label: "Ukuran", value: variants.length > 0 ? variants.map((v) => v.label).join(", ") : "—" },
+                { label: "Kategori", value: form.category || "—" },
+              ].map((r, i) => (
+                <div key={i} style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
+                  <span style={{ color: "var(--text-soft)", fontWeight: 500 }}>{r.label}</span>
+                  <span style={{ fontWeight: 700 }}>{r.value}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Delete confirm modal */}
+      {deleteConfirm ? (
+        <div className="modal-overlay" onClick={() => setDeleteConfirm(false)}>
+          <div className="modal" style={{ width: 380, textAlign: "center" }} onClick={(e) => e.stopPropagation()}>
+            <div style={{ width: 52, height: 52, borderRadius: "50%", background: "var(--danger-soft)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 14px" }}>
+              <svg width={22} height={22} fill="none" stroke="var(--danger)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14H6L5 6" /><path d="M10 11v6M14 11v6" /></svg>
+            </div>
+            <div style={{ fontSize: 17, fontWeight: 800, marginBottom: 8 }}>Hapus Produk?</div>
+            <div style={{ fontSize: 13.5, color: "var(--text-soft)", marginBottom: 20 }}>
+              <strong>{product?.name}</strong> akan dihapus permanen dari katalog dan tidak bisa dikembalikan.
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setDeleteConfirm(false)}>Batal</button>
+              <button className="btn" style={{ flex: 1, background: "var(--danger)", color: "#fff" }} onClick={() => navigate("/catalog")}>Hapus</button>
+            </div>
+          </div>
+        </div>
       ) : null}
+    </div>
+  );
+}
+
+// Toggle component
+function StatusToggle({ label, desc, defaultOn = false }) {
+  const [on, setOn] = useState(defaultOn);
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+      <div style={{ flex: 1 }}>
+        <div style={{ fontSize: 13, fontWeight: 700 }}>{label}</div>
+        <div style={{ fontSize: 11.5, color: "var(--text-soft)" }}>{desc}</div>
+      </div>
+      <div onClick={() => setOn(!on)} style={{ width: 40, height: 22, borderRadius: 11, background: on ? "var(--accent)" : "var(--surface-2)", cursor: "pointer", position: "relative", transition: "background 0.2s", flexShrink: 0 }}>
+        <div style={{ position: "absolute", top: 2, left: on ? 20 : 2, width: 18, height: 18, borderRadius: "50%", background: "#fff", boxShadow: "0 1px 4px rgba(0,0,0,0.2)", transition: "left 0.2s" }} />
+      </div>
     </div>
   );
 }
