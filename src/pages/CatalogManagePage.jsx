@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
 import { usePosData } from "../context/PosDataContext";
@@ -24,35 +24,27 @@ export function CatalogManagePage() {
 
   const catList = useMemo(() => [...new Set((categories || []).map((c) => c.name))].sort(), [categories]);
 
-  // Form state
-  const [form, setForm] = useState({
-    name: "",
-    category: catList[0] || "",
-    description: "",
-    basePrice: "",
-  });
-
-  // Variants state
-  const [variants, setVariants] = useState([
-    { label: "S", qty: 0, sku: "" },
-    { label: "M", qty: 0, sku: "" },
-    { label: "L", qty: 0, sku: "" },
-  ]);
+  const [form, setForm] = useState({ name: "", category: catList[0] || "", description: "", basePrice: "" });
+  const [variants, setVariants] = useState([]);
   const [newSize, setNewSize] = useState("");
   const [saved, setSaved] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
-  const [initialized, setInitialized] = useState(false);
   const [saveError, setSaveError] = useState("");
+  const loadedProductIdRef = useRef(null);
 
-  // Reset initialized when productId changes (navigating to different product)
+  // Load product data — only when product actually changes (by id)
   useEffect(() => {
-    setInitialized(false);
-  }, [productId]);
-
-  // Load product data for edit — only once per product
-  useEffect(() => {
-    if (!product || initialized) return;
+    if (isNew) {
+      if (loadedProductIdRef.current !== "new") {
+        setForm({ name: "", category: catList[0] || "", description: "", basePrice: "" });
+        setVariants([{ label: "S", qty: 0, sku: "" }, { label: "M", qty: 0, sku: "" }, { label: "L", qty: 0, sku: "" }]);
+        loadedProductIdRef.current = "new";
+      }
+      return;
+    }
+    if (!product || loadedProductIdRef.current === product.id) return;
+    loadedProductIdRef.current = product.id;
     setForm({
       name: product.name || "",
       category: product.category || "",
@@ -67,12 +59,11 @@ export function CatalogManagePage() {
         sku: v.sku || "",
         attribute1Value: v.attribute1Value || "",
         attribute2Value: v.attribute2Value || "",
-        priceOverride: v.priceOverride,
+        priceOverride: v.priceOverride != null ? v.priceOverride : null,
         lowStockThreshold: v.lowStockThreshold || 0,
       }))
     );
-    setInitialized(true);
-  }, [product, initialized]);
+  }, [product, isNew, catList]);
 
   const totalStock = variants.reduce((s, v) => s + (parseInt(v.qty) || 0), 0);
 
@@ -132,14 +123,14 @@ export function CatalogManagePage() {
         // Note: each call triggers bootstrap reload, but we block form reset with `initialized` flag
         for (const v of variants) {
           const variantPayload = {
-            sku: v.sku || `${form.name.substring(0, 3).toUpperCase().replace(/\s/g, "")}-${v.label}`,
-            attribute1Value: v.label,
+            sku: v.sku || `${(form.name || "PRD").substring(0, 3).toUpperCase().replace(/\s/g, "")}-${v.label}`,
+            attribute1Value: v.label || "",
             attribute2Value: v.attribute2Value || "",
             quantityOnHand: parseInt(v.qty) || 0,
-            lowStockThreshold: v.lowStockThreshold || 3,
+            lowStockThreshold: parseInt(v.lowStockThreshold) || 3,
             isActive: true,
+            priceOverride: v.priceOverride != null ? Number(v.priceOverride) : null,
           };
-          if (v.priceOverride != null) variantPayload.priceOverride = v.priceOverride;
 
           try {
             if (v.id) {
