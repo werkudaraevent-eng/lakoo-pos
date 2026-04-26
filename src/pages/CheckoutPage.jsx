@@ -1,329 +1,336 @@
-import { startTransition, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+import { useDeferredValue, useMemo, useRef, useState } from "react";
 
 import { useAuth } from "../context/AuthContext";
 import { usePosData } from "../context/PosDataContext";
-import { LatestReceipt } from "../features/checkout/components/LatestReceipt";
-import {
-  buildCheckoutCategories,
-  filterCheckoutVariants,
-  formatCheckoutVariantMeta,
-  getCheckoutStockState,
-} from "../features/checkout/checkoutData";
-import {
-  CHECKOUT_CART_COUNT_STORAGE_KEY,
-  canFinalizeSale,
-  createFinalizeSaleLock,
-  evaluateCartAddition,
-} from "../features/checkout/checkoutGuards";
 import { formatCurrency } from "../utils/formatters";
 import "../features/checkout/checkout.css";
-
-function getMonogram(name) {
-  const tokens = String(name || "").split(/\s+/).filter(Boolean).slice(0, 2);
-  return tokens.length === 0 ? "P" : tokens.map((t) => t.charAt(0).toUpperCase()).join("");
-}
+import "../features/dashboard/dashboard.css";
 
 export function CheckoutPage() {
   const { user } = useAuth();
-  const { variants, promotions, settings, finalizeSale, loading, loadError } = usePosData();
-  const [query, setQuery] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState("All Items");
+  const { variants, settings, finalizeSale, loading, loadError } = usePosData();
+  const [search, setSearch] = useState("");
+  const [cat, setCat] = useState("Semua");
   const [cart, setCart] = useState([]);
-  const [promoCode, setPromoCode] = useState("");
-  const [paymentMethod, setPaymentMethod] = useState("cash");
-  const [message, setMessage] = useState("");
-  const [receiptSale, setReceiptSale] = useState(null);
+  const [modal, setModal] = useState(null); // selected product for size picker
+  const [selVariant, setSelVariant] = useState(null);
+  const [payModal, setPayModal] = useState(false);
+  const [paid, setPaid] = useState(false);
+  const [payMethod, setPayMethod] = useState("qris");
+  const [cash, setCash] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const finalizeLockRef = useRef(null);
-  const deferredQuery = useDeferredValue(query);
+  const [lastSale, setLastSale] = useState(null);
+  const deferredSearch = useDeferredValue(search);
 
-  if (finalizeLockRef.current === null) {
-    finalizeLockRef.current = createFinalizeSaleLock();
-  }
+  const attr1Label = settings?.attribute1Label || "Size";
 
-  const browseableVariants = useMemo(
-    () => variants.filter((item) => item.productActive && item.isActive),
-    [variants]
-  );
-  const categories = useMemo(() => buildCheckoutCategories(browseableVariants), [browseableVariants]);
-  const visibleProducts = useMemo(
-    () => filterCheckoutVariants({ variants: browseableVariants, category: selectedCategory, query: deferredQuery }),
-    [browseableVariants, selectedCategory, deferredQuery]
-  );
-
-  const cartCount = cart.reduce((sum, item) => sum + item.qty, 0);
-  const subtotal = cart.reduce((sum, item) => sum + item.price * item.qty, 0);
-  const matchedPromo = promotions.find((p) => p.code === promoCode.toUpperCase() && p.isActive);
-  const discount = matchedPromo == null ? 0
-    : matchedPromo.type === "percentage" ? Math.round((subtotal * matchedPromo.value) / 100)
-    : Math.min(subtotal, matchedPromo.value);
-  const taxRate = settings?.taxRate ?? 0;
-  const afterDiscount = subtotal - discount;
-  const tax = taxRate > 0 ? Math.round((afterDiscount * taxRate) / 100) : 0;
-  const grandTotal = Math.max(0, afterDiscount + tax);
-
-  useEffect(() => {
-    window.sessionStorage?.setItem(CHECKOUT_CART_COUNT_STORAGE_KEY, String(cartCount));
-  }, [cartCount]);
-
-  useEffect(() => () => {
-    window.sessionStorage?.removeItem(CHECKOUT_CART_COUNT_STORAGE_KEY);
-  }, []);
-
-  function addToCart(variant) {
-    setMessage("");
-    const preview = evaluateCartAddition(cart, variant);
-    if (preview.blocked) {
-      setMessage(preview.reason === "out-of-stock" ? "Stok habis." : "Sudah mencapai batas stok.");
-      return;
-    }
-    startTransition(() => {
-      setCart((current) => {
-        const result = evaluateCartAddition(current, variant);
-        return result.blocked ? current : result.nextCart;
-      });
+  // Group variants by product
+  const productMap = useMemo(() => {
+    const map = new Map();
+    (variants || []).forEach((v) => {
+      if (!v.productActive || !v.isActive) return;
+      if (!map.has(v.productId)) {
+        map.set(v.productId, {
+          id: v.productId,
+          name: v.productName,
+          category: v.category,
+          price: v.basePrice,
+          variants: [],
+        });
+      }
+      map.get(v.productId).variants.push(v);
     });
+    return map;
+  }, [variants]);
+
+  const products = useMemo(() => [...productMap.values()], [productMap]);
+
+  const categories = useMemo(() => {
+    const cats = [...new Set(products.map((p) => p.category).filter(Boolean))].sort();
+    return ["Semua", ...cats];
+  }, [products]);
+
+  const filtered = useMemo(() => {
+    const q = deferredSearch.toLowerCase();
+    return products.filter((p) => {
+      const matchCat = cat === "Semua" || p.category === cat;
+      const matchSearch = !q || p.name.toLowerCase().includes(q) || p.variants.some((v) => (v.sku || "").toLowerCase().includes(q));
+      return matchCat && matchSearch;
+    });
+  }, [products, cat, deferredSearch]);
+
+  function getTotalStock(product) {
+    return product.variants.reduce((sum, v) => sum + (v.quantityOnHand || 0), 0);
   }
 
-  function updateQty(variantId, nextQty) {
-    if (nextQty <= 0) {
-      setCart((current) => current.filter((item) => item.variantId !== variantId));
-      return;
-    }
-    const variant = variants.find((item) => item.id === variantId);
-    if (!variant || nextQty > variant.quantityOnHand) return;
-    setCart((current) => current.map((item) => (item.variantId === variantId ? { ...item, qty: nextQty } : item)));
+  // Cart logic
+  const subtotal = cart.reduce((s, i) => s + i.price * i.qty, 0);
+  const taxRate = settings?.taxRate || 0;
+  const tax = taxRate > 0 ? Math.round((subtotal * taxRate) / 100) : 0;
+  const total = subtotal + tax;
+  const cartItemCount = cart.reduce((s, i) => s + i.qty, 0);
+
+  const cashNum = parseInt(String(cash).replace(/\D/g, "")) || 0;
+  const kembalian = cashNum - total;
+
+  function openProduct(product) {
+    if (getTotalStock(product) === 0) return;
+    setModal(product);
+    // Auto-select first available variant
+    const first = product.variants.find((v) => (v.quantityOnHand || 0) > 0);
+    setSelVariant(first || null);
   }
 
-  function clearCart() {
-    setCart([]);
-    setPromoCode("");
-    setMessage("");
+  function addToCart() {
+    if (!selVariant) return;
+    setCart((prev) => {
+      const existing = prev.find((i) => i.variantId === selVariant.id);
+      if (existing) {
+        return prev.map((i) => i.variantId === selVariant.id ? { ...i, qty: i.qty + 1 } : i);
+      }
+      return [...prev, {
+        variantId: selVariant.id,
+        productName: modal.name,
+        sku: selVariant.sku,
+        attribute1Value: selVariant.attribute1Value || "",
+        attribute2Value: selVariant.attribute2Value || "",
+        price: selVariant.priceOverride ?? selVariant.price ?? modal.price,
+        qty: 1,
+      }];
+    });
+    setModal(null);
+    setSelVariant(null);
   }
 
-  async function handleCheckout() {
-    const status = canFinalizeSale({ cartLength: cart.length });
-    if (!status.allowed) {
-      if (status.reason === "empty-cart") setMessage("Tambahkan item ke cart.");
-      return;
-    }
-    const lock = finalizeLockRef.current;
-    if (!lock.tryBegin()) { setMessage("Sedang diproses."); return; }
+  function changeQty(variantId, delta) {
+    setCart((prev) => prev.map((i) => i.variantId === variantId ? { ...i, qty: Math.max(0, i.qty + delta) } : i).filter((i) => i.qty > 0));
+  }
+
+  async function handlePay() {
     setSubmitting(true);
     try {
-      const result = await finalizeSale({ cart, promoCode, paymentMethod, actor: user });
-      setMessage(result.message || (result.ok ? "Transaksi berhasil!" : ""));
+      const result = await finalizeSale({
+        cart,
+        promoCode: "",
+        paymentMethod: payMethod,
+        actor: user,
+      });
       if (result.ok) {
-        setReceiptSale(result.sale);
-        setCart([]);
-        setPromoCode("");
-        setPaymentMethod("cash");
+        setLastSale(result.sale);
+        setPaid(true);
       }
     } finally {
-      lock.release();
       setSubmitting(false);
     }
   }
 
-  const paymentMethods = [
-    { key: "cash", label: "Cash", icon: "💵" },
-    { key: "card", label: "Card", icon: "💳" },
-    { key: "qris", label: "QRIS", icon: "📱" },
-    { key: "transfer", label: "Transfer", icon: "🏦" },
-    { key: "ewallet", label: "E-Wallet", icon: "📲" },
-  ];
+  function handleNewTrx() {
+    setCart([]);
+    setPayModal(false);
+    setPaid(false);
+    setCash("");
+    setPayMethod("qris");
+    setLastSale(null);
+  }
 
   return (
-    <div className="pos-terminal">
-      {/* ── Left: Product catalog ── */}
+    <div className="pos-layout">
+      {/* ── Catalog ── */}
       <div className="pos-catalog">
-        {/* Search + category bar */}
-        <div className="pos-catalog-header">
-          <div className="pos-search-row">
-            <div className="pos-search">
-              <svg className="pos-search-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" />
-              </svg>
-              <input
-                className="pos-search-input"
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Cari produk, SKU, atau barcode..."
-                value={query}
-              />
-              {query ? (
-                <button className="pos-search-clear" onClick={() => setQuery("")} type="button">✕</button>
-              ) : null}
-            </div>
-            <div className="pos-result-count">
-              <strong>{visibleProducts.length}</strong> item
-            </div>
-          </div>
-
-          <div className="pos-categories">
-            {categories.map((cat) => (
-              <button
-                className={`pos-cat-pill${selectedCategory === cat ? " active" : ""}`}
-                key={cat}
-                onClick={() => setSelectedCategory(cat)}
-                type="button"
-              >
-                {cat}
-              </button>
-            ))}
+        <div style={{ display: "flex", gap: 10, marginBottom: 14 }}>
+          <div className="input-wrap" style={{ flex: 1 }}>
+            <span className="input-icon">
+              <svg width={14} height={14} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
+            </span>
+            <input className="input has-icon" placeholder="Cari produk..." value={search} onChange={(e) => setSearch(e.target.value)} />
           </div>
         </div>
 
-        {loading ? <div className="pos-loading">Memuat katalog...</div> : null}
-        {loadError ? <div className="pos-error">{loadError}</div> : null}
+        <div className="cat-filter">
+          {categories.map((c) => (
+            <div key={c} className={`cat-chip${cat === c ? " active" : ""}`} onClick={() => setCat(c)}>{c}</div>
+          ))}
+        </div>
 
-        {/* Product grid */}
-        <div className="pos-grid">
-          {visibleProducts.length > 0 ? (
-            visibleProducts.map((variant) => {
-              const stock = getCheckoutStockState(variant.quantityOnHand);
-              const inCart = cart.find((c) => c.variantId === variant.id);
-              return (
-                <button
-                  className={`pos-product${variant.quantityOnHand <= 0 ? " out" : ""}${inCart ? " in-cart" : ""}`}
-                  disabled={variant.quantityOnHand <= 0}
-                  key={variant.id}
-                  onClick={() => addToCart(variant)}
-                  type="button"
-                >
-                  <div className="pos-product-mono">{getMonogram(variant.productName)}</div>
-                  <div className="pos-product-info">
-                    <span className="pos-product-name">{variant.productName}</span>
-                    <span className="pos-product-meta">{formatCheckoutVariantMeta(variant)}</span>
-                  </div>
-                  <div className="pos-product-bottom">
-                    <span className="pos-product-price">{formatCurrency(variant.price)}</span>
-                    <span className={`pos-product-stock ${stock.tone}`}>{stock.label}</span>
-                  </div>
-                  {inCart ? (
-                    <div className="pos-product-cart-badge">{inCart.qty}</div>
-                  ) : null}
-                </button>
-              );
-            })
-          ) : (
-            <div className="pos-empty">
-              <p>Tidak ada produk ditemukan</p>
-              <span>Coba kata kunci lain atau ganti kategori.</span>
-            </div>
-          )}
+        {loading ? <div className="text-sm text-muted" style={{ padding: 16 }}>Memuat katalog...</div> : null}
+
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 10 }}>
+          {filtered.map((p) => {
+            const stock = getTotalStock(p);
+            return (
+              <div key={p.id} className={`product-card${stock === 0 ? " out-of-stock" : ""}`} onClick={() => openProduct(p)}>
+                <div className="product-thumb">
+                  <span style={{ fontSize: 20, fontWeight: 800, color: "var(--text-muted)" }}>{p.name.charAt(0)}</span>
+                </div>
+                <div className="product-name">{p.name}</div>
+                <div className="product-price">{formatCurrency(p.price)}</div>
+                <div className="product-stock">{stock > 0 ? `Stok: ${stock}` : "Habis"}</div>
+              </div>
+            );
+          })}
         </div>
       </div>
 
-      {/* ── Right: Cart panel ── */}
+      {/* ── Cart ── */}
       <div className="pos-cart">
         <div className="pos-cart-header">
-          <div>
-            <h2 className="pos-cart-title">Pesanan</h2>
-            <span className="pos-cart-count">{cartCount} item</span>
+          <div className="row-between">
+            <span style={{ fontWeight: 800, fontSize: 15 }}>Keranjang</span>
+            {cart.length > 0 ? (
+              <button className="btn btn-ghost btn-sm" style={{ color: "var(--danger)" }} onClick={() => setCart([])}>Kosongkan</button>
+            ) : null}
           </div>
-          {cart.length > 0 ? (
-            <button className="pos-cart-clear" onClick={clearCart} type="button">
-              Hapus Semua
-            </button>
-          ) : null}
+          <div className="text-sm text-muted mt-4">{cartItemCount} item</div>
         </div>
 
-        {/* Cart items */}
         <div className="pos-cart-items">
           {cart.length === 0 ? (
-            <div className="pos-cart-empty">
-              <span className="pos-cart-empty-icon">🛒</span>
-              <p>Belum ada item</p>
-              <span>Tap produk untuk menambahkan</span>
+            <div className="empty-state" style={{ padding: "40px 16px" }}>
+              <svg width={32} height={32} fill="none" stroke="var(--text-muted)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z" /><line x1="3" y1="6" x2="21" y2="6" /><path d="M16 10a4 4 0 01-8 0" /></svg>
+              <div style={{ marginTop: 10, fontSize: 13 }}>Pilih produk untuk ditambah</div>
             </div>
-          ) : (
-            cart.map((item) => (
-              <div className="pos-cart-item" key={item.variantId}>
-                <div className="pos-cart-item-mono">{getMonogram(item.productName)}</div>
-                <div className="pos-cart-item-info">
-                  <span className="pos-cart-item-name">{item.productName}</span>
-                  <span className="pos-cart-item-meta">
-                    {item.attribute1Value} / {item.attribute2Value} · {formatCurrency(item.price)}
-                  </span>
-                </div>
-                <div className="pos-cart-item-qty">
-                  <button className="pos-qty-btn" onClick={() => updateQty(item.variantId, item.qty - 1)} type="button">−</button>
-                  <span className="pos-qty-val">{item.qty}</span>
-                  <button className="pos-qty-btn" onClick={() => updateQty(item.variantId, item.qty + 1)} type="button">+</button>
-                </div>
-                <span className="pos-cart-item-total">{formatCurrency(item.price * item.qty)}</span>
+          ) : cart.map((item) => (
+            <div key={item.variantId} className="cart-item">
+              <div style={{ flex: 1 }}>
+                <div className="cart-item-name">{item.productName}</div>
+                <div className="cart-item-size">{attr1Label}: {item.attribute1Value || "-"}</div>
               </div>
-            ))
-          )}
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
+                <div className="qty-ctrl">
+                  <div className="qty-btn" onClick={() => changeQty(item.variantId, -1)}>−</div>
+                  <span className="qty-val">{item.qty}</span>
+                  <div className="qty-btn" onClick={() => changeQty(item.variantId, 1)}>+</div>
+                </div>
+                <div className="cart-item-price">{formatCurrency(item.price * item.qty)}</div>
+              </div>
+            </div>
+          ))}
         </div>
 
-        {/* Summary + payment */}
-        <div className="pos-cart-footer">
-          {/* Promo */}
-          <div className="pos-promo-row">
-            <input
-              className="pos-promo-input"
-              onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
-              placeholder="Kode promo"
-              value={promoCode}
-            />
-          </div>
-
-          {/* Payment methods */}
-          <div className="pos-payment-row">
-            {paymentMethods.map((m) => (
-              <button
-                className={`pos-pay-btn${paymentMethod === m.key ? " active" : ""}`}
-                key={m.key}
-                onClick={() => setPaymentMethod(m.key)}
-                type="button"
-              >
-                <span className="pos-pay-icon">{m.icon}</span>
-                <span>{m.label}</span>
-              </button>
-            ))}
-          </div>
-
-          {/* Totals */}
-          <div className="pos-totals">
-            <div className="pos-total-row">
-              <span>Subtotal</span>
-              <span>{formatCurrency(subtotal)}</span>
-            </div>
-            {discount > 0 ? (
-              <div className="pos-total-row discount">
-                <span>Diskon</span>
-                <span>- {formatCurrency(discount)}</span>
+        {cart.length > 0 ? (
+          <div className="pos-cart-footer">
+            <div style={{ display: "flex", flexDirection: "column", gap: 7, marginBottom: 14 }}>
+              <div className="row-between text-sm"><span className="text-muted">Subtotal</span><span>{formatCurrency(subtotal)}</span></div>
+              {taxRate > 0 ? (
+                <div className="row-between text-sm"><span className="text-muted">Pajak ({taxRate}%)</span><span>{formatCurrency(tax)}</span></div>
+              ) : null}
+              <div className="divider" style={{ margin: "4px 0" }} />
+              <div className="row-between">
+                <span style={{ fontWeight: 800, fontSize: 15 }}>Total</span>
+                <span style={{ fontWeight: 800, fontSize: 17, color: "var(--accent)" }}>{formatCurrency(total)}</span>
               </div>
-            ) : null}
-            {tax > 0 ? (
-              <div className="pos-total-row">
-                <span>Pajak ({taxRate}%)</span>
-                <span>{formatCurrency(tax)}</span>
-              </div>
-            ) : null}
-            <div className="pos-total-row grand">
-              <span>Total</span>
-              <span>{formatCurrency(grandTotal)}</span>
             </div>
+            <button className="btn btn-primary w-full" style={{ height: 44, fontSize: 14 }} onClick={() => setPayModal(true)}>
+              Proses Pembayaran
+            </button>
           </div>
-
-          {message ? <p className="pos-message">{message}</p> : null}
-
-          {/* Charge button */}
-          <button
-            className="pos-charge-btn"
-            disabled={submitting || cart.length === 0}
-            onClick={handleCheckout}
-            type="button"
-          >
-            <span>{submitting ? "Memproses..." : "Bayar"}</span>
-            <span className="pos-charge-amount">{formatCurrency(grandTotal)}</span>
-          </button>
-        </div>
+        ) : null}
       </div>
 
-      <LatestReceipt sale={receiptSale} />
+      {/* ── Size Picker Modal ── */}
+      {modal ? (
+        <div className="modal-overlay" onClick={() => setModal(null)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-title">{modal.name}</div>
+            <div style={{ fontSize: 20, fontWeight: 800, color: "var(--accent)", marginBottom: 16 }}>{formatCurrency(modal.price)}</div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text-soft)", marginBottom: 6 }}>PILIH UKURAN</div>
+            <div className="size-grid">
+              {modal.variants.map((v) => {
+                const stock = v.quantityOnHand || 0;
+                const label = v.attribute1Value || v.sku;
+                const isSelected = selVariant?.id === v.id;
+                return (
+                  <div
+                    key={v.id}
+                    className={`size-chip${isSelected ? " selected" : ""}${stock === 0 ? " unavail" : ""}`}
+                    onClick={() => stock > 0 && setSelVariant(v)}
+                  >
+                    {label}<br /><span style={{ fontSize: 10, fontWeight: 400, opacity: 0.7 }}>{stock} stok</span>
+                  </div>
+                );
+              })}
+            </div>
+            <div style={{ display: "flex", gap: 8, marginTop: 20 }}>
+              <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setModal(null)}>Batal</button>
+              <button className="btn btn-primary" style={{ flex: 2 }} onClick={addToCart} disabled={!selVariant}>+ Tambah ke Keranjang</button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {/* ── Payment Modal ── */}
+      {payModal && !paid ? (
+        <div className="modal-overlay">
+          <div className="modal" style={{ width: 440 }}>
+            <div className="modal-title">Pembayaran</div>
+            <div style={{ fontSize: 13, color: "var(--text-soft)", marginBottom: 4 }}>Total yang harus dibayar</div>
+            <div style={{ fontSize: 32, fontWeight: 800, color: "var(--accent)", marginBottom: 20 }}>{formatCurrency(total)}</div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text-soft)", marginBottom: 10 }}>METODE PEMBAYARAN</div>
+            {[
+              { id: "qris", label: "QRIS", desc: "Scan QR Code" },
+              { id: "cash", label: "Cash", desc: "Uang tunai" },
+              { id: "transfer", label: "Transfer Bank", desc: "BCA / Mandiri / BNI" },
+              { id: "card", label: "Kartu Debit/Kredit", desc: "Visa / Mastercard" },
+              { id: "ewallet", label: "E-Wallet", desc: "GoPay / OVO / Dana" },
+            ].map((m) => (
+              <div
+                key={m.id}
+                onClick={() => setPayMethod(m.id)}
+                style={{
+                  padding: "12px 14px",
+                  border: `1.5px solid ${payMethod === m.id ? "var(--accent)" : "var(--line)"}`,
+                  borderRadius: 8,
+                  marginBottom: 8,
+                  cursor: "pointer",
+                  background: payMethod === m.id ? "var(--accent-light)" : "#fff",
+                  transition: "all 0.15s",
+                }}
+              >
+                <div style={{ fontWeight: 700, fontSize: 13 }}>{m.label}</div>
+                <div style={{ fontSize: 12, color: "var(--text-soft)" }}>{m.desc}</div>
+              </div>
+            ))}
+            {payMethod === "cash" ? (
+              <div style={{ marginTop: 12 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: "var(--text-soft)", marginBottom: 6 }}>JUMLAH UANG (CASH)</div>
+                <input className="input" placeholder="0" value={cash} onChange={(e) => setCash(e.target.value)} style={{ fontWeight: 700, fontSize: 16 }} />
+                {cashNum > 0 ? (
+                  <div style={{ marginTop: 8, fontSize: 13, color: "var(--success)", fontWeight: 600 }}>
+                    Kembalian: {formatCurrency(Math.max(0, kembalian))}
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+            <div style={{ display: "flex", gap: 8, marginTop: 20 }}>
+              <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setPayModal(false)}>Batal</button>
+              <button className="btn btn-primary" style={{ flex: 2, height: 44 }} onClick={handlePay} disabled={submitting}>
+                {submitting ? "Memproses..." : "Konfirmasi Bayar"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {/* ── Success Modal ── */}
+      {paid ? (
+        <div className="modal-overlay">
+          <div className="modal" style={{ textAlign: "center" }}>
+            <div style={{ width: 60, height: 60, borderRadius: "50%", background: "var(--success-soft)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
+              <svg width={28} height={28} fill="none" stroke="var(--success)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12" /></svg>
+            </div>
+            <div style={{ fontSize: 20, fontWeight: 800, marginBottom: 8 }}>Pembayaran Berhasil!</div>
+            <div style={{ fontSize: 14, color: "var(--text-soft)", marginBottom: 4 }}>Total dibayar</div>
+            <div style={{ fontSize: 28, fontWeight: 800, color: "var(--accent)", marginBottom: 20 }}>{formatCurrency(total)}</div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button className="btn btn-secondary" style={{ flex: 1 }}>
+                <svg width={14} height={14} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><polyline points="6 9 6 2 18 2 18 9" /><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2" /><rect x="6" y="14" width="12" height="8" /></svg>
+                {" "}Cetak Struk
+              </button>
+              <button className="btn btn-primary" style={{ flex: 1 }} onClick={handleNewTrx}>Transaksi Baru</button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
