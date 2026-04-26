@@ -205,16 +205,19 @@
   height: 100%;
   gap: 0;
   padding: 0;
+  border: 1.5px solid transparent;
   border-radius: 18px;
   background: #ffffff;
   box-shadow: 0 14px 30px rgba(35, 31, 27, 0.05);
-  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+  cursor: pointer;
 }
 
 .product-card:not(:disabled):hover .product-card-surface,
 .product-card:not(:disabled):focus-visible .product-card-surface {
-  transform: translateY(-2px);
-  box-shadow: 0 20px 34px rgba(35, 31, 27, 0.08);
+  transform: translateY(-3px);
+  box-shadow: 0 20px 40px rgba(35, 31, 27, 0.10);
+  border-color: var(--accent);
 }
 
 .product-media {
@@ -627,25 +630,33 @@
 
 .btn-charge {
   width: 100%;
-  height: 48px;
-  padding: 0 20px;
+  height: 56px;
+  padding: 0 24px;
   border: none;
-  border-radius: 8px;
+  border-radius: 12px;
   color: #ffffff;
-  font-size: 16px;
-  font-weight: 600;
-  background: #2EC4B6;
+  font-size: 17px;
+  font-weight: 700;
+  background: linear-gradient(135deg, #2EC4B6 0%, #1a9e92 100%);
   justify-content: space-between;
-  box-shadow: none;
-  transition: background-color 0.2s ease;
+  box-shadow: 0 4px 14px rgba(46, 196, 182, 0.35);
+  transition: all 0.2s ease;
 }
 
 .btn-charge:hover:not(:disabled) {
-  background: #28b0a3;
+  background: linear-gradient(135deg, #28b0a3 0%, #178a7f 100%);
+  box-shadow: 0 6px 20px rgba(46, 196, 182, 0.45);
+  transform: translateY(-1px);
+}
+
+.btn-charge:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: 0 2px 8px rgba(46, 196, 182, 0.3);
 }
 
 .btn-charge:disabled {
-  opacity: 0.6;
+  opacity: 0.5;
+  box-shadow: none;
 }
 
 .charge-label {

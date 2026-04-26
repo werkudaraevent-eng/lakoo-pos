@@ -2025,14 +2025,15 @@ p {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 46px;
-  height: 46px;
+  width: 50px;
+  height: 50px;
   border-radius: 16px;
-  color: var(--accent);
-  font-size: 0.82rem;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  background: rgba(47, 41, 35, 0.08);
+  font-size: 24px;
+  background: var(--accent-soft);
+}
+
+.workspace-picker-item-badge.is-event {
+  background: rgba(255, 107, 107, 0.12);
 }
 
 .workspace-picker-item-copy {

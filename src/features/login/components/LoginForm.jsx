@@ -1,17 +1,23 @@
 export function LoginForm({ form, authLoading, error, onChange, onSubmit }) {
   return (
-    <section className="login-form-shell">
+    <section className="login-form-section">
       <div className="login-card">
         <div>
-          <p className="eyebrow">Lakoo</p>
-          <h2>Masuk ke dashboard</h2>
-          <p className="muted-text">Login dengan akun yang sudah terdaftar.</p>
+          <h2>Masuk ke akun Anda</h2>
+          <p className="muted-text" style={{ marginTop: 6 }}>
+            Masukkan username dan password untuk melanjutkan.
+          </p>
         </div>
 
         <form className="form-stack" onSubmit={onSubmit}>
           <label className="field">
             <span>Username</span>
-            <input value={form.username} onChange={(event) => onChange("username", event.target.value)} />
+            <input
+              autoFocus
+              value={form.username}
+              onChange={(event) => onChange("username", event.target.value)}
+              placeholder="Masukkan username"
+            />
           </label>
 
           <label className="field">
@@ -20,17 +26,18 @@ export function LoginForm({ form, authLoading, error, onChange, onSubmit }) {
               type="password"
               value={form.password}
               onChange={(event) => onChange("password", event.target.value)}
+              placeholder="Masukkan password"
             />
           </label>
 
           {error ? <p className="error-text">{error}</p> : null}
 
           <button className="primary-button" disabled={authLoading} type="submit">
-            {authLoading ? "Signing in..." : "Login"}
+            {authLoading ? "Memproses..." : "Masuk"}
           </button>
         </form>
 
-        <p className="muted-text" style={{ textAlign: "center", marginTop: "1rem" }}>
+        <p className="login-register-link">
           Belum punya akun? <a href="/register">Daftar gratis</a>
         </p>
       </div>

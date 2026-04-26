@@ -113,7 +113,9 @@ export function WorkspacePickerPage() {
                     onClick={() => handleSelect(workspace.id)}
                     type="button"
                   >
-                    <div className="workspace-picker-item-badge">{workspace.badgeLabel}</div>
+                    <div className={`workspace-picker-item-badge${workspace.typeLabel === 'Event' ? ' is-event' : ''}`}>
+                      {workspace.typeLabel === 'Event' ? '🎪' : '🏪'}
+                    </div>
                     <div className="workspace-picker-item-copy">
                       <div className="workspace-picker-item-head">
                         <strong>{workspace.name}</strong>
