@@ -81,15 +81,28 @@ export function AuthProvider({ children }) {
     };
   }, [token]);
 
-  async function login({ username, password }) {
+  async function login({ username, password, tenantSlug }) {
     setAuthLoading(true);
 
     try {
-      const payload = await apiPost("/api/auth/login", { username, password });
+      const payload = await apiPost("/api/auth/login", { username, password, tenantSlug: tenantSlug || undefined });
       setAuthToken(payload.token);
       setToken(payload.token);
       setUser(payload.user);
       return { ok: true, user: payload.user };
+    } catch (error) {
+      return { ok: false, message: error.message };
+    } finally {
+      setAuthLoading(false);
+    }
+  }
+
+  async function register({ businessName, slug, email, password, ownerName }) {
+    setAuthLoading(true);
+
+    try {
+      const payload = await apiPost("/api/auth/register", { businessName, slug, email, password, ownerName });
+      return { ok: true, tenantId: payload.tenantId };
     } catch (error) {
       return { ok: false, message: error.message };
     } finally {
@@ -104,7 +117,7 @@ export function AuthProvider({ children }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, token, login, logout, authLoading }}>
+    <AuthContext.Provider value={{ user, token, login, logout, register, authLoading }}>
       {children}
     </AuthContext.Provider>
   );

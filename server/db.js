@@ -100,12 +100,12 @@ function canCompleteClosingReviewRecord(payload) {
   return Boolean(payload?.salesReviewed && payload?.stockReviewed && payload?.paymentReviewed);
 }
 
-async function ensureCategory(executor, name) {
+async function ensureCategory(executor, name, tenantId) {
   const slug = slugify(name);
   const existing = await executor`
     SELECT id, name, slug
     FROM categories
-    WHERE slug = ${slug}
+    WHERE slug = ${slug} AND tenant_id = ${tenantId}
     LIMIT 1
   `;
 
@@ -120,42 +120,45 @@ async function ensureCategory(executor, name) {
   };
 
   await executor`
-    INSERT INTO categories (id, name, slug)
-    VALUES (${category.id}, ${category.name}, ${category.slug})
+    INSERT INTO categories (id, name, slug, tenant_id)
+    VALUES (${category.id}, ${category.name}, ${category.slug}, ${tenantId})
   `;
 
   return category;
 }
 
-async function fetchSettings(executor) {
+async function fetchSettings(executor, tenantId) {
   const rows = await executor`
     SELECT key, value
     FROM settings
+    WHERE tenant_id = ${tenantId}
     ORDER BY key ASC
   `;
 
   return mapSettingsRows(rows);
 }
 
-async function fetchCategories(executor) {
+async function fetchCategories(executor, tenantId) {
   return executor`
     SELECT id, name, slug
     FROM categories
+    WHERE tenant_id = ${tenantId}
     ORDER BY name ASC
   `;
 }
 
-async function fetchUsers(executor) {
+async function fetchUsers(executor, tenantId) {
   const rows = await executor`
     SELECT id, name, username, role, is_active AS "isActive", created_at AS "createdAt"
     FROM users
+    WHERE tenant_id = ${tenantId}
     ORDER BY created_at DESC
   `;
 
   return mapUsers(rows);
 }
 
-async function fetchProducts(executor) {
+async function fetchProducts(executor, tenantId) {
   const rows = await executor`
     SELECT
       p.id,
@@ -177,6 +180,7 @@ async function fetchProducts(executor) {
     FROM products p
     JOIN categories c ON c.id = p.category_id
     LEFT JOIN product_variants pv ON pv.product_id = p.id
+    WHERE p.tenant_id = ${tenantId}
     ORDER BY p.created_at DESC, p.name ASC, pv.created_at ASC, pv.sku ASC
   `;
 
@@ -200,7 +204,7 @@ async function fetchWorkspaceVariantStocks(executor, workspaceId) {
   `;
 }
 
-async function fetchPromotions(executor) {
+async function fetchPromotions(executor, tenantId) {
   const rows = await executor`
     SELECT
       p.id,
@@ -215,13 +219,14 @@ async function fetchPromotions(executor) {
       p.created_at AS "createdAt"
     FROM promotions p
     JOIN users u ON u.id = p.created_by
+    WHERE p.tenant_id = ${tenantId}
     ORDER BY p.created_at DESC
   `;
 
   return mapPromotions(rows);
 }
 
-async function fetchWorkspaces(executor) {
+async function fetchWorkspaces(executor, tenantId) {
   const rows = await executor`
     SELECT
       w.id,
@@ -236,13 +241,14 @@ async function fetchWorkspaces(executor) {
       wa.user_id AS "assignedUserId"
     FROM workspaces w
     LEFT JOIN workspace_assignments wa ON wa.workspace_id = w.id
+    WHERE w.tenant_id = ${tenantId}
     ORDER BY w.type ASC, w.created_at DESC, wa.assigned_at ASC
   `;
 
   return mapWorkspaceRows(rows);
 }
 
-async function fetchSales(executor, { workspaceId, fallbackWorkspaceId }) {
+async function fetchSales(executor, { workspaceId, fallbackWorkspaceId, tenantId }) {
   const salesRows = await executor`
     SELECT
       s.id,
@@ -259,6 +265,7 @@ async function fetchSales(executor, { workspaceId, fallbackWorkspaceId }) {
       s.created_at AS "createdAt"
     FROM sales s
     JOIN users u ON u.id = s.cashier_user_id
+    WHERE s.tenant_id = ${tenantId}
     ORDER BY s.created_at DESC
   `;
   const filteredSales = filterRowsByWorkspace(salesRows, { workspaceId, fallbackWorkspaceId });
@@ -290,7 +297,7 @@ async function fetchSales(executor, { workspaceId, fallbackWorkspaceId }) {
   return mapSales(filteredSales, items, promotions);
 }
 
-async function fetchInventoryMovements(executor, { workspaceId, fallbackWorkspaceId }) {
+async function fetchInventoryMovements(executor, { workspaceId, fallbackWorkspaceId, tenantId }) {
   const rows = await executor`
     SELECT
       m.id,
@@ -310,13 +317,14 @@ async function fetchInventoryMovements(executor, { workspaceId, fallbackWorkspac
     JOIN product_variants pv ON pv.id = m.variant_id
     JOIN products p ON p.id = pv.product_id
     JOIN users u ON u.id = m.actor_user_id
+    WHERE m.tenant_id = ${tenantId}
     ORDER BY m.created_at DESC
   `;
 
   return filterRowsByWorkspace(rows, { workspaceId, fallbackWorkspaceId });
 }
 
-async function resolveWriteWorkspaceId(executor, workspaceId) {
+async function resolveWriteWorkspaceId(executor, workspaceId, tenantId) {
   if (workspaceId) {
     return workspaceId;
   }
@@ -324,7 +332,7 @@ async function resolveWriteWorkspaceId(executor, workspaceId) {
   const rows = await executor`
     SELECT id
     FROM workspaces
-    WHERE type = ${"store"}
+    WHERE type = ${"store"} AND tenant_id = ${tenantId}
     ORDER BY created_at ASC
     LIMIT 1
   `;
@@ -332,8 +340,8 @@ async function resolveWriteWorkspaceId(executor, workspaceId) {
   return rows[0]?.id ?? null;
 }
 
-async function resolveWriteWorkspace(executor, workspaceId) {
-  const resolvedWorkspaceId = await resolveWriteWorkspaceId(executor, workspaceId);
+async function resolveWriteWorkspace(executor, workspaceId, tenantId) {
+  const resolvedWorkspaceId = await resolveWriteWorkspaceId(executor, workspaceId, tenantId);
 
   if (!resolvedWorkspaceId) {
     return null;
@@ -384,14 +392,17 @@ export async function initializeDatabase() {
   await executor`SELECT 1`;
 }
 
-export async function getBootstrap({ workspaceId } = {}) {
+export async function getBootstrap({ workspaceId, tenantId } = {}) {
   const executor = ensureSql();
-  const settings = await fetchSettings(executor);
-  const categories = await fetchCategories(executor);
-  const users = await fetchUsers(executor);
-  const workspaces = await fetchWorkspaces(executor);
+  if (!tenantId) {
+    throw new Error("tenantId is required for getBootstrap.");
+  }
+  const settings = await fetchSettings(executor, tenantId);
+  const categories = await fetchCategories(executor, tenantId);
+  const users = await fetchUsers(executor, tenantId);
+  const workspaces = await fetchWorkspaces(executor, tenantId);
   const activeWorkspace = workspaces.find((workspace) => workspace.id === (workspaceId || null)) ?? null;
-  const baseProducts = await fetchProducts(executor);
+  const baseProducts = await fetchProducts(executor, tenantId);
   const products =
     activeWorkspace?.type === "event"
       ? overlayProductsWithWorkspaceStock(
@@ -399,11 +410,12 @@ export async function getBootstrap({ workspaceId } = {}) {
           await fetchWorkspaceVariantStocks(executor, activeWorkspace.id)
         )
       : baseProducts;
-  const promotions = await fetchPromotions(executor);
+  const promotions = await fetchPromotions(executor, tenantId);
   const fallbackWorkspaceId = workspaces.find((workspace) => workspace.type === "store")?.id ?? null;
   const scope = {
     workspaceId: workspaceId || null,
     fallbackWorkspaceId,
+    tenantId,
   };
   const sales = await fetchSales(executor, scope);
   const inventoryMovements = await fetchInventoryMovements(executor, scope);
@@ -420,32 +432,58 @@ export async function getBootstrap({ workspaceId } = {}) {
   };
 }
 
-export async function authenticateUser(username, password) {
+export async function authenticateUser(username, password, tenantSlug) {
   const executor = ensureSql();
-  const rows = await executor`
-    SELECT id, name, username, role, is_active AS "isActive", password_hash AS "passwordHash"
-    FROM users
-    WHERE lower(username) = lower(${username})
-    LIMIT 1
-  `;
+
+  // If tenantSlug provided, scope to that tenant
+  let tenantFilter = '';
+  const rows = tenantSlug
+    ? await executor`
+        SELECT u.id, u.name, u.username, u.role, u.is_active AS "isActive",
+               u.password_hash AS "passwordHash", u.tenant_id AS "tenantId"
+        FROM users u
+        JOIN tenants t ON t.id = u.tenant_id
+        WHERE lower(u.username) = lower(${username}) AND t.slug = ${tenantSlug}
+        LIMIT 1
+      `
+    : await executor`
+        SELECT u.id, u.name, u.username, u.role, u.is_active AS "isActive",
+               u.password_hash AS "passwordHash", u.tenant_id AS "tenantId"
+        FROM users u
+        WHERE lower(u.username) = lower(${username})
+        LIMIT 1
+      `;
   const user = rows[0];
 
   if (!user || !user.isActive || !verifyPassword(password, user.passwordHash)) {
     return null;
   }
 
+  // Load tenant info
+  const tenantRows = await executor`
+    SELECT id, name, slug, plan, status, trial_ends_at AS "trialEndsAt",
+           subscription_starts_at AS "subscriptionStartsAt",
+           subscription_ends_at AS "subscriptionEndsAt"
+    FROM tenants
+    WHERE id = ${user.tenantId}
+    LIMIT 1
+  `;
+  const tenant = tenantRows[0] || null;
+
   return {
     id: user.id,
     name: user.name,
     username: user.username,
     role: user.role,
+    tenantId: user.tenantId,
+    tenant,
   };
 }
 
 export async function getUserById(userId) {
   const executor = ensureSql();
   const rows = await executor`
-    SELECT id, name, username, role, is_active AS "isActive"
+    SELECT id, name, username, role, is_active AS "isActive", tenant_id AS "tenantId"
     FROM users
     WHERE id = ${userId}
     LIMIT 1
@@ -454,7 +492,7 @@ export async function getUserById(userId) {
   return rows[0] || null;
 }
 
-export async function createEventRecord(payload) {
+export async function createEventRecord(payload, _actorUserId, tenantId) {
   const executor = ensureSql();
   const name = String(payload?.name || "").trim();
   const code = String(payload?.code || "").trim().toUpperCase();
@@ -482,7 +520,7 @@ export async function createEventRecord(payload) {
     await executor.begin(async (tx) => {
       await tx`
         INSERT INTO workspaces
-        (id, type, name, code, status, stock_mode, location_label, starts_at, ends_at, is_visible, created_at)
+        (id, type, name, code, status, stock_mode, location_label, starts_at, ends_at, is_visible, created_at, tenant_id)
         VALUES (
           ${eventId},
           ${"event"},
@@ -494,14 +532,15 @@ export async function createEventRecord(payload) {
           ${startsAt.toISOString()},
           ${endsAt.toISOString()},
           ${true},
-          ${nowIso()}
+          ${nowIso()},
+          ${tenantId}
         )
       `;
 
       for (const userId of assignedUserIds) {
         await tx`
-          INSERT INTO workspace_assignments (id, workspace_id, user_id, assigned_at)
-          VALUES (${createId("wa")}, ${eventId}, ${userId}, ${nowIso()})
+          INSERT INTO workspace_assignments (id, workspace_id, user_id, assigned_at, tenant_id)
+          VALUES (${createId("wa")}, ${eventId}, ${userId}, ${nowIso()}, ${tenantId})
         `;
       }
     });
@@ -599,12 +638,12 @@ export async function closeEventRecord(eventId, payload) {
   return { ok: true, eventId };
 }
 
-export async function createPromotionRecord(payload, actorUserId) {
+export async function createPromotionRecord(payload, actorUserId, tenantId) {
   const executor = ensureSql();
 
   await executor`
     INSERT INTO promotions
-    (id, code, type, value, start_at, end_at, min_purchase, is_active, created_by, created_at)
+    (id, code, type, value, start_at, end_at, min_purchase, is_active, created_by, created_at, tenant_id)
     VALUES (
       ${createId("promo")},
       ${payload.code.toUpperCase()},
@@ -615,15 +654,16 @@ export async function createPromotionRecord(payload, actorUserId) {
       ${Number(payload.minPurchase || 0)},
       ${true},
       ${actorUserId},
-      ${nowIso()}
+      ${nowIso()},
+      ${tenantId}
     )
   `;
 }
 
-export async function adjustInventoryRecord(payload, actorUserId) {
+export async function adjustInventoryRecord(payload, actorUserId, tenantId) {
   const executor = ensureSql();
   const amount = Number(payload.quantity);
-  const workspace = await resolveWriteWorkspace(executor, payload.workspaceId || null);
+  const workspace = await resolveWriteWorkspace(executor, payload.workspaceId || null, tenantId);
 
   if (amount < 1 || !workspace) {
     return { ok: false, message: "Inventory request tidak valid." };
@@ -718,7 +758,7 @@ export async function adjustInventoryRecord(payload, actorUserId) {
 
       await tx`
         INSERT INTO inventory_movements
-        (id, variant_id, workspace_id, type, qty_delta, note, actor_user_id, reference_id, created_at)
+        (id, variant_id, workspace_id, type, qty_delta, note, actor_user_id, reference_id, created_at, tenant_id)
         VALUES (
           ${createId("mov")},
           ${payload.variantId},
@@ -728,7 +768,8 @@ export async function adjustInventoryRecord(payload, actorUserId) {
           ${payload.note},
           ${actorUserId},
           ${null},
-          ${nowIso()}
+          ${nowIso()},
+          ${tenantId}
         )
       `;
     });
@@ -739,10 +780,10 @@ export async function adjustInventoryRecord(payload, actorUserId) {
   }
 }
 
-export async function finalizeSaleRecord(payload, actorUserId) {
+export async function finalizeSaleRecord(payload, actorUserId, tenantId) {
   const executor = ensureSql();
   const cart = payload.cart || [];
-  const workspace = await resolveWriteWorkspace(executor, payload.workspaceId || null);
+  const workspace = await resolveWriteWorkspace(executor, payload.workspaceId || null, tenantId);
 
   if (!cart.length || !workspace) {
     return { ok: false, message: "Cart masih kosong." };
@@ -863,7 +904,7 @@ export async function finalizeSaleRecord(payload, actorUserId) {
 
       await tx`
         INSERT INTO sales
-        (id, receipt_number, cashier_user_id, workspace_id, subtotal, discount_total, tax_total, grand_total, payment_method, paid_amount, created_at)
+        (id, receipt_number, cashier_user_id, workspace_id, subtotal, discount_total, tax_total, grand_total, payment_method, paid_amount, created_at, tenant_id)
         VALUES (
           ${saleId},
           ${receiptNumber},
@@ -875,7 +916,8 @@ export async function finalizeSaleRecord(payload, actorUserId) {
           ${grandTotal},
           ${payload.paymentMethod},
           ${grandTotal},
-          ${createdAt}
+          ${createdAt},
+          ${tenantId}
         )
       `;
 
@@ -886,7 +928,7 @@ export async function finalizeSaleRecord(payload, actorUserId) {
 
         await tx`
           INSERT INTO sale_items
-          (id, sale_id, variant_id, product_name_snapshot, sku_snapshot, attribute1_snapshot, attribute2_snapshot, unit_price_snapshot, qty, line_total)
+          (id, sale_id, variant_id, product_name_snapshot, sku_snapshot, attribute1_snapshot, attribute2_snapshot, unit_price_snapshot, qty, line_total, tenant_id)
           VALUES (
             ${createId("si")},
             ${saleId},
@@ -897,7 +939,8 @@ export async function finalizeSaleRecord(payload, actorUserId) {
             ${variant.attribute2Value},
             ${item.price},
             ${item.qty},
-            ${lineTotal}
+            ${lineTotal},
+            ${tenantId}
           )
         `;
 
@@ -919,7 +962,7 @@ export async function finalizeSaleRecord(payload, actorUserId) {
 
         await tx`
           INSERT INTO inventory_movements
-          (id, variant_id, workspace_id, type, qty_delta, note, actor_user_id, reference_id, created_at)
+          (id, variant_id, workspace_id, type, qty_delta, note, actor_user_id, reference_id, created_at, tenant_id)
           VALUES (
             ${createId("mov")},
             ${item.variantId},
@@ -929,7 +972,8 @@ export async function finalizeSaleRecord(payload, actorUserId) {
             ${`Sale ${receiptNumber}`},
             ${actorUserId},
             ${saleId},
-            ${createdAt}
+            ${createdAt},
+            ${tenantId}
           )
         `;
       }
@@ -937,13 +981,14 @@ export async function finalizeSaleRecord(payload, actorUserId) {
       if (matchedPromo) {
         await tx`
           INSERT INTO sale_promotion_usages
-          (id, sale_id, promotion_id, code_snapshot, discount_amount)
+          (id, sale_id, promotion_id, code_snapshot, discount_amount, tenant_id)
           VALUES (
             ${createId("spu")},
             ${saleId},
             ${matchedPromo.id},
             ${matchedPromo.code},
-            ${discount}
+            ${discount},
+            ${tenantId}
           )
         `;
       }
@@ -957,7 +1002,7 @@ export async function finalizeSaleRecord(payload, actorUserId) {
   }
 }
 
-export async function updateSettingsRecord(payload) {
+export async function updateSettingsRecord(payload, tenantId) {
   const executor = ensureSql();
   const entries = [
     ["storeName", payload.storeName],
@@ -972,27 +1017,35 @@ export async function updateSettingsRecord(payload) {
 
   await executor.begin(async (tx) => {
     for (const [key, value] of entries) {
-      await tx`
-        INSERT INTO settings (key, value)
-        VALUES (${key}, ${value})
-        ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value
+      const existing = await tx`
+        SELECT id FROM settings WHERE tenant_id = ${tenantId} AND key = ${key} LIMIT 1
       `;
+      if (existing[0]) {
+        await tx`
+          UPDATE settings SET value = ${value} WHERE id = ${existing[0].id}
+        `;
+      } else {
+        await tx`
+          INSERT INTO settings (id, key, value, tenant_id)
+          VALUES (${createId("set")}, ${key}, ${value}, ${tenantId})
+        `;
+      }
     }
   });
 }
 
-export async function createProductRecord(payload) {
+export async function createProductRecord(payload, tenantId) {
   const executor = ensureSql();
 
   try {
     await executor.begin(async (tx) => {
-      const category = await ensureCategory(tx, payload.category);
+      const category = await ensureCategory(tx, payload.category, tenantId);
       const productId = createId("p");
       const createdAt = nowIso();
 
       await tx`
         INSERT INTO products
-        (id, name, category_id, description, base_price, is_active, created_at)
+        (id, name, category_id, description, base_price, is_active, created_at, tenant_id)
         VALUES (
           ${productId},
           ${payload.name},
@@ -1000,14 +1053,15 @@ export async function createProductRecord(payload) {
           ${payload.description},
           ${Number(payload.basePrice)},
           ${Boolean(payload.isActive)},
-          ${createdAt}
+          ${createdAt},
+          ${tenantId}
         )
       `;
 
       for (const variant of payload.variants || []) {
         await tx`
           INSERT INTO product_variants
-          (id, product_id, sku, attribute1_value, attribute2_value, price_override, quantity_on_hand, low_stock_threshold, is_active, created_at)
+          (id, product_id, sku, attribute1_value, attribute2_value, price_override, quantity_on_hand, low_stock_threshold, is_active, created_at, tenant_id)
           VALUES (
             ${createId("v")},
             ${productId},
@@ -1018,7 +1072,8 @@ export async function createProductRecord(payload) {
             ${Number(variant.quantityOnHand)},
             ${Number(variant.lowStockThreshold)},
             ${Boolean(variant.isActive)},
-            ${createdAt}
+            ${createdAt},
+            ${tenantId}
           )
         `;
       }
@@ -1030,13 +1085,13 @@ export async function createProductRecord(payload) {
   }
 }
 
-export async function updateProductRecord(productId, payload) {
+export async function updateProductRecord(productId, payload, tenantId) {
   const executor = ensureSql();
 
   const existing = await executor`
     SELECT id
     FROM products
-    WHERE id = ${productId}
+    WHERE id = ${productId} AND tenant_id = ${tenantId}
     LIMIT 1
   `;
 
@@ -1045,7 +1100,7 @@ export async function updateProductRecord(productId, payload) {
   }
 
   try {
-    const category = await ensureCategory(executor, payload.category);
+    const category = await ensureCategory(executor, payload.category, tenantId);
 
     await executor`
       UPDATE products
@@ -1064,12 +1119,12 @@ export async function updateProductRecord(productId, payload) {
   }
 }
 
-export async function createVariantRecord(productId, payload) {
+export async function createVariantRecord(productId, payload, tenantId) {
   const executor = ensureSql();
   const product = await executor`
     SELECT id
     FROM products
-    WHERE id = ${productId}
+    WHERE id = ${productId} AND tenant_id = ${tenantId}
     LIMIT 1
   `;
 
@@ -1080,7 +1135,7 @@ export async function createVariantRecord(productId, payload) {
   try {
     await executor`
       INSERT INTO product_variants
-      (id, product_id, sku, attribute1_value, attribute2_value, price_override, quantity_on_hand, low_stock_threshold, is_active, created_at)
+      (id, product_id, sku, attribute1_value, attribute2_value, price_override, quantity_on_hand, low_stock_threshold, is_active, created_at, tenant_id)
       VALUES (
         ${createId("v")},
         ${productId},
@@ -1091,7 +1146,8 @@ export async function createVariantRecord(productId, payload) {
         ${Number(payload.quantityOnHand)},
         ${Number(payload.lowStockThreshold)},
         ${Boolean(payload.isActive)},
-        ${nowIso()}
+        ${nowIso()},
+        ${tenantId}
       )
     `;
 
@@ -1101,12 +1157,12 @@ export async function createVariantRecord(productId, payload) {
   }
 }
 
-export async function updateVariantRecord(variantId, payload) {
+export async function updateVariantRecord(variantId, payload, tenantId) {
   const executor = ensureSql();
   const existing = await executor`
     SELECT id
     FROM product_variants
-    WHERE id = ${variantId}
+    WHERE id = ${variantId} AND tenant_id = ${tenantId}
     LIMIT 1
   `;
 
@@ -1134,11 +1190,11 @@ export async function updateVariantRecord(variantId, payload) {
   }
 }
 
-export async function createUserRecord(payload) {
+export async function createUserRecord(payload, tenantId) {
   const executor = ensureSql();
 
   await executor`
-    INSERT INTO users (id, name, username, password_hash, role, is_active, created_at)
+    INSERT INTO users (id, name, username, password_hash, role, is_active, created_at, tenant_id)
     VALUES (
       ${createId("u")},
       ${payload.name},
@@ -1146,17 +1202,18 @@ export async function createUserRecord(payload) {
       ${hashPassword(payload.password)},
       ${payload.role},
       ${Boolean(payload.isActive)},
-      ${nowIso()}
+      ${nowIso()},
+      ${tenantId}
     )
   `;
 }
 
-export async function updateUserRecord(userId, payload) {
+export async function updateUserRecord(userId, payload, tenantId) {
   const executor = ensureSql();
   const rows = await executor`
     SELECT id, name, username, role, is_active AS "isActive", password_hash AS "passwordHash"
     FROM users
-    WHERE id = ${userId}
+    WHERE id = ${userId} AND tenant_id = ${tenantId}
     LIMIT 1
   `;
   const current = rows[0];
@@ -1176,5 +1233,215 @@ export async function updateUserRecord(userId, payload) {
     WHERE id = ${userId}
   `;
 
+  return { ok: true };
+}
+
+// ── Tenant management ──────────────────────────────────────────────
+
+export async function createTenant({ name, slug, email, password, ownerName, ownerUsername }) {
+  const executor = ensureSql();
+  const tenantId = createId("tenant");
+  const now = nowIso();
+  const trialEndsAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString();
+
+  try {
+    await executor.begin(async (tx) => {
+      // Create tenant
+      await tx`
+        INSERT INTO tenants (id, name, slug, email, plan, status, trial_ends_at, created_at, updated_at)
+        VALUES (
+          ${tenantId},
+          ${name},
+          ${slugify(slug)},
+          ${email.toLowerCase()},
+          ${'trial'},
+          ${'active'},
+          ${trialEndsAt},
+          ${now},
+          ${now}
+        )
+      `;
+
+      // Create admin user for this tenant
+      await tx`
+        INSERT INTO users (id, name, username, email, password_hash, role, is_active, created_at, tenant_id)
+        VALUES (
+          ${createId('u')},
+          ${ownerName},
+          ${ownerUsername},
+          ${email.toLowerCase()},
+          ${hashPassword(password)},
+          ${'admin'},
+          ${true},
+          ${now},
+          ${tenantId}
+        )
+      `;
+
+      // Create default store workspace
+      await tx`
+        INSERT INTO workspaces (id, type, name, status, stock_mode, is_visible, created_at, tenant_id)
+        VALUES (
+          ${createId('workspace')},
+          ${'store'},
+          ${'Toko Utama'},
+          ${'active'},
+          ${'manual'},
+          ${true},
+          ${now},
+          ${tenantId}
+        )
+      `;
+
+      // Create default settings
+      const defaultSettings = [
+        ['storeName', name],
+        ['storeCode', slug.toUpperCase()],
+        ['address', ''],
+        ['paymentMethods', JSON.stringify(['cash', 'qris'])],
+        ['serviceChargeEnabled', 'false'],
+        ['taxRate', '0'],
+        ['attribute1Label', 'Size'],
+        ['attribute2Label', 'Color'],
+      ];
+
+      for (const [key, value] of defaultSettings) {
+        await tx`
+          INSERT INTO settings (id, key, value, tenant_id)
+          VALUES (${createId('set')}, ${key}, ${value}, ${tenantId})
+        `;
+      }
+    });
+
+    return { ok: true, tenantId };
+  } catch (error) {
+    if (error?.code === '23505') {
+      if (error.constraint_name?.includes('slug') || error.message?.includes('slug')) {
+        return { ok: false, message: 'Slug bisnis sudah dipakai.' };
+      }
+      if (error.constraint_name?.includes('email') || error.message?.includes('email')) {
+        return { ok: false, message: 'Email sudah terdaftar.' };
+      }
+      return { ok: false, message: 'Data sudah ada.' };
+    }
+    return { ok: false, message: error.message };
+  }
+}
+
+export async function getTenantById(tenantId) {
+  const executor = ensureSql();
+  const rows = await executor`
+    SELECT id, name, slug, email, plan, status,
+           trial_ends_at AS "trialEndsAt",
+           subscription_starts_at AS "subscriptionStartsAt",
+           subscription_ends_at AS "subscriptionEndsAt",
+           created_at AS "createdAt"
+    FROM tenants
+    WHERE id = ${tenantId}
+    LIMIT 1
+  `;
+  return rows[0] || null;
+}
+
+export async function getTenantBySlug(slug) {
+  const executor = ensureSql();
+  const rows = await executor`
+    SELECT id, name, slug, email, plan, status,
+           trial_ends_at AS "trialEndsAt",
+           subscription_starts_at AS "subscriptionStartsAt",
+           subscription_ends_at AS "subscriptionEndsAt",
+           created_at AS "createdAt"
+    FROM tenants
+    WHERE slug = ${slug}
+    LIMIT 1
+  `;
+  return rows[0] || null;
+}
+
+export async function updateTenantRecord(tenantId, payload) {
+  const executor = ensureSql();
+  const existing = await executor`
+    SELECT id FROM tenants WHERE id = ${tenantId} LIMIT 1
+  `;
+  if (!existing[0]) {
+    return { ok: false, message: 'Tenant tidak ditemukan.' };
+  }
+
+  await executor`
+    UPDATE tenants
+    SET
+      name = COALESCE(${payload.name || null}, name),
+      plan = COALESCE(${payload.plan || null}, plan),
+      status = COALESCE(${payload.status || null}, status),
+      subscription_starts_at = COALESCE(${payload.subscriptionStartsAt || null}, subscription_starts_at),
+      subscription_ends_at = COALESCE(${payload.subscriptionEndsAt || null}, subscription_ends_at),
+      updated_at = ${nowIso()}
+    WHERE id = ${tenantId}
+  `;
+  return { ok: true };
+}
+
+export async function listTenants() {
+  const executor = ensureSql();
+  return executor`
+    SELECT id, name, slug, email, plan, status,
+           trial_ends_at AS "trialEndsAt",
+           subscription_starts_at AS "subscriptionStartsAt",
+           subscription_ends_at AS "subscriptionEndsAt",
+           created_at AS "createdAt"
+    FROM tenants
+    ORDER BY created_at DESC
+  `;
+}
+
+export async function authenticatePlatformAdmin(email, password) {
+  const executor = ensureSql();
+  const rows = await executor`
+    SELECT id, email, name, is_active AS "isActive", password_hash AS "passwordHash"
+    FROM platform_admins
+    WHERE lower(email) = lower(${email})
+    LIMIT 1
+  `;
+  const admin = rows[0];
+  if (!admin || !admin.isActive || !verifyPassword(password, admin.passwordHash)) {
+    return null;
+  }
+  return { id: admin.id, email: admin.email, name: admin.name, role: 'platform_admin' };
+}
+
+// ── Plan limits ────────────────────────────────────────────────────
+
+const PLAN_LIMITS = {
+  trial:   { workspaces: 1, products: 50,  users: 2  },
+  starter: { workspaces: 1, products: 100, users: 2  },
+  pro:     { workspaces: 5, products: -1,  users: 10 },
+  business:{ workspaces: -1,products: -1,  users: -1 },
+};
+
+export function getPlanLimits(plan) {
+  return PLAN_LIMITS[plan] || PLAN_LIMITS.trial;
+}
+
+export async function getTenantUsage(tenantId) {
+  const executor = ensureSql();
+  const [workspaceCount] = await executor`SELECT COUNT(*)::int AS count FROM workspaces WHERE tenant_id = ${tenantId}`;
+  const [productCount] = await executor`SELECT COUNT(*)::int AS count FROM products WHERE tenant_id = ${tenantId}`;
+  const [userCount] = await executor`SELECT COUNT(*)::int AS count FROM users WHERE tenant_id = ${tenantId}`;
+  return {
+    workspaces: workspaceCount.count,
+    products: productCount.count,
+    users: userCount.count,
+  };
+}
+
+export function checkTenantStatus(tenant) {
+  if (!tenant) return { ok: false, reason: 'not_found' };
+  if (tenant.status === 'suspended') return { ok: false, reason: 'suspended' };
+  if (tenant.status === 'cancelled') return { ok: false, reason: 'cancelled' };
+  if (tenant.plan === 'trial' && tenant.trialEndsAt) {
+    if (new Date(tenant.trialEndsAt) < new Date()) {
+      return { ok: false, reason: 'trial_expired' };
+    }
+  }
   return { ok: true };
 }

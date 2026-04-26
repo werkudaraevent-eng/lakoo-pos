@@ -4,9 +4,9 @@ import test from "node:test";
 
 import { createApp } from "../server/index.js";
 
-function createAuthMiddleware(user = { id: "u-manager", role: "manager", isActive: true }) {
+function createAuthMiddleware(user = { id: "u-manager", role: "manager", isActive: true, tenantId: "tenant-test" }) {
   return (req, _res, next) => {
-    req.auth = { user };
+    req.auth = { user, payload: { role: user.role } };
     next();
   };
 }
@@ -29,7 +29,7 @@ test("POST /api/sales uses the request workspace for writes and bootstrap reads 
   let bootstrapWorkspaceId = null;
 
   const app = createApp({
-    authMiddleware: createAuthMiddleware({ id: "u-cashier", role: "cashier", isActive: true }),
+    authMiddleware: createAuthMiddleware({ id: "u-cashier", role: "cashier", isActive: true, tenantId: "tenant-test" }),
     finalizeSaleRecordFn: async (payload) => {
       capturedPayload = payload;
       return {

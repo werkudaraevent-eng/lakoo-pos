@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from "react-router-dom";
 
 import { ProtectedRoute } from "./ProtectedRoute";
 import { LoginPage } from "../pages/LoginPage";
+import { RegisterPage } from "../pages/RegisterPage";
 import { DashboardPage } from "../pages/DashboardPage";
 import { CheckoutPage } from "../pages/CheckoutPage";
 import { CatalogPage } from "../pages/CatalogPage";
@@ -25,6 +26,7 @@ export function App() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/register" element={<RegisterPage />} />
       <Route element={<ProtectedRoute requireWorkspace={false} renderShell={false} />}>
         <Route path="/workspace/select" element={<WorkspacePickerPage />} />
       </Route>

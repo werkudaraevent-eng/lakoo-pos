@@ -29,6 +29,10 @@ export function LoginForm({ form, authLoading, error, onChange, onSubmit }) {
             {authLoading ? "Signing in..." : "Login"}
           </button>
         </form>
+
+        <p className="muted-text" style={{ textAlign: "center", marginTop: "1rem" }}>
+          Belum punya akun? <a href="/register">Daftar gratis</a>
+        </p>
       </div>
     </section>
   );

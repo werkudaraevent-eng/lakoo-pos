@@ -1,9 +1,22 @@
 import { useEffect, useState } from "react";
 
+import { apiGet } from "../api/client";
 import { usePosData } from "../context/PosDataContext";
+
+function formatDate(iso) {
+  if (!iso) return "-";
+  return new Date(iso).toLocaleDateString("id-ID", { year: "numeric", month: "long", day: "numeric" });
+}
+
+const PLAN_LABELS = { trial: "Trial (14 hari)", starter: "Starter — Rp 99rb/bln", pro: "Pro — Rp 249rb/bln", business: "Business" };
 
 export function SettingsPage() {
   const { settings, updateSettings, loading, loadError } = usePosData();
+  const [tenantInfo, setTenantInfo] = useState(null);
+
+  useEffect(() => {
+    apiGet("/api/tenant").then((res) => setTenantInfo(res)).catch(() => {});
+  }, []);
   const [form, setForm] = useState({
     storeName: "",
     storeCode: "",
@@ -69,6 +82,45 @@ export function SettingsPage() {
           </p>
         </div>
       </section>
+
+      {tenantInfo?.tenant ? (
+        <article className="panel-card narrow-card">
+          <div className="panel-head">
+            <h2>Subscription</h2>
+          </div>
+          <div className="panel-body form-stack">
+            <div className="dual-fields">
+              <div className="field">
+                <span className="muted-text">Plan</span>
+                <strong>{PLAN_LABELS[tenantInfo.tenant.plan] || tenantInfo.tenant.plan}</strong>
+              </div>
+              <div className="field">
+                <span className="muted-text">Status</span>
+                <strong style={{ textTransform: "capitalize" }}>{tenantInfo.tenant.status}</strong>
+              </div>
+            </div>
+            {tenantInfo.tenant.plan === "trial" && tenantInfo.tenant.trialEndsAt ? (
+              <p className="muted-text">Trial berakhir: {formatDate(tenantInfo.tenant.trialEndsAt)}</p>
+            ) : null}
+            {tenantInfo.usage && tenantInfo.limits ? (
+              <div className="dual-fields">
+                <div className="field">
+                  <span className="muted-text">Produk</span>
+                  <span>{tenantInfo.usage.products} / {tenantInfo.limits.products === -1 ? "\u221E" : tenantInfo.limits.products}</span>
+                </div>
+                <div className="field">
+                  <span className="muted-text">User</span>
+                  <span>{tenantInfo.usage.users} / {tenantInfo.limits.users === -1 ? "\u221E" : tenantInfo.limits.users}</span>
+                </div>
+                <div className="field">
+                  <span className="muted-text">Workspace</span>
+                  <span>{tenantInfo.usage.workspaces} / {tenantInfo.limits.workspaces === -1 ? "\u221E" : tenantInfo.limits.workspaces}</span>
+                </div>
+              </div>
+            ) : null}
+          </div>
+        </article>
+      ) : null}
 
       <article className="panel-card narrow-card">
         <div className="panel-head">

@@ -7,19 +7,27 @@ import { requireAuth, requireRole, signJwt } from "./auth.js";
 import {
   adjustInventoryRecord,
   authenticateUser,
+  authenticatePlatformAdmin,
+  checkTenantStatus,
   closeEventRecord,
   createEventRecord,
   createProductRecord,
   createPromotionRecord,
+  createTenant,
   createUserRecord,
   createVariantRecord,
   finalizeSaleRecord,
   getBootstrap,
+  getPlanLimits,
+  getTenantById,
+  getTenantUsage,
   getUserById,
   initializeDatabase,
+  listTenants,
   updateEventStatusRecord,
   updateProductRecord,
   updateSettingsRecord,
+  updateTenantRecord,
   updateUserRecord,
   updateVariantRecord,
 } from "./db.js";
@@ -91,21 +99,65 @@ export function createApp({
   app.post(
     "/api/auth/login",
     asyncHandler(async (req, res) => {
-      const { username, password } = req.body || {};
-      const user = await authenticateUserFn(username, password);
+      const { username, password, tenantSlug } = req.body || {};
+      const user = await authenticateUserFn(username, password, tenantSlug || null);
 
       if (!user) {
         res.status(401).json({ ok: false, message: "Username atau password tidak valid." });
         return;
       }
 
+      // Check tenant status
+      if (user.tenant) {
+        const tenantCheck = checkTenantStatus(user.tenant);
+        if (!tenantCheck.ok) {
+          const messages = {
+            suspended: "Akun bisnis Anda sedang disuspend. Hubungi support.",
+            cancelled: "Akun bisnis Anda sudah dibatalkan.",
+            trial_expired: "Masa trial Anda sudah habis. Silakan upgrade ke paket berbayar.",
+          };
+          res.status(403).json({ ok: false, message: messages[tenantCheck.reason] || "Akun tidak aktif." });
+          return;
+        }
+      }
+
       const token = signJwtFn({
         sub: user.id,
         role: user.role,
         username: user.username,
+        tenantId: user.tenantId,
       });
 
-      res.json({ ok: true, token, user });
+      res.json({ ok: true, token, user: { ...user, tenant: user.tenant } });
+    })
+  );
+
+  // Registration (create new tenant + admin user)
+  app.post(
+    "/api/auth/register",
+    asyncHandler(async (req, res) => {
+      const { businessName, slug, email, password, ownerName } = req.body || {};
+
+      if (!businessName || !slug || !email || !password) {
+        res.status(400).json({ ok: false, message: "Semua field wajib diisi." });
+        return;
+      }
+
+      const result = await createTenant({
+        name: businessName,
+        slug,
+        email,
+        password,
+        ownerName: ownerName || businessName,
+        ownerUsername: email.split('@')[0],
+      });
+
+      if (!result.ok) {
+        res.status(400).json(result);
+        return;
+      }
+
+      res.json({ ok: true, tenantId: result.tenantId });
     })
   );
 
@@ -113,7 +165,31 @@ export function createApp({
     "/api/auth/me",
     auth,
     asyncHandler(async (req, res) => {
-      res.json({ ok: true, user: req.auth.user });
+      const tenant = req.auth.user.tenantId
+        ? await getTenantById(req.auth.user.tenantId)
+        : null;
+      const usage = req.auth.user.tenantId
+        ? await getTenantUsage(req.auth.user.tenantId)
+        : null;
+      const limits = tenant ? getPlanLimits(tenant.plan) : null;
+      res.json({ ok: true, user: req.auth.user, tenant, usage, limits });
+    })
+  );
+
+  // Tenant info
+  app.get(
+    "/api/tenant",
+    auth,
+    asyncHandler(async (req, res) => {
+      const tenantId = req.auth.user.tenantId;
+      if (!tenantId) {
+        res.status(400).json({ ok: false, message: "No tenant." });
+        return;
+      }
+      const tenant = await getTenantById(tenantId);
+      const usage = await getTenantUsage(tenantId);
+      const limits = getPlanLimits(tenant?.plan);
+      res.json({ ok: true, tenant, usage, limits });
     })
   );
 
@@ -121,10 +197,16 @@ export function createApp({
     "/api/bootstrap",
     auth,
     asyncHandler(async (req, res) => {
+      const tenantId = req.auth.user.tenantId;
+      if (!tenantId) {
+        res.status(400).json({ ok: false, message: "No tenant context." });
+        return;
+      }
       res.json({
         ok: true,
         data: await getBootstrapFn({
           workspaceId: req.query.workspaceId || null,
+          tenantId,
         }),
       });
     })
@@ -135,7 +217,8 @@ export function createApp({
     auth,
     requireRoleMiddleware(["admin", "manager"]),
     asyncHandler(async (req, res) => {
-      const result = await createEventRecordFn(req.body, req.auth.user.id);
+      const tenantId = req.auth.user.tenantId;
+      const result = await createEventRecordFn(req.body, req.auth.user.id, tenantId);
 
       if (!result.ok) {
         res.status(400).json(result);
@@ -145,7 +228,7 @@ export function createApp({
       res.json({
         ok: true,
         eventId: result.eventId,
-        data: await getBootstrapFn({ workspaceId: getRequestWorkspaceId(req) }),
+        data: await getBootstrapFn({ workspaceId: getRequestWorkspaceId(req), tenantId }),
       });
     })
   );
@@ -155,6 +238,7 @@ export function createApp({
     auth,
     requireRoleMiddleware(["admin", "manager"]),
     asyncHandler(async (req, res) => {
+      const tenantId = req.auth.user.tenantId;
       const result = await updateEventStatusRecordFn(req.params.id, req.body, req.auth.user.id);
 
       if (!result.ok) {
@@ -166,7 +250,7 @@ export function createApp({
         ok: true,
         eventId: result.eventId,
         nextStatus: result.nextStatus,
-        data: await getBootstrapFn({ workspaceId: getRequestWorkspaceId(req) }),
+        data: await getBootstrapFn({ workspaceId: getRequestWorkspaceId(req), tenantId }),
       });
     })
   );
@@ -176,6 +260,7 @@ export function createApp({
     auth,
     requireRoleMiddleware(["admin", "manager"]),
     asyncHandler(async (req, res) => {
+      const tenantId = req.auth.user.tenantId;
       const result = await closeEventRecordFn(req.params.id, req.body, req.auth.user.id);
 
       if (!result.ok) {
@@ -186,7 +271,7 @@ export function createApp({
       res.json({
         ok: true,
         eventId: result.eventId,
-        data: await getBootstrapFn({ workspaceId: getRequestWorkspaceId(req) }),
+        data: await getBootstrapFn({ workspaceId: getRequestWorkspaceId(req), tenantId }),
       });
     })
   );
@@ -196,10 +281,11 @@ export function createApp({
     auth,
     requireRoleMiddleware(["admin", "manager"]),
     asyncHandler(async (req, res) => {
-      await createPromotionRecordFn(req.body, req.auth.user.id);
+      const tenantId = req.auth.user.tenantId;
+      await createPromotionRecordFn(req.body, req.auth.user.id, tenantId);
       res.json({
         ok: true,
-        data: await getBootstrapFn({ workspaceId: getRequestWorkspaceId(req) }),
+        data: await getBootstrapFn({ workspaceId: getRequestWorkspaceId(req), tenantId }),
       });
     })
   );
@@ -209,10 +295,12 @@ export function createApp({
     auth,
     requireRoleMiddleware(["admin", "manager"]),
     asyncHandler(async (req, res) => {
+      const tenantId = req.auth.user.tenantId;
       const requestWorkspaceId = getRequestWorkspaceId(req);
       const result = await adjustInventoryRecordFn(
         withRequestWorkspace(req.body, requestWorkspaceId),
-        req.auth.user.id
+        req.auth.user.id,
+        tenantId
       );
 
       if (!result.ok) {
@@ -224,6 +312,7 @@ export function createApp({
         ok: true,
         data: await getBootstrapFn({
           workspaceId: getRequestWorkspaceId(req, result.workspaceId ?? null),
+          tenantId,
         }),
       });
     })
@@ -233,8 +322,9 @@ export function createApp({
     "/api/sales",
     auth,
     asyncHandler(async (req, res) => {
+      const tenantId = req.auth.user.tenantId;
       const requestWorkspaceId = getRequestWorkspaceId(req);
-      const result = await finalizeSaleRecordFn(withRequestWorkspace(req.body, requestWorkspaceId), req.auth.user.id);
+      const result = await finalizeSaleRecordFn(withRequestWorkspace(req.body, requestWorkspaceId), req.auth.user.id, tenantId);
 
       if (!result.ok) {
         res.status(400).json(result);
@@ -243,6 +333,7 @@ export function createApp({
 
       const data = await getBootstrapFn({
         workspaceId: getRequestWorkspaceId(req, result.workspaceId ?? null),
+        tenantId,
       });
       const sale = data.sales.find((item) => item.id === result.saleId) ?? null;
       res.json({ ok: true, sale, data });
@@ -254,10 +345,11 @@ export function createApp({
     auth,
     requireRoleMiddleware(["admin"]),
     asyncHandler(async (req, res) => {
-      await updateSettingsRecordFn(req.body);
+      const tenantId = req.auth.user.tenantId;
+      await updateSettingsRecordFn(req.body, tenantId);
       res.json({
         ok: true,
-        data: await getBootstrapFn({ workspaceId: getRequestWorkspaceId(req) }),
+        data: await getBootstrapFn({ workspaceId: getRequestWorkspaceId(req), tenantId }),
       });
     })
   );
@@ -267,10 +359,11 @@ export function createApp({
     auth,
     requireRoleMiddleware(["admin"]),
     asyncHandler(async (req, res) => {
-      await createUserRecordFn(req.body);
+      const tenantId = req.auth.user.tenantId;
+      await createUserRecordFn(req.body, tenantId);
       res.json({
         ok: true,
-        data: await getBootstrapFn({ workspaceId: getRequestWorkspaceId(req) }),
+        data: await getBootstrapFn({ workspaceId: getRequestWorkspaceId(req), tenantId }),
       });
     })
   );
@@ -280,7 +373,8 @@ export function createApp({
     auth,
     requireRoleMiddleware(["admin"]),
     asyncHandler(async (req, res) => {
-      const result = await updateUserRecordFn(req.params.id, req.body);
+      const tenantId = req.auth.user.tenantId;
+      const result = await updateUserRecordFn(req.params.id, req.body, tenantId);
 
       if (!result.ok) {
         res.status(404).json(result);
@@ -289,7 +383,7 @@ export function createApp({
 
       res.json({
         ok: true,
-        data: await getBootstrapFn({ workspaceId: getRequestWorkspaceId(req) }),
+        data: await getBootstrapFn({ workspaceId: getRequestWorkspaceId(req), tenantId }),
       });
     })
   );
@@ -299,7 +393,8 @@ export function createApp({
     auth,
     requireRoleMiddleware(["admin", "manager"]),
     asyncHandler(async (req, res) => {
-      const result = await createProductRecordFn(req.body);
+      const tenantId = req.auth.user.tenantId;
+      const result = await createProductRecordFn(req.body, tenantId);
 
       if (!result.ok) {
         res.status(400).json(result);
@@ -308,7 +403,7 @@ export function createApp({
 
       res.json({
         ok: true,
-        data: await getBootstrapFn({ workspaceId: getRequestWorkspaceId(req) }),
+        data: await getBootstrapFn({ workspaceId: getRequestWorkspaceId(req), tenantId }),
       });
     })
   );
@@ -318,7 +413,8 @@ export function createApp({
     auth,
     requireRoleMiddleware(["admin", "manager"]),
     asyncHandler(async (req, res) => {
-      const result = await updateProductRecordFn(req.params.id, req.body);
+      const tenantId = req.auth.user.tenantId;
+      const result = await updateProductRecordFn(req.params.id, req.body, tenantId);
 
       if (!result.ok) {
         res.status(404).json(result);
@@ -327,7 +423,7 @@ export function createApp({
 
       res.json({
         ok: true,
-        data: await getBootstrapFn({ workspaceId: getRequestWorkspaceId(req) }),
+        data: await getBootstrapFn({ workspaceId: getRequestWorkspaceId(req), tenantId }),
       });
     })
   );
@@ -337,7 +433,8 @@ export function createApp({
     auth,
     requireRoleMiddleware(["admin", "manager"]),
     asyncHandler(async (req, res) => {
-      const result = await createVariantRecordFn(req.params.id, req.body);
+      const tenantId = req.auth.user.tenantId;
+      const result = await createVariantRecordFn(req.params.id, req.body, tenantId);
 
       if (!result.ok) {
         res.status(400).json(result);
@@ -346,7 +443,7 @@ export function createApp({
 
       res.json({
         ok: true,
-        data: await getBootstrapFn({ workspaceId: getRequestWorkspaceId(req) }),
+        data: await getBootstrapFn({ workspaceId: getRequestWorkspaceId(req), tenantId }),
       });
     })
   );
@@ -356,7 +453,8 @@ export function createApp({
     auth,
     requireRoleMiddleware(["admin", "manager"]),
     asyncHandler(async (req, res) => {
-      const result = await updateVariantRecordFn(req.params.id, req.body);
+      const tenantId = req.auth.user.tenantId;
+      const result = await updateVariantRecordFn(req.params.id, req.body, tenantId);
 
       if (!result.ok) {
         res.status(404).json(result);
@@ -365,8 +463,55 @@ export function createApp({
 
       res.json({
         ok: true,
-        data: await getBootstrapFn({ workspaceId: getRequestWorkspaceId(req) }),
+        data: await getBootstrapFn({ workspaceId: getRequestWorkspaceId(req), tenantId }),
       });
+    })
+  );
+
+  // ── Platform admin routes ──────────────────────────────────────
+
+  app.post(
+    "/api/platform/login",
+    asyncHandler(async (req, res) => {
+      const { email, password } = req.body || {};
+      const admin = await authenticatePlatformAdmin(email, password);
+      if (!admin) {
+        res.status(401).json({ ok: false, message: "Email atau password tidak valid." });
+        return;
+      }
+      const token = signJwtFn({ sub: admin.id, role: 'platform_admin', email: admin.email });
+      res.json({ ok: true, token, admin });
+    })
+  );
+
+  app.get(
+    "/api/platform/tenants",
+    auth,
+    asyncHandler(async (req, res) => {
+      if (req.auth.payload.role !== 'platform_admin') {
+        res.status(403).json({ ok: false, message: "Forbidden." });
+        return;
+      }
+      const tenants = await listTenants();
+      res.json({ ok: true, tenants });
+    })
+  );
+
+  app.patch(
+    "/api/platform/tenants/:id",
+    auth,
+    asyncHandler(async (req, res) => {
+      if (req.auth.payload.role !== 'platform_admin') {
+        res.status(403).json({ ok: false, message: "Forbidden." });
+        return;
+      }
+      const result = await updateTenantRecord(req.params.id, req.body);
+      if (!result.ok) {
+        res.status(400).json(result);
+        return;
+      }
+      const tenants = await listTenants();
+      res.json({ ok: true, tenants });
     })
   );
 
