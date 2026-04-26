@@ -1,7 +1,6 @@
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
-import { PageHeader } from "../components/PageHeader";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
 import { Input } from "../components/ui/input";
@@ -67,7 +66,7 @@ export function CatalogPage() {
 
   return (
     <div className="catalog-banani-page">
-      <PageHeader title="Katalog" description="Kelola produk, varian, dan stok.">
+      <div className="page-actions">
         <div className="catalog-banani-header-actions">
           <Button
             className="catalog-banani-button is-outline"
@@ -86,7 +85,7 @@ export function CatalogPage() {
             </Link>
           </Button>
         </div>
-      </PageHeader>
+      </div>
 
       {loading ? <p className="info-text">Loading catalog...</p> : null}
       {loadError ? <p className="error-text">{loadError}</p> : null}

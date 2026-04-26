@@ -263,6 +263,15 @@
   overflow: hidden;
 }
 
+/* ── Page actions bar ── */
+.page-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
 /* ── Page components ── */
 .page-stack {
   display: flex;

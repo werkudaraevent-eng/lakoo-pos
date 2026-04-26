@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
-import { PageHeader } from "../components/PageHeader";
 
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
@@ -79,7 +78,7 @@ export function SalesPage() {
 
   return (
     <div className="sales-banani-page">
-      <PageHeader title="Penjualan" description="Riwayat transaksi dan detail struk.">
+      <div className="page-actions">
         <div className="sales-banani-metrics">
           <div className="sales-banani-metric">
             <span className="sales-banani-metric-label">Matched receipts</span>
@@ -90,7 +89,7 @@ export function SalesPage() {
             <span className="sales-banani-metric-value">{formatCurrency(summary.matchedRevenue)}</span>
           </div>
         </div>
-      </PageHeader>
+      </div>
 
       {loading ? <p className="info-text">Loading sales...</p> : null}
       {loadError ? <p className="error-text">{loadError}</p> : null}

@@ -1,7 +1,6 @@
 import { useMemo } from "react";
 import { Link } from "react-router-dom";
 
-import { PageHeader } from "../components/PageHeader";
 import { usePosData } from "../context/PosDataContext";
 import { buildDashboardCollections } from "../features/dashboard/dashboardData";
 import { buildDashboardKpiCards } from "../features/dashboard/dashboardWorkspace";
@@ -9,6 +8,7 @@ import { buildDashboardSummary } from "../features/events/eventHelpers";
 import { AppIcon } from "../features/ui/AppIcon";
 import { getDashboardKpiIconName } from "../features/ui/iconMaps";
 import { formatCurrency, formatDate } from "../utils/formatters";
+import "../features/dashboard/dashboard.css";
 
 const PLACEHOLDER_CHART_BARS = [
   { label: "10 AM", height: 16 },
@@ -47,7 +47,7 @@ export function DashboardPage() {
 
   return (
     <div className="dashboard-container">
-      <PageHeader title="Dashboard" description="Ringkasan performa bisnis hari ini." />
+
 
       {loading ? <p className="info-text">Loading dashboard data...</p> : null}
       {loadError ? <p className="error-text">{loadError}</p> : null}

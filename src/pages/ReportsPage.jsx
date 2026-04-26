@@ -1,6 +1,5 @@
 import { useMemo, useState } from "react";
 
-import { PageHeader } from "../components/PageHeader";
 import { Button } from "../components/ui/button";
 import { usePosData } from "../context/PosDataContext";
 import {
@@ -38,7 +37,7 @@ export function ReportsPage() {
 
   return (
     <div className="reports-banani-page">
-      <PageHeader title="Laporan" description="Analisis performa penjualan dan tren bisnis.">
+      <div className="page-actions">
         <div className="reports-banani-actions">
           <label className="reports-banani-select">
             <select onChange={(event) => setPeriod(event.target.value)} value={period}>
@@ -54,7 +53,7 @@ export function ReportsPage() {
             <span>Export Report</span>
           </Button>
         </div>
-      </PageHeader>
+      </div>
 
       {loading ? <p className="info-text">Loading reports...</p> : null}
       {loadError ? <p className="error-text">{loadError}</p> : null}

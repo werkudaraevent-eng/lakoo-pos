@@ -1,7 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
-import { PageHeader } from "../components/PageHeader";
 
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
@@ -137,7 +136,7 @@ export function EventsPage() {
 
   return (
     <div className="events-banani-page">
-      <PageHeader title="Event" description="Kelola bazaar dan pop-up store.">
+      <div className="page-actions">
         <div className="events-banani-metrics">
           <div className="events-banani-metric">
             <span className="events-banani-metric-label">Active Events</span>
@@ -152,7 +151,7 @@ export function EventsPage() {
             <span className="events-banani-metric-value">{formatCurrencyCell(ytdRevenue)}</span>
           </div>
         </div>
-      </PageHeader>
+      </div>
 
       {loading ? <p className="info-text">Loading events...</p> : null}
       {loadError ? <p className="error-text">{loadError}</p> : null}

@@ -1,7 +1,6 @@
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
-import { PageHeader } from "../components/PageHeader";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { usePosData } from "../context/PosDataContext";
@@ -76,7 +75,7 @@ export function InventoryPage() {
 
   return (
     <div className="inventory-banani-page">
-      <PageHeader title="Inventori" description="Pantau stok, filter kategori, dan kelola pergerakan barang.">
+      <div className="page-actions">
         <div className="inventory-banani-actions">
           <Button
             className="inventory-banani-button"
@@ -99,7 +98,7 @@ export function InventoryPage() {
             </Link>
           </Button>
         </div>
-      </PageHeader>
+      </div>
 
       {loading ? <p className="info-text">Loading inventory...</p> : null}
       {loadError ? <p className="error-text">{loadError}</p> : null}
