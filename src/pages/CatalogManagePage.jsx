@@ -21,6 +21,7 @@ export function CatalogManagePage() {
   const isNew = !productId;
   const product = products.find((p) => p.id === productId) || null;
   const attr1Label = settings?.attribute1Label || "Size";
+  const attr2Label = settings?.attribute2Label || "";
 
   const catList = useMemo(() => [...new Set((categories || []).map((c) => c.name))].sort(), [categories]);
 
@@ -38,7 +39,7 @@ export function CatalogManagePage() {
     if (isNew) {
       if (loadedProductIdRef.current !== "new") {
         setForm({ name: "", category: catList[0] || "", description: "", basePrice: "" });
-        setVariants([{ label: "S", qty: 0, sku: "" }, { label: "M", qty: 0, sku: "" }, { label: "L", qty: 0, sku: "" }]);
+        setVariants([{ label: "", qty: 0, sku: "" }]);
         loadedProductIdRef.current = "new";
       }
       return;
@@ -106,7 +107,7 @@ export function CatalogManagePage() {
           variants: variants.map((v) => ({
             sku: v.sku || `${form.name.substring(0, 3).toUpperCase()}-${v.label}`,
             attribute1Value: v.label,
-            attribute2Value: "",
+            attribute2Value: v.attribute2Value || "",
             quantityOnHand: parseInt(v.qty) || 0,
             lowStockThreshold: 3,
             isActive: true,
@@ -215,14 +216,17 @@ export function CatalogManagePage() {
           {/* Ukuran & Stok */}
           <div className="card">
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-              <div style={{ fontSize: 11, fontWeight: 800, color: "var(--text-soft)", textTransform: "uppercase", letterSpacing: "0.5px" }}>UKURAN & STOK</div>
+              <div style={{ fontSize: 11, fontWeight: 800, color: "var(--text-soft)", textTransform: "uppercase", letterSpacing: "0.5px" }}>{(attr1Label || "UKURAN").toUpperCase()} & STOK</div>
               <span style={{ fontSize: 12.5, color: "var(--text-soft)" }}>Total: <strong style={{ color: "var(--text)" }}>{totalStock} unit</strong></span>
             </div>
 
             <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 14 }}>
               {variants.map((sz) => (
                 <div key={sz.label} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", background: "var(--surface)", borderRadius: 8 }}>
-                  <div style={{ width: 44, height: 32, borderRadius: 6, background: "#fff", border: "1px solid var(--line)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 13, flexShrink: 0 }}>{sz.label}</div>
+                  <div style={{ width: 44, height: 32, borderRadius: 6, background: "#fff", border: "1px solid var(--line)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 13, flexShrink: 0 }}>{sz.label || "—"}</div>
+                  {attr2Label ? (
+                    <input className="input" placeholder={attr2Label} value={sz.attribute2Value || ""} onChange={(e) => updateVariantField(sz.label, "attribute2Value", e.target.value)} style={{ width: 90, fontSize: 12, padding: "4px 8px" }} />
+                  ) : null}
                   <div style={{ flex: 1, fontSize: 13, color: "var(--text-soft)", fontWeight: 500 }}>Stok tersedia</div>
                   <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                     <div className="qty-btn" style={{ width: 28, height: 28 }} onClick={() => setQty(sz.label, sz.qty - 1)}>−</div>
@@ -242,7 +246,7 @@ export function CatalogManagePage() {
             </div>
 
             <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-              <input className="input" placeholder="Tambah ukuran (mis: XS, XXL, 30...)" value={newSize} onChange={(e) => setNewSize(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addSize()} style={{ flex: 1, fontSize: 13 }} />
+              <input className="input" placeholder={`Tambah ${(attr1Label || "ukuran").toLowerCase()} (mis: XS, XXL, 30...)`} value={newSize} onChange={(e) => setNewSize(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addSize()} style={{ flex: 1, fontSize: 13 }} />
               <button className="btn btn-secondary btn-sm" style={{ flexShrink: 0 }} onClick={addSize}>
                 <svg width={13} height={13} fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
                 {" "}Tambah
@@ -281,7 +285,7 @@ export function CatalogManagePage() {
               {[
                 { label: "Harga", value: form.basePrice ? formatCurrency(Number(form.basePrice)) : "—" },
                 { label: "Total Stok", value: `${totalStock} unit` },
-                { label: "Ukuran", value: variants.length > 0 ? variants.map((v) => v.label).join(", ") : "—" },
+                { label: attr1Label || "Ukuran", value: variants.length > 0 ? variants.map((v) => v.label).filter(Boolean).join(", ") || "—" : "—" },
                 { label: "Kategori", value: form.category || "—" },
               ].map((r, i) => (
                 <div key={i} style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
@@ -307,7 +311,7 @@ export function CatalogManagePage() {
             </div>
             <div style={{ display: "flex", gap: 8 }}>
               <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setDeleteConfirm(false)}>Batal</button>
-              <button className="btn" style={{ flex: 1, background: "var(--danger)", color: "#fff" }} onClick={() => navigate("/catalog")}>Hapus</button>
+              <button className="btn" style={{ flex: 1, background: "var(--danger)", color: "#fff" }} onClick={async () => { await updateProduct(productId, { isActive: false }); navigate("/catalog"); }}>Hapus</button>
             </div>
           </div>
         </div>

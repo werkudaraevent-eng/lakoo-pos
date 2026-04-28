@@ -45,7 +45,7 @@ function getPageTitle(pathname) {
   for (const [path, title] of Object.entries(PAGE_TITLES)) {
     if (pathname === path || pathname.startsWith(path + "/")) return title;
   }
-  return "Lakoo POS";
+  return "Lakoo. POS";
 }
 
 function formatDate() {
@@ -60,22 +60,110 @@ function formatDate() {
 export function AppShell({ children }) {
   const { user, logout } = useAuth();
   const location = useLocation();
-  const { workspaces } = usePosData();
+  const { workspaces, settings } = usePosData();
   const { activeWorkspaceId } = useWorkspace();
   const isCheckoutRoute = location.pathname.startsWith("/checkout");
+  const isImpersonating = localStorage.getItem("pos-impersonating") === "true";
 
   const activeWorkspace = workspaces.find((w) => w.id === activeWorkspaceId);
-  const allowedItems = NAV_ITEMS.filter((item) => item.section || item.roles.includes(user.role));
+  const canCustomBrand = user?.planLimits?.customBranding === true;
+  const brandName = canCustomBrand && settings?.storeName ? settings.storeName : "Lakoo.";
+
+  // Expiry warning banner calculation
+  const expiryDate = user?.tenant?.plan === "trial"
+    ? user?.tenant?.trialEndsAt
+    : user?.tenant?.subscriptionEndsAt;
+  const daysLeft = expiryDate
+    ? Math.ceil((new Date(expiryDate) - new Date()) / (1000 * 60 * 60 * 24))
+    : null;
+  const showExpiryWarning = daysLeft !== null && daysLeft <= 7 && daysLeft > 0;
+  // Filter nav items: only show section headers that have at least one visible child
+  const allowedItems = NAV_ITEMS.filter((item, index) => {
+    if (!item.section) return item.roles.includes(user.role);
+    // Section header: check if any following items (until next section) are visible
+    for (let j = index + 1; j < NAV_ITEMS.length; j++) {
+      if (NAV_ITEMS[j].section) break;
+      if (NAV_ITEMS[j].roles.includes(user.role)) return true;
+    }
+    return false;
+  });
   const pageTitle = getPageTitle(location.pathname);
 
+  const bannerOffset = (isImpersonating ? 30 : 0) + (showExpiryWarning ? 30 : 0);
+
   return (
-    <div className={`shell${isCheckoutRoute ? " shell-checkout" : ""}`}>
+    <div
+      className={`shell${isCheckoutRoute ? " shell-checkout" : ""}${isImpersonating ? " shell-impersonating" : ""}`}
+      style={bannerOffset ? { height: `calc(100vh - ${bannerOffset}px)`, marginTop: bannerOffset } : undefined}
+    >
+      {/* ── Impersonation Banner ── */}
+      {isImpersonating && (
+        <div
+          style={{
+            background: "var(--accent, #6c5ce7)",
+            color: "#fff",
+            padding: "6px 16px",
+            fontSize: 12,
+            fontWeight: 600,
+            textAlign: "center",
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            zIndex: 1000,
+          }}
+        >
+          ⚡ Sesi impersonasi aktif — Anda masuk sebagai admin tenant.
+          <button
+            onClick={() => {
+              localStorage.removeItem("pos-token");
+              localStorage.removeItem("pos-user");
+              localStorage.removeItem("pos-impersonating");
+              window.close();
+            }}
+            style={{
+              marginLeft: 12,
+              background: "rgba(255,255,255,0.2)",
+              border: "none",
+              color: "#fff",
+              padding: "2px 10px",
+              borderRadius: 4,
+              cursor: "pointer",
+              fontSize: 11,
+              fontFamily: "inherit",
+            }}
+          >
+            Tutup Sesi
+          </button>
+        </div>
+      )}
+
+      {/* ── Expiry Warning Banner ── */}
+      {showExpiryWarning && (
+        <div style={{
+          background: "var(--accent)",
+          color: "#fff",
+          padding: "6px 16px",
+          fontSize: 12,
+          fontWeight: 600,
+          textAlign: "center",
+          position: "fixed",
+          top: isImpersonating ? 30 : 0,
+          left: 0,
+          right: 0,
+          zIndex: 999,
+        }}>
+          ⏰ {user?.tenant?.plan === "trial" ? "Masa trial" : "Langganan"} Anda akan berakhir dalam {daysLeft} hari.
+          {user?.role === "admin" && " Hubungi tim Lakoo untuk perpanjangan."}
+        </div>
+      )}
+
       {/* ── Sidebar ── */}
       <aside className="shell-sidebar">
         <div className="shell-sidebar-top">
           {/* Brand */}
           <div className="shell-brand">
-            <div className="shell-brand-name">Lakoo</div>
+            <div className="shell-brand-name">{brandName}</div>
             <div className="shell-brand-sub">Point of Sale</div>
           </div>
 

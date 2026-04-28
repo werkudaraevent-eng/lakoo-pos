@@ -1,137 +1,204 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
-import { Button } from "../components/ui/button";
 import { useAuth } from "../context/AuthContext";
 import "../features/login/login.css";
 
 export function RegisterPage() {
   const navigate = useNavigate();
-  const { register, authLoading } = useAuth();
+  const { register } = useAuth();
   const [form, setForm] = useState({
     businessName: "",
     slug: "",
+    ownerName: "",
     email: "",
     password: "",
-    ownerName: "",
   });
-  const [message, setMessage] = useState("");
+  const [showPass, setShowPass] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  function handleSlugify(name) {
-    return name
-      .toLowerCase()
-      .trim()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-+|-+$/g, "");
+  function slugify(name) {
+    return name.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
   }
 
   function handleBusinessNameChange(value) {
-    setForm((current) => ({
-      ...current,
-      businessName: value,
-      slug: handleSlugify(value),
-    }));
+    setForm((f) => ({ ...f, businessName: value, slug: slugify(value) }));
   }
 
   async function handleSubmit(event) {
     event.preventDefault();
-    setMessage("");
+    setError("");
 
     if (!form.businessName || !form.email || !form.password) {
-      setMessage("Semua field wajib diisi.");
+      setError("Nama bisnis, email, dan password wajib diisi.");
+      return;
+    }
+    if (form.password.length < 6) {
+      setError("Password minimal 6 karakter.");
       return;
     }
 
-    const result = await register({
-      businessName: form.businessName,
-      slug: form.slug,
-      email: form.email,
-      password: form.password,
-      ownerName: form.ownerName || form.businessName,
-    });
+    setLoading(true);
+    try {
+      const result = await register({
+        businessName: form.businessName,
+        slug: form.slug,
+        email: form.email,
+        password: form.password,
+        ownerName: form.ownerName || form.businessName,
+      });
 
-    if (!result.ok) {
-      setMessage(result.message);
-      return;
+      if (!result.ok) {
+        setError(result.message);
+        return;
+      }
+
+      setSuccess(true);
+      setTimeout(() => navigate("/login"), 2500);
+    } catch (err) {
+      setError(err.message || "Registrasi gagal.");
+    } finally {
+      setLoading(false);
     }
-
-    setMessage("Registrasi berhasil! Silakan login.");
-    setTimeout(() => navigate("/login"), 2000);
   }
+
+  const labelStyle = {
+    display: "block",
+    fontSize: 12.5,
+    fontWeight: 700,
+    color: "var(--text-soft)",
+    textTransform: "uppercase",
+    letterSpacing: "0.5px",
+    marginBottom: 6,
+  };
 
   return (
     <div className="login-page">
-      <div className="login-container">
-        <div className="login-hero-section">
-          <div className="login-hero-content">
-            <h1 className="login-hero-title">Lakoo</h1>
-            <p className="login-hero-subtitle">Daftar gratis, trial 14 hari</p>
-          </div>
+      <div className="login-wrapper" style={{ maxWidth: 460 }}>
+        {/* Logo */}
+        <div className="login-logo">
+          <div className="login-logo-text">Lakoo.</div>
+          <div className="login-logo-sub">Point of Sale System</div>
         </div>
 
-        <div className="login-form-section">
-          <form className="login-form" onSubmit={handleSubmit}>
-            <h2>Daftar Bisnis Baru</h2>
+        {/* Card */}
+        <div className="login-card">
+          {success ? (
+            /* Success State */
+            <div style={{ textAlign: "center", padding: "16px 0" }}>
+              <div style={{ fontSize: 48, marginBottom: 16 }}>🎉</div>
+              <div style={{ fontSize: 20, fontWeight: 800, marginBottom: 8 }}>Registrasi Berhasil!</div>
+              <div style={{ fontSize: 14, color: "var(--text-soft)", lineHeight: 1.6, marginBottom: 8 }}>
+                Akun bisnis <strong>{form.businessName}</strong> telah dibuat.
+              </div>
+              <div style={{ fontSize: 13, color: "var(--text-muted)" }}>
+                Mengalihkan ke halaman login...
+              </div>
+            </div>
+          ) : (
+            /* Register Form */
+            <>
+              <h2 style={{ fontSize: 20, fontWeight: 800, marginBottom: 4 }}>Daftar Bisnis Baru</h2>
+              <div style={{ fontSize: 13.5, color: "var(--text-soft)", marginBottom: 24 }}>
+                Buat akun gratis dan mulai kelola bisnis Anda
+              </div>
 
-            {message ? <p className="login-error">{message}</p> : null}
+              {error && (
+                <div className="error-text" style={{ marginBottom: 16 }}>{error}</div>
+              )}
 
-            <label className="field">
-              <span>Nama Bisnis</span>
-              <input
-                autoFocus
-                onChange={(e) => handleBusinessNameChange(e.target.value)}
-                placeholder="Contoh: Toko Saya"
-                value={form.businessName}
-              />
-            </label>
+              <form onSubmit={handleSubmit}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                  {/* Nama Bisnis */}
+                  <div className="field">
+                    <label style={labelStyle}>Nama Bisnis *</label>
+                    <input
+                      className="input"
+                      autoFocus
+                      value={form.businessName}
+                      onChange={(e) => handleBusinessNameChange(e.target.value)}
+                      placeholder="Contoh: Warung Kopi Nusantara"
+                    />
+                  </div>
 
-            <label className="field">
-              <span>Slug (URL)</span>
-              <input
-                onChange={(e) => setForm((c) => ({ ...c, slug: e.target.value }))}
-                placeholder="toko-saya"
-                value={form.slug}
-              />
-              <small className="muted-text">lakoo.app/{form.slug || "..."}</small>
-            </label>
+                  {/* Slug */}
+                  <div className="field">
+                    <label style={labelStyle}>Slug URL</label>
+                    <input
+                      className="input"
+                      value={form.slug}
+                      onChange={(e) => setForm((f) => ({ ...f, slug: e.target.value }))}
+                      placeholder="warung-kopi"
+                      style={{ fontFamily: "monospace", fontSize: 13 }}
+                    />
+                    <div style={{ fontSize: 11.5, color: "var(--text-muted)", marginTop: 4 }}>
+                      lakoo.app/<strong>{form.slug || "..."}</strong>
+                    </div>
+                  </div>
 
-            <label className="field">
-              <span>Nama Pemilik</span>
-              <input
-                onChange={(e) => setForm((c) => ({ ...c, ownerName: e.target.value }))}
-                placeholder="Nama lengkap"
-                value={form.ownerName}
-              />
-            </label>
+                  {/* Nama Pemilik */}
+                  <div className="field">
+                    <label style={labelStyle}>Nama Pemilik</label>
+                    <input
+                      className="input"
+                      value={form.ownerName}
+                      onChange={(e) => setForm((f) => ({ ...f, ownerName: e.target.value }))}
+                      placeholder="Nama lengkap pemilik"
+                    />
+                  </div>
 
-            <label className="field">
-              <span>Email</span>
-              <input
-                onChange={(e) => setForm((c) => ({ ...c, email: e.target.value }))}
-                placeholder="email@contoh.com"
-                type="email"
-                value={form.email}
-              />
-            </label>
+                  {/* Email */}
+                  <div className="field">
+                    <label style={labelStyle}>Email *</label>
+                    <input
+                      className="input"
+                      type="email"
+                      value={form.email}
+                      onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
+                      placeholder="email@bisnis.com"
+                    />
+                  </div>
 
-            <label className="field">
-              <span>Password</span>
-              <input
-                onChange={(e) => setForm((c) => ({ ...c, password: e.target.value }))}
-                placeholder="Min. 6 karakter"
-                type="password"
-                value={form.password}
-              />
-            </label>
+                  {/* Password */}
+                  <div className="field">
+                    <label style={labelStyle}>Password *</label>
+                    <div className="password-input-wrapper">
+                      <input
+                        className="input"
+                        type={showPass ? "text" : "password"}
+                        value={form.password}
+                        onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
+                        placeholder="Min. 6 karakter"
+                      />
+                      <button
+                        type="button"
+                        className="password-toggle-btn"
+                        onClick={() => setShowPass(!showPass)}
+                      >
+                        {showPass ? "Sembunyikan" : "Tampilkan"}
+                      </button>
+                    </div>
+                  </div>
 
-            <Button disabled={authLoading} type="submit">
-              {authLoading ? "Mendaftar..." : "Daftar Sekarang"}
-            </Button>
+                  {/* Submit */}
+                  <button
+                    type="submit"
+                    className="btn btn-primary"
+                    disabled={loading}
+                    style={{ width: "100%", height: 46, fontSize: 14, fontWeight: 700, marginTop: 6 }}
+                  >
+                    {loading ? "Mendaftar..." : "Daftar Sekarang →"}
+                  </button>
+                </div>
+              </form>
 
-            <p className="muted-text" style={{ textAlign: "center", marginTop: "1rem" }}>
-              Sudah punya akun? <Link to="/login">Login di sini</Link>
-            </p>
-          </form>
+              <p className="login-register-link">
+                Sudah punya akun? <Link to="/login">Login di sini</Link>
+              </p>
+            </>
+          )}
         </div>
       </div>
     </div>

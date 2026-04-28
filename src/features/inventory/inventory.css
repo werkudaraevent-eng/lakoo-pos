@@ -311,6 +311,19 @@
   }
 }
 
+/* Product Picker Item – hover effect */
+.inventory-picker-item {
+  padding: 12px 14px;
+  border: 1.5px solid var(--line);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+
+.inventory-picker-item:hover {
+  border-color: var(--accent);
+}
+
 @media (max-width: 720px) {
   .inventory-banani-toolbar,
   .inventory-banani-toolbar-group {

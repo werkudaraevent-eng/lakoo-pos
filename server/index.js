@@ -11,6 +11,7 @@ import {
   checkTenantStatus,
   closeEventRecord,
   createEventRecord,
+  deactivateEventRecord,
   createProductRecord,
   createPromotionRecord,
   createTenant,
@@ -19,11 +20,17 @@ import {
   finalizeSaleRecord,
   getBootstrap,
   getPlanLimits,
+  getPlatformAdminById,
+  getPlatformStats,
+  getTenantAdminUser,
   getTenantById,
+  getTenantDetail,
   getTenantUsage,
   getUserById,
   initializeDatabase,
   listTenants,
+  setWorkspaceAssignments,
+  updateEventRecord,
   updateEventStatusRecord,
   updateProductRecord,
   updateSettingsRecord,
@@ -65,21 +72,38 @@ function withRequestWorkspace(payload, workspaceId) {
   };
 }
 
+function requirePlatformAdmin(req, res, next) {
+  if (req.auth?.payload?.role !== 'platform_admin') {
+    res.status(403).json({ ok: false, message: "Forbidden." });
+    return;
+  }
+  next();
+}
+
 export function createApp({
   adjustInventoryRecordFn = adjustInventoryRecord,
   authenticateUserFn = authenticateUser,
   closeEventRecordFn = closeEventRecord,
   createEventRecordFn = createEventRecord,
+  deactivateEventRecordFn = deactivateEventRecord,
   createProductRecordFn = createProductRecord,
   createPromotionRecordFn = createPromotionRecord,
   createUserRecordFn = createUserRecord,
   createVariantRecordFn = createVariantRecord,
   finalizeSaleRecordFn = finalizeSaleRecord,
   getBootstrapFn = getBootstrap,
+  getPlatformAdminByIdFn = getPlatformAdminById,
+  getPlatformStatsFn = getPlatformStats,
+  getTenantAdminUserFn = getTenantAdminUser,
+  getTenantByIdFn = getTenantById,
+  getTenantDetailFn = getTenantDetail,
+  checkTenantStatusFn = checkTenantStatus,
   getUserByIdFn = getUserById,
   requireAuthFn = requireAuth,
   requireRoleMiddleware = requireRole,
+  setWorkspaceAssignmentsFn = setWorkspaceAssignments,
   signJwtFn = signJwt,
+  updateEventRecordFn = updateEventRecord,
   updateEventStatusRecordFn = updateEventStatusRecord,
   updateProductRecordFn = updateProductRecord,
   updateSettingsRecordFn = updateSettingsRecord,
@@ -88,7 +112,7 @@ export function createApp({
   authMiddleware = null,
 } = {}) {
   const app = express();
-  const auth = authMiddleware ?? requireAuthFn(getUserByIdFn);
+  const auth = authMiddleware ?? requireAuthFn(getUserByIdFn, getTenantByIdFn, checkTenantStatusFn);
 
   app.use(express.json());
 
@@ -115,6 +139,7 @@ export function createApp({
             suspended: "Akun bisnis Anda sedang disuspend. Hubungi support.",
             cancelled: "Akun bisnis Anda sudah dibatalkan.",
             trial_expired: "Masa trial Anda sudah habis. Silakan upgrade ke paket berbayar.",
+            subscription_expired: "Langganan Anda sudah berakhir. Silakan perpanjang langganan.",
           };
           res.status(403).json({ ok: false, message: messages[tenantCheck.reason] || "Akun tidak aktif." });
           return;
@@ -128,7 +153,8 @@ export function createApp({
         tenantId: user.tenantId,
       });
 
-      res.json({ ok: true, token, user: { ...user, tenant: user.tenant } });
+      const limits = user.tenant ? getPlanLimits(user.tenant.plan) : null;
+      res.json({ ok: true, token, user: { ...user, tenant: user.tenant }, limits });
     })
   );
 
@@ -276,6 +302,45 @@ export function createApp({
     })
   );
 
+  app.patch(
+    "/api/events/:id",
+    auth,
+    requireRoleMiddleware(["admin", "manager"]),
+    asyncHandler(async (req, res) => {
+      const tenantId = req.auth.user.tenantId;
+      const result = await updateEventRecordFn(req.params.id, req.body, tenantId);
+      if (!result.ok) { res.status(400).json(result); return; }
+      const data = await getBootstrapFn({ workspaceId: getRequestWorkspaceId(req), tenantId });
+      res.json({ ok: true, data });
+    })
+  );
+
+  app.delete(
+    "/api/events/:id",
+    auth,
+    requireRoleMiddleware(["admin"]),
+    asyncHandler(async (req, res) => {
+      const tenantId = req.auth.user.tenantId;
+      const result = await deactivateEventRecordFn(req.params.id, tenantId);
+      if (!result.ok) { res.status(400).json(result); return; }
+      const data = await getBootstrapFn({ workspaceId: getRequestWorkspaceId(req), tenantId });
+      res.json({ ok: true, data });
+    })
+  );
+
+  app.put(
+    "/api/workspaces/:id/assignments",
+    auth,
+    requireRoleMiddleware(["admin"]),
+    asyncHandler(async (req, res) => {
+      const tenantId = req.auth.user.tenantId;
+      const result = await setWorkspaceAssignmentsFn(req.params.id, req.body.userIds || [], tenantId);
+      if (!result.ok) { res.status(400).json(result); return; }
+      const data = await getBootstrapFn({ workspaceId: getRequestWorkspaceId(req), tenantId });
+      res.json({ ok: true, data });
+    })
+  );
+
   app.post(
     "/api/promotions",
     auth,
@@ -360,9 +425,10 @@ export function createApp({
     requireRoleMiddleware(["admin"]),
     asyncHandler(async (req, res) => {
       const tenantId = req.auth.user.tenantId;
-      await createUserRecordFn(req.body, tenantId);
+      const result = await createUserRecordFn(req.body, tenantId);
       res.json({
         ok: true,
+        userId: result.userId,
         data: await getBootstrapFn({ workspaceId: getRequestWorkspaceId(req), tenantId }),
       });
     })
@@ -485,33 +551,144 @@ export function createApp({
   );
 
   app.get(
-    "/api/platform/tenants",
+    "/api/platform/me",
     auth,
+    requirePlatformAdmin,
     asyncHandler(async (req, res) => {
-      if (req.auth.payload.role !== 'platform_admin') {
-        res.status(403).json({ ok: false, message: "Forbidden." });
+      const admin = await getPlatformAdminByIdFn(req.auth.payload.sub);
+      if (!admin) {
+        res.status(401).json({ ok: false, message: "Admin tidak ditemukan." });
         return;
       }
+      res.json({ ok: true, admin });
+    })
+  );
+
+  app.get(
+    "/api/platform/tenants",
+    auth,
+    requirePlatformAdmin,
+    asyncHandler(async (req, res) => {
       const tenants = await listTenants();
       res.json({ ok: true, tenants });
+    })
+  );
+
+  app.get(
+    "/api/platform/stats",
+    auth,
+    requirePlatformAdmin,
+    asyncHandler(async (req, res) => {
+      const stats = await getPlatformStatsFn();
+      res.json({ ok: true, ...stats });
+    })
+  );
+
+  app.get(
+    "/api/platform/tenants/:id",
+    auth,
+    requirePlatformAdmin,
+    asyncHandler(async (req, res) => {
+      const detail = await getTenantDetailFn(req.params.id);
+      if (!detail) {
+        res.status(404).json({ ok: false, message: "Tenant tidak ditemukan." });
+        return;
+      }
+      res.json({ ok: true, ...detail });
     })
   );
 
   app.patch(
     "/api/platform/tenants/:id",
     auth,
+    requirePlatformAdmin,
     asyncHandler(async (req, res) => {
-      if (req.auth.payload.role !== 'platform_admin') {
-        res.status(403).json({ ok: false, message: "Forbidden." });
-        return;
-      }
       const result = await updateTenantRecord(req.params.id, req.body);
       if (!result.ok) {
         res.status(400).json(result);
         return;
       }
+      const detail = await getTenantDetailFn(req.params.id);
+      res.json({ ok: true, ...detail });
+    })
+  );
+
+  // Platform: create tenant
+  app.post(
+    "/api/platform/tenants",
+    auth,
+    requirePlatformAdmin,
+    asyncHandler(async (req, res) => {
+      const { businessName, slug, email, password, ownerName, plan, trialDays } = req.body || {};
+      if (!businessName || !slug || !email || !password) {
+        res.status(400).json({ ok: false, message: "Nama bisnis, slug, email, dan password wajib diisi." });
+        return;
+      }
+      const result = await createTenant({
+        name: businessName,
+        slug,
+        email,
+        password,
+        ownerName: ownerName || businessName,
+        ownerUsername: email.split('@')[0],
+        trialDays: plan === 'trial' ? (parseInt(trialDays) || 14) : undefined,
+      });
+      if (!result.ok) {
+        res.status(400).json(result);
+        return;
+      }
+      // If plan specified (not trial), update it with subscription dates
+      if (plan && plan !== 'trial') {
+        const now = new Date();
+        const oneYearLater = new Date(now);
+        oneYearLater.setFullYear(oneYearLater.getFullYear() + 1);
+
+        await updateTenantRecord(result.tenantId, {
+          plan,
+          status: 'active',
+          subscriptionStartsAt: now.toISOString(),
+          subscriptionEndsAt: oneYearLater.toISOString(),
+        });
+      }
       const tenants = await listTenants();
-      res.json({ ok: true, tenants });
+      res.json({ ok: true, tenants, tenantId: result.tenantId });
+    })
+  );
+
+  // Platform: update a tenant's user (reset password, change role, etc.)
+  app.patch(
+    "/api/platform/tenants/:tenantId/users/:userId",
+    auth,
+    requirePlatformAdmin,
+    asyncHandler(async (req, res) => {
+      const result = await updateUserRecordFn(req.params.userId, req.body, req.params.tenantId);
+      if (result && !result.ok) {
+        res.status(400).json(result);
+        return;
+      }
+      const detail = await getTenantDetailFn(req.params.tenantId);
+      res.json({ ok: true, ...detail });
+    })
+  );
+
+  app.post(
+    "/api/platform/login-as/:tenantId",
+    auth,
+    requirePlatformAdmin,
+    asyncHandler(async (req, res) => {
+      const adminUser = await getTenantAdminUserFn(req.params.tenantId);
+      if (!adminUser) {
+        res.status(404).json({ ok: false, message: "Admin user tidak ditemukan untuk tenant ini." });
+        return;
+      }
+      // Issue a token as if this admin user logged in
+      const token = signJwtFn({
+        sub: adminUser.id,
+        role: adminUser.role,
+        username: adminUser.username,
+        tenantId: adminUser.tenantId,
+      });
+      res.json({ ok: true, token, user: adminUser });
     })
   );
 

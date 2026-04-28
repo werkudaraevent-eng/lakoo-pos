@@ -1,5 +1,7 @@
-import { Navigate, Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 
+import { useAuth } from "../context/AuthContext";
+import { LoadingScreen } from "../components/LoadingScreen";
 import { ProtectedRoute } from "./ProtectedRoute";
 import { LoginPage } from "../pages/LoginPage";
 import { RegisterPage } from "../pages/RegisterPage";
@@ -21,12 +23,35 @@ import { SalesPage } from "../pages/SalesPage";
 import { SettingsPage } from "../pages/SettingsPage";
 import { UsersPage } from "../pages/UsersPage";
 import { WorkspacePickerPage } from "../pages/WorkspacePickerPage";
+import { AccountBlockedPage } from "../pages/AccountBlockedPage";
+
+import { PlatformLoginPage } from "../pages/platform/PlatformLoginPage";
+import { PlatformDashboardPage } from "../pages/platform/PlatformDashboardPage";
+import { PlatformTenantsPage } from "../pages/platform/PlatformTenantsPage";
+import { PlatformTenantDetailPage } from "../pages/platform/PlatformTenantDetailPage";
 
 export function App() {
+  const { authLoading } = useAuth();
+  const location = useLocation();
+
+  // Show branded loading screen while restoring session (skip for platform routes & public pages)
+  const isPlatformRoute = location.pathname.startsWith("/platform");
+  const isPublicRoute = ["/login", "/register", "/account-blocked"].includes(location.pathname);
+  if (authLoading && !isPlatformRoute && !isPublicRoute) {
+    return <LoadingScreen message="Memulihkan sesi..." />;
+  }
+
   return (
     <Routes>
+      {/* Platform Admin Routes */}
+      <Route path="/platform/login" element={<PlatformLoginPage />} />
+      <Route path="/platform" element={<PlatformDashboardPage />} />
+      <Route path="/platform/tenants" element={<PlatformTenantsPage />} />
+      <Route path="/platform/tenants/:tenantId" element={<PlatformTenantDetailPage />} />
+
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
+      <Route path="/account-blocked" element={<AccountBlockedPage />} />
       <Route element={<ProtectedRoute requireWorkspace={false} renderShell={false} />}>
         <Route path="/workspace/select" element={<WorkspacePickerPage />} />
       </Route>

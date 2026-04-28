@@ -5,7 +5,7 @@ import { formatCurrency } from "../utils/formatters";
 import "../features/dashboard/dashboard.css";
 
 export function ReportsPage() {
-  const { sales, loading, loadError } = usePosData();
+  const { sales, settings, loading, loadError } = usePosData();
   const [period, setPeriod] = useState("30d");
 
   const periodDays = period === "7d" ? 7 : period === "30d" ? 30 : 90;
@@ -39,6 +39,15 @@ export function ReportsPage() {
   const maxRev = Math.max(...weeklyData.map((d) => d.rev), 1);
   const totalWeek = weeklyData.reduce((s, d) => s + d.rev, 0);
 
+  // Dynamic payment method labels from settings
+  const payMethodLabels = useMemo(() => {
+    const methods = settings?.paymentMethods;
+    if (Array.isArray(methods) && methods.length > 0 && typeof methods[0] === "object") {
+      return Object.fromEntries(methods.map(m => [m.id, m.label]));
+    }
+    return { cash: "Cash", qris: "QRIS", transfer: "Transfer", card: "Kartu Debit/Kredit", ewallet: "E-Wallet" };
+  }, [settings?.paymentMethods]);
+
   // Payment method breakdown
   const methodBreakdown = useMemo(() => {
     const counts = {};
@@ -47,12 +56,11 @@ export function ReportsPage() {
       counts[m] = (counts[m] || 0) + 1;
     });
     const total = filteredSales.length || 1;
-    const labels = { cash: "Cash", card: "Card", qris: "QRIS", transfer: "Transfer", ewallet: "E-Wallet" };
-    const colors = { cash: "var(--blue)", card: "var(--accent)", qris: "var(--success)", transfer: "#8b5cf6", ewallet: "#e67e22" };
+    const colors = { cash: "var(--blue)", qris: "var(--success)", transfer: "#8b5cf6", card: "var(--accent)", ewallet: "#e67e22" };
     return Object.entries(counts)
-      .map(([key, count]) => ({ label: labels[key] || key, pct: Math.round((count / total) * 100), color: colors[key] || "var(--accent)" }))
+      .map(([key, count]) => ({ label: payMethodLabels[key] || key, pct: Math.round((count / total) * 100), color: colors[key] || "var(--accent)" }))
       .sort((a, b) => b.pct - a.pct);
-  }, [filteredSales]);
+  }, [filteredSales, payMethodLabels]);
 
   // Top products
   const topProducts = useMemo(() => {

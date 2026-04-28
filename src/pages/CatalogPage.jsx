@@ -6,9 +6,15 @@ import { formatCurrency } from "../utils/formatters";
 import "../features/dashboard/dashboard.css";
 
 export function CatalogPage() {
-  const { products, categories, settings, loading, loadError } = usePosData();
+  const { products, categories, settings, loading, loadError, updateProduct } = usePosData();
   const [search, setSearch] = useState("");
   const [cat, setCat] = useState("Semua");
+  const [deleteConfirm, setDeleteConfirm] = useState(null);
+
+  async function handleDelete(product) {
+    await updateProduct(product.id, { isActive: false });
+    setDeleteConfirm(null);
+  }
 
   const catList = useMemo(() => {
     const unique = [...new Set((categories || []).map((c) => c.name))].sort();
@@ -99,7 +105,7 @@ export function CatalogPage() {
                   <svg width={12} height={12} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
                   {" "}Edit
                 </Link>
-                <button className="btn btn-ghost btn-sm btn-icon" style={{ color: "var(--danger)" }} type="button">
+                <button className="btn btn-ghost btn-sm btn-icon" style={{ color: "var(--danger)" }} type="button" onClick={(e) => { e.stopPropagation(); setDeleteConfirm(p); }}>
                   <svg width={13} height={13} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14H6L5 6" /><path d="M10 11v6M14 11v6" /></svg>
                 </button>
               </div>
@@ -114,6 +120,27 @@ export function CatalogPage() {
           </div>
         ) : null}
       </div>
+
+      {deleteConfirm && (
+        <div className="modal-overlay" onClick={() => setDeleteConfirm(null)}>
+          <div className="modal" style={{ width: 380, textAlign: "center" }} onClick={(e) => e.stopPropagation()}>
+            {/* Red circle with trash icon */}
+            <div style={{ width: 52, height: 52, borderRadius: "50%", background: "var(--danger-soft)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
+              <svg width="22" height="22" fill="none" stroke="var(--danger)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+                <polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" />
+              </svg>
+            </div>
+            <div style={{ fontSize: 17, fontWeight: 800, marginBottom: 8 }}>Hapus Produk?</div>
+            <div style={{ fontSize: 13.5, color: "var(--text-soft)", marginBottom: 20 }}>
+              Produk <strong>{deleteConfirm.name}</strong> akan dihapus dari katalog.
+            </div>
+            <div style={{ display: "flex", gap: 10 }}>
+              <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setDeleteConfirm(null)}>Batal</button>
+              <button className="btn" style={{ flex: 1, background: "var(--danger)", color: "#fff" }} onClick={() => handleDelete(deleteConfirm)}>Hapus</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -5,7 +5,7 @@ export function LoginHero({ accounts, onPick }) {
     <section className="login-hero">
       <div className="login-hero-brand">
         <div className="login-hero-logo">L</div>
-        <span className="login-hero-brand-text">Lakoo</span>
+        <span className="login-hero-brand-text">Lakoo.</span>
       </div>
 
       <div className="login-hero-content">

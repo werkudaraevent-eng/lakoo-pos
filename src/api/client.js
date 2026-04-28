@@ -1,4 +1,5 @@
 let authToken = "";
+let platformToken = "";
 
 function buildHeaders() {
   const headers = {};
@@ -10,11 +11,44 @@ function buildHeaders() {
   return headers;
 }
 
+function buildPlatformHeaders() {
+  const headers = {};
+
+  if (platformToken) {
+    headers.Authorization = `Bearer ${platformToken}`;
+  }
+
+  return headers;
+}
+
 async function parseResponse(response) {
-  const payload = await response.json();
+  let payload;
+  try {
+    payload = await response.json();
+  } catch {
+    // Server returned non-JSON (e.g. HTML 404 page)
+    if (response.status === 404) {
+      throw new Error("Endpoint tidak ditemukan. Pastikan server sudah di-restart.");
+    }
+    if (response.status >= 500) {
+      throw new Error("Terjadi kesalahan pada server. Silakan coba lagi.");
+    }
+    throw new Error(`Gagal memproses respons server (${response.status}).`);
+  }
 
   if (!response.ok || payload.ok === false) {
-    throw new Error(payload.message || "API request failed.");
+    // Auto-redirect to blocked page when tenant is suspended/expired
+    if (response.status === 403 && payload.reason) {
+      const blockedReasons = ["suspended", "cancelled", "trial_expired", "subscription_expired"];
+      if (blockedReasons.includes(payload.reason) && !window.location.pathname.startsWith("/platform")) {
+        localStorage.removeItem("pos-token");
+        localStorage.removeItem("pos-user");
+        window.location.href = `/account-blocked?reason=${payload.reason}&message=${encodeURIComponent(payload.message || "")}`;
+        // Throw to stop further execution
+        throw new Error(payload.message || "Akun tidak aktif.");
+      }
+    }
+    throw new Error(payload.message || "Permintaan gagal. Silakan coba lagi.");
   }
 
   return payload;
@@ -26,6 +60,14 @@ export function setAuthToken(token) {
 
 export function getAuthToken() {
   return authToken;
+}
+
+export function setPlatformToken(token) {
+  platformToken = token || "";
+}
+
+export function getPlatformToken() {
+  return platformToken;
 }
 
 export function withActiveWorkspace(body, activeWorkspaceId) {
@@ -90,6 +132,14 @@ export async function apiPatch(path, body) {
   return parseResponse(response);
 }
 
+export async function apiDelete(path) {
+  const response = await fetch(path, {
+    method: "DELETE",
+    headers: buildHeaders(),
+  });
+  return parseResponse(response);
+}
+
 export async function apiPut(path, body) {
   const response = await fetch(path, {
     method: "PUT",
@@ -100,5 +150,38 @@ export async function apiPut(path, body) {
     body: JSON.stringify(body),
   });
 
+  return parseResponse(response);
+}
+
+// ── Platform-scoped API helpers (use platformToken) ──────────────
+
+export async function platformGet(path) {
+  const response = await fetch(path, {
+    headers: buildPlatformHeaders(),
+  });
+  return parseResponse(response);
+}
+
+export async function platformPost(path, body) {
+  const response = await fetch(path, {
+    method: "POST",
+    headers: {
+      ...buildPlatformHeaders(),
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+  return parseResponse(response);
+}
+
+export async function platformPatch(path, body) {
+  const response = await fetch(path, {
+    method: "PATCH",
+    headers: {
+      ...buildPlatformHeaders(),
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
   return parseResponse(response);
 }

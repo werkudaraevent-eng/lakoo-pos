@@ -5,6 +5,7 @@ import { usePosData } from "../context/PosDataContext";
 import { buildDashboardCollections } from "../features/dashboard/dashboardData";
 import { buildDashboardKpiCards } from "../features/dashboard/dashboardWorkspace";
 import { buildDashboardSummary } from "../features/events/eventHelpers";
+import { AppIcon } from "../features/ui/AppIcon";
 import { formatCurrency } from "../utils/formatters";
 import "../features/dashboard/dashboard.css";
 
@@ -42,6 +43,9 @@ export function DashboardPage() {
   const topProducts = topItems.slice(0, 5);
   const maxSold = topProducts.length > 0 ? topProducts[0].qty : 1;
 
+  // Current month badge
+  const monthYear = new Date().toLocaleDateString("id-ID", { month: "short", year: "numeric" });
+
   return (
     <div className="content">
       {loading ? <p className="text-sm text-muted" style={{ padding: 16 }}>Memuat data...</p> : null}
@@ -50,7 +54,10 @@ export function DashboardPage() {
       {/* KPIs */}
       <div className="grid-4 mb-16">
         {kpiCards.map((k) => (
-          <div key={k.label} className="card">
+          <div key={k.label} className="card card-sm">
+            <div className="kpi-icon" style={{ background: k.iconBg }}>
+              <AppIcon name={k.iconName} size={18} strokeWidth={2} />
+            </div>
             <div className="kpi-label">{k.label}</div>
             <div className="kpi-value">
               {k.kind === "currency" ? formatCurrency(k.value) : k.value}
@@ -69,9 +76,7 @@ export function DashboardPage() {
         <div className="card">
           <div className="row-between mb-16">
             <div className="section-title" style={{ marginBottom: 0 }}>Pendapatan Minggu Ini</div>
-            <Link to="/reports" className="text-sm" style={{ color: "var(--accent)", fontWeight: 600, textDecoration: "none" }}>
-              Lihat Laporan →
-            </Link>
+            <span className="badge badge-amber">{monthYear}</span>
           </div>
           <svg width="100%" viewBox={`0 0 ${weeklyData.length * 60} ${chartH + 28}`} style={{ overflow: "visible" }}>
             {weeklyData.map((d, i) => {
@@ -130,9 +135,12 @@ export function DashboardPage() {
       <div className="card" style={{ marginTop: 16 }}>
         <div className="row-between mb-16">
           <div className="section-title" style={{ marginBottom: 0 }}>Transaksi Terbaru</div>
-          <Link to="/sales" className="text-sm" style={{ color: "var(--accent)", fontWeight: 600, textDecoration: "none" }}>
-            Lihat Semua →
-          </Link>
+          <div className="row">
+            <span className="text-sm text-muted">Hari ini</span>
+            <Link to="/sales" className="text-sm" style={{ color: "var(--accent)", fontWeight: 600, textDecoration: "none" }}>
+              Lihat Semua →
+            </Link>
+          </div>
         </div>
         <div className="table-wrap">
           <table>
@@ -140,6 +148,7 @@ export function DashboardPage() {
               <tr>
                 <th>ID</th>
                 <th>Waktu</th>
+                <th>Produk</th>
                 <th>Items</th>
                 <th>Total</th>
                 <th>Metode</th>
@@ -153,6 +162,7 @@ export function DashboardPage() {
                   <td className="text-muted text-sm">
                     {new Date(sale.createdAt).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })}
                   </td>
+                  <td className="text-sm">{sale.productSummary || "-"}</td>
                   <td>{sale.items?.length || 0}</td>
                   <td><span style={{ fontWeight: 700 }}>{formatCurrency(sale.grandTotal)}</span></td>
                   <td><span className="badge badge-gray">{sale.paymentMethod}</span></td>
@@ -160,7 +170,7 @@ export function DashboardPage() {
                 </tr>
               )) : (
                 <tr>
-                  <td colSpan={6} className="text-muted text-sm" style={{ textAlign: "center", padding: 32 }}>
+                  <td colSpan={7} className="text-muted text-sm" style={{ textAlign: "center", padding: 32 }}>
                     Belum ada transaksi hari ini
                   </td>
                 </tr>

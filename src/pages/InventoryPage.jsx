@@ -5,6 +5,7 @@ import { useAuth } from "../context/AuthContext";
 import { usePosData } from "../context/PosDataContext";
 import { formatCurrency } from "../utils/formatters";
 import "../features/dashboard/dashboard.css";
+import "../features/inventory/inventory.css";
 
 function getTotalStock(product) {
   return (product.variants || []).filter((v) => v.isActive !== false).reduce((sum, v) => sum + (v.quantityOnHand || 0), 0);
@@ -200,7 +201,7 @@ export function InventoryPage() {
         <div className="table-wrap">
           <table>
             <thead>
-              <tr><th>Produk</th><th>SKU</th><th>Kategori</th><th>Ukuran & Stok</th><th>Total</th><th>Status</th><th>Aksi</th></tr>
+              <tr><th>Produk</th><th>SKU</th><th>Kategori</th><th>{attr1Label || "Ukuran"} & Stok</th><th>Total</th><th>Status</th><th>Aksi</th></tr>
             </thead>
             <tbody>
               {filtered.map((p) => {
@@ -269,7 +270,7 @@ export function InventoryPage() {
               {allProducts.map((p) => {
                 const tot = getTotalStock(p);
                 return (
-                  <div key={p.id} onClick={() => setTambahModal(p)} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 14px", borderRadius: 8, cursor: "pointer", border: "1px solid var(--line)", background: "#fff", transition: "all 0.12s" }}>
+                  <div key={p.id} className="inventory-picker-item" onClick={() => setTambahModal(p)} style={{ display: "flex", alignItems: "center", gap: 12, background: "#fff" }}>
                     <div style={{ flex: 1 }}>
                       <div style={{ fontWeight: 700, fontSize: 13.5 }}>{p.name}</div>
                       <div style={{ fontSize: 12, color: "var(--text-soft)" }}>{(p.variants || [])[0]?.sku || "-"} · {p.category}</div>

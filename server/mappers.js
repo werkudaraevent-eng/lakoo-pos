@@ -6,10 +6,18 @@ export function mapSettingsRows(rows) {
   const settings = {};
 
   for (const row of rows) {
-    if (row.key === "paymentMethods" || row.key === "serviceChargeEnabled") {
+    if (row.key === "showLogo" || row.key === "showBarcode" || row.key === "taxEnabled") {
+      settings[row.key] = row.value === "true";
+    } else if (row.key === "paymentMethods") {
+      try {
+        settings[row.key] = JSON.parse(row.value);
+      } catch {
+        settings[row.key] = [];
+      }
+    } else if (row.key === "serviceChargeEnabled") {
       settings[row.key] = JSON.parse(row.value);
     } else if (row.key === "taxRate") {
-      settings[row.key] = Number(row.value) || 0;
+      settings[row.key] = parseFloat(row.value) || 0;
     } else {
       settings[row.key] = row.value;
     }

@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
 import { useAuth } from "../context/AuthContext";
+import { setAuthToken } from "../api/client";
 import "../features/login/login.css";
 
 export function LoginPage() {
@@ -10,8 +11,31 @@ export function LoginPage() {
   const location = useLocation();
   const [form, setForm] = useState({ username: "", password: "" });
   const [error, setError] = useState("");
+  const [showPass, setShowPass] = useState(false);
 
   const destination = location.state?.from || "/dashboard";
+
+  // Handle impersonation from platform admin
+  // AuthContext already picks up the impersonate token from URL params,
+  // but we need to set the user data and impersonation flag, then redirect.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const impersonateToken = params.get("impersonate");
+    const impersonateUser = params.get("user");
+
+    if (impersonateToken && impersonateUser) {
+      try {
+        const user = JSON.parse(impersonateUser);
+        localStorage.setItem("pos-user", JSON.stringify(user));
+        localStorage.setItem("pos-impersonating", "true");
+        // Clean URL and redirect — AuthContext will handle session restore with the new token
+        window.history.replaceState({}, "", "/workspace/select");
+        navigate("/workspace/select", { replace: true });
+      } catch (e) {
+        console.error("Impersonation failed:", e);
+      }
+    }
+  }, [navigate]);
 
   async function handleSubmit(event) {
     event.preventDefault();
@@ -20,7 +44,20 @@ export function LoginPage() {
 
     const result = await login(form);
     if (!result.ok) {
-      setError(result.message);
+      const message = result.message || "";
+
+      // Detect blocked account reason from error message and redirect
+      if (message.includes("trial") || message.includes("Trial")) {
+        navigate("/account-blocked", { state: { reason: "trial_expired", message } });
+      } else if (message.includes("langganan") || message.includes("Langganan")) {
+        navigate("/account-blocked", { state: { reason: "subscription_expired", message } });
+      } else if (message.includes("suspend") || message.includes("Suspend")) {
+        navigate("/account-blocked", { state: { reason: "suspended", message } });
+      } else if (message.includes("batal") || message.includes("Batal")) {
+        navigate("/account-blocked", { state: { reason: "cancelled", message } });
+      } else {
+        setError(message);
+      }
       return;
     }
     navigate(destination, { replace: true });
@@ -53,12 +90,21 @@ export function LoginPage() {
 
             <div className="field">
               <label>Password</label>
-              <input
-                type="password"
-                placeholder="Masukkan password"
-                value={form.password}
-                onChange={(e) => { setForm((c) => ({ ...c, password: e.target.value })); setError(""); }}
-              />
+              <div className="password-input-wrapper">
+                <input
+                  type={showPass ? "text" : "password"}
+                  placeholder="Masukkan password"
+                  value={form.password}
+                  onChange={(e) => { setForm((c) => ({ ...c, password: e.target.value })); setError(""); }}
+                />
+                <button
+                  type="button"
+                  className="password-toggle-btn"
+                  onClick={() => setShowPass((v) => !v)}
+                >
+                  {showPass ? "Sembunyikan" : "Tampilkan"}
+                </button>
+              </div>
             </div>
 
             {error ? <p className="error-text">{error}</p> : null}

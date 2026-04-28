@@ -19,32 +19,40 @@ export function buildDashboardKpiCards({ revenue = 0, transactions = 0, itemsSol
 
   return [
     {
-      label: "Gross revenue",
+      label: "Pendapatan Hari Ini",
       value: revenue,
       kind: "currency",
       tone: "up",
-      meta: `${transactions} transactions today`,
+      meta: `${transactions} transaksi hari ini`,
+      iconName: "BarChart3",
+      iconBg: "#f5ead8",
     },
     {
-      label: "Transactions",
+      label: "Transaksi Hari Ini",
       value: transactions,
       kind: "count",
       tone: "up",
-      meta: "Completed sales today.",
+      meta: "Penjualan selesai hari ini.",
+      iconName: "Monitor",
+      iconBg: "#e8f0f8",
     },
     {
-      label: "Average order value",
-      value: averageOrderValue,
-      kind: "currency",
-      tone: "down",
-      meta: "Average basket size.",
-    },
-    {
-      label: "Items sold",
+      label: "Item Terjual",
       value: itemsSold,
       kind: "count",
       tone: "up",
-      meta: "Units sold today.",
+      meta: "Unit terjual hari ini.",
+      iconName: "ShoppingBag",
+      iconBg: "#ebf5ef",
+    },
+    {
+      label: "Rata-rata Order",
+      value: averageOrderValue,
+      kind: "currency",
+      tone: "down",
+      meta: "Rata-rata nilai pesanan.",
+      iconName: "Clock",
+      iconBg: "#fbeaea",
     },
   ];
 }

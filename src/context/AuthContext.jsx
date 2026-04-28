@@ -36,7 +36,26 @@ export function AuthProvider({ children }) {
     }
   }, [user]);
 
+  // Check if this is an impersonation redirect — if so, apply the token immediately
+  // before any session restore runs
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const impersonateToken = params.get("impersonate");
+    if (impersonateToken) {
+      // Impersonation takes priority — overwrite any existing token
+      setToken(impersonateToken);
+      localStorage.setItem("pos-token", impersonateToken);
+      setAuthToken(impersonateToken);
+    }
+  }, []);
+
+  useEffect(() => {
+    // Don't interfere with platform admin routes
+    if (window.location.pathname.startsWith("/platform")) return;
+    // Don't overwrite during impersonation redirect
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("impersonate")) return;
+
     setAuthToken(token);
 
     if (token) {
@@ -47,6 +66,12 @@ export function AuthProvider({ children }) {
   }, [token]);
 
   useEffect(() => {
+    // Don't interfere with platform admin routes
+    if (window.location.pathname.startsWith("/platform")) {
+      setAuthLoading(false);
+      return;
+    }
+
     if (!token) {
       return;
     }
@@ -59,7 +84,7 @@ export function AuthProvider({ children }) {
       try {
         const payload = await apiGet("/api/auth/me");
         if (!cancelled) {
-          setUser(payload.user);
+          setUser({ ...payload.user, tenant: payload.tenant, planLimits: payload.limits });
         }
       } catch {
         if (!cancelled) {
@@ -88,8 +113,9 @@ export function AuthProvider({ children }) {
       const payload = await apiPost("/api/auth/login", { username, password, tenantSlug: tenantSlug || undefined });
       setAuthToken(payload.token);
       setToken(payload.token);
-      setUser(payload.user);
-      return { ok: true, user: payload.user };
+      const enrichedUser = { ...payload.user, planLimits: payload.limits };
+      setUser(enrichedUser);
+      return { ok: true, user: enrichedUser };
     } catch (error) {
       return { ok: false, message: error.message };
     } finally {

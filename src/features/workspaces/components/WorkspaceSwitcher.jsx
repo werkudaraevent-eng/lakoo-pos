@@ -1,10 +1,12 @@
-import { Link, useLocation } from "react-router-dom";
+import { useState } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 
 import { useAuth } from "../../../context/AuthContext";
 import { usePosData } from "../../../context/PosDataContext";
 import { CHECKOUT_CART_COUNT_STORAGE_KEY } from "../../checkout/checkoutGuards";
 import { useWorkspace } from "../../../context/WorkspaceContext";
 import { filterAccessibleWorkspaces, shouldConfirmWorkspaceSwitch } from "../workspaceGuards";
+import { ConfirmModal } from "../../../components/ConfirmModal";
 
 function formatWorkspaceType(type) {
   if (type === "event") {
@@ -40,9 +42,11 @@ function formatStockMode(stockMode) {
 
 export function WorkspaceSwitcher({ variant = "executive" }) {
   const location = useLocation();
+  const navigate = useNavigate();
   const { user } = useAuth();
   const { workspaces, loading } = usePosData();
   const { activeWorkspaceId } = useWorkspace();
+  const [switchConfirm, setSwitchConfirm] = useState(false);
   const accessibleWorkspaces = filterAccessibleWorkspaces(workspaces, user);
   const activeWorkspace =
     accessibleWorkspaces.find((workspace) => workspace.id === activeWorkspaceId) ??
@@ -64,13 +68,15 @@ export function WorkspaceSwitcher({ variant = "executive" }) {
       cartCount: Number.isFinite(cartCount) ? cartCount : 0,
     });
 
-    if (
-      requiresConfirm &&
-      typeof window !== "undefined" &&
-      !window.confirm("The current checkout cart still has items. Switch workspace anyway?")
-    ) {
+    if (requiresConfirm) {
       event.preventDefault();
+      setSwitchConfirm(true);
     }
+  }
+
+  function doSwitch() {
+    setSwitchConfirm(false);
+    navigate("/workspace/select", { state: { from: `${location.pathname}${location.search}` } });
   }
 
   if (variant === "banani") {
@@ -95,13 +101,24 @@ export function WorkspaceSwitcher({ variant = "executive" }) {
               <span className="badge badge-muted">{formatWorkspaceType(activeWorkspace.type)}</span>
               {statusLabel ? <span className="badge badge-success">{statusLabel}</span> : null}
             </div>
-            {stockModeLabel ? <button className="btn-outline-full" type="button">{stockModeLabel}</button> : null}
+        {stockModeLabel ? <button className="btn-outline-full" type="button">{stockModeLabel}</button> : null}
           </>
         ) : (
           <p className="muted-text workspace-switcher-empty">
             {loading ? "Loading workspace..." : "Select a workspace to start."}
           </p>
         )}
+
+        <ConfirmModal
+          open={switchConfirm}
+          icon="warning"
+          title="Pindah Workspace?"
+          message="Keranjang checkout masih memiliki item. Yakin ingin pindah workspace?"
+          confirmLabel="Ya, Pindah"
+          confirmVariant="primary"
+          onConfirm={doSwitch}
+          onCancel={() => setSwitchConfirm(false)}
+        />
       </section>
     );
   }
@@ -127,13 +144,24 @@ export function WorkspaceSwitcher({ variant = "executive" }) {
             <span className="badge-soft">{formatWorkspaceType(activeWorkspace.type)}</span>
             {statusLabel ? <span className="badge-soft">{statusLabel}</span> : null}
           </div>
-          {stockModeLabel ? <div className="workspace-switcher-stock-pill">{stockModeLabel}</div> : null}
+      {stockModeLabel ? <div className="workspace-switcher-stock-pill">{stockModeLabel}</div> : null}
         </>
       ) : (
         <p className="muted-text workspace-switcher-empty">
           Select a workspace to scope dashboard, sales, and inventory data.
         </p>
       )}
+
+      <ConfirmModal
+        open={switchConfirm}
+        icon="warning"
+        title="Pindah Workspace?"
+        message="Keranjang checkout masih memiliki item. Yakin ingin pindah workspace?"
+        confirmLabel="Ya, Pindah"
+        confirmVariant="primary"
+        onConfirm={doSwitch}
+        onCancel={() => setSwitchConfirm(false)}
+      />
     </section>
   );
 }

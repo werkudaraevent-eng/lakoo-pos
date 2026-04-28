@@ -482,14 +482,19 @@ export async function authenticateUser(username, password, tenantSlug) {
 
 export async function getUserById(userId) {
   const executor = ensureSql();
-  const rows = await executor`
+  // Try regular users first
+  const userRows = await executor`
     SELECT id, name, username, role, is_active AS "isActive", tenant_id AS "tenantId"
-    FROM users
-    WHERE id = ${userId}
-    LIMIT 1
+    FROM users WHERE id = ${userId} LIMIT 1
   `;
-
-  return rows[0] || null;
+  if (userRows[0]) return userRows[0];
+  
+  // Fallback: check platform_admins
+  const adminRows = await executor`
+    SELECT id, name, email AS username, 'platform_admin' AS role, is_active AS "isActive", NULL AS "tenantId"
+    FROM platform_admins WHERE id = ${userId} LIMIT 1
+  `;
+  return adminRows[0] || null;
 }
 
 export async function createEventRecord(payload, _actorUserId, tenantId) {
@@ -539,8 +544,8 @@ export async function createEventRecord(payload, _actorUserId, tenantId) {
 
       for (const userId of assignedUserIds) {
         await tx`
-          INSERT INTO workspace_assignments (id, workspace_id, user_id, assigned_at, tenant_id)
-          VALUES (${createId("wa")}, ${eventId}, ${userId}, ${nowIso()}, ${tenantId})
+          INSERT INTO workspace_assignments (id, workspace_id, user_id, assigned_at)
+          VALUES (${createId("wa")}, ${eventId}, ${userId}, ${nowIso()})
         `;
       }
     });
@@ -636,6 +641,78 @@ export async function closeEventRecord(eventId, payload) {
   `;
 
   return { ok: true, eventId };
+}
+
+export async function updateEventRecord(eventId, payload, tenantId) {
+  const executor = ensureSql();
+  
+  const rows = await executor`
+    SELECT id, status FROM workspaces
+    WHERE id = ${eventId} AND type = 'event' AND tenant_id = ${tenantId}
+    LIMIT 1
+  `;
+  
+  if (!rows[0]) return { ok: false, message: "Event tidak ditemukan." };
+  if (rows[0].status === "closed" || rows[0].status === "archived") {
+    return { ok: false, message: "Event yang sudah ditutup/diarsipkan tidak bisa diedit." };
+  }
+  
+  await executor`
+    UPDATE workspaces SET
+      name = COALESCE(${payload.name || null}, name),
+      location_label = COALESCE(${payload.locationLabel || null}, location_label),
+      starts_at = COALESCE(${payload.startsAt || null}, starts_at),
+      ends_at = COALESCE(${payload.endsAt || null}, ends_at),
+      stock_mode = COALESCE(${payload.stockMode || null}, stock_mode)
+    WHERE id = ${eventId} AND tenant_id = ${tenantId}
+  `;
+  
+  return { ok: true };
+}
+
+export async function deactivateEventRecord(eventId, tenantId) {
+  const executor = ensureSql();
+  
+  const rows = await executor`
+    SELECT id FROM workspaces
+    WHERE id = ${eventId} AND type = 'event' AND tenant_id = ${tenantId}
+    LIMIT 1
+  `;
+  
+  if (!rows[0]) return { ok: false, message: "Event tidak ditemukan." };
+  
+  await executor`
+    UPDATE workspaces SET
+      is_visible = false,
+      status = 'archived',
+      archived_at = ${new Date().toISOString()}
+    WHERE id = ${eventId} AND tenant_id = ${tenantId}
+  `;
+  
+  return { ok: true };
+}
+
+export async function setWorkspaceAssignments(workspaceId, userIds, tenantId) {
+  const executor = ensureSql();
+  
+  const wsRows = await executor`
+    SELECT id FROM workspaces WHERE id = ${workspaceId} AND tenant_id = ${tenantId} LIMIT 1
+  `;
+  if (!wsRows[0]) return { ok: false, message: "Workspace tidak ditemukan." };
+  
+  await executor.begin(async (tx) => {
+    await tx`DELETE FROM workspace_assignments WHERE workspace_id = ${workspaceId}`;
+    
+    const now = nowIso();
+    for (const userId of (userIds || [])) {
+      await tx`
+        INSERT INTO workspace_assignments (id, workspace_id, user_id, assigned_at)
+        VALUES (${createId("wa")}, ${workspaceId}, ${userId}, ${now})
+      `;
+    }
+  });
+  
+  return { ok: true };
 }
 
 export async function createPromotionRecord(payload, actorUserId, tenantId) {
@@ -914,8 +991,8 @@ export async function finalizeSaleRecord(payload, actorUserId, tenantId) {
           ${discount},
           ${taxTotal},
           ${grandTotal},
-          ${payload.paymentMethod},
-          ${grandTotal},
+          ${payload.paymentMethod || "cash"},
+          ${payload.paidAmount && payload.paidAmount >= grandTotal ? payload.paidAmount : grandTotal},
           ${createdAt},
           ${tenantId}
         )
@@ -998,6 +1075,7 @@ export async function finalizeSaleRecord(payload, actorUserId, tenantId) {
 
     return result;
   } catch (error) {
+    console.error("[finalizeSaleRecord] Error:", error.message, "| paymentMethod:", payload.paymentMethod);
     return { ok: false, message: error.message };
   }
 }
@@ -1013,6 +1091,16 @@ export async function updateSettingsRecord(payload, tenantId) {
     ["taxRate", String(payload.taxRate ?? 0)],
     ["attribute1Label", payload.attribute1Label ?? "Size"],
     ["attribute2Label", payload.attribute2Label ?? "Color"],
+    ["tagline", payload.tagline ?? ""],
+    ["phone", payload.phone ?? ""],
+    ["email", payload.email ?? ""],
+    ["instagram", payload.instagram ?? ""],
+    ["receiptHeader", payload.receiptHeader ?? ""],
+    ["receiptFooter", payload.receiptFooter ?? ""],
+    ["showLogo", JSON.stringify(Boolean(payload.showLogo))],
+    ["showBarcode", JSON.stringify(Boolean(payload.showBarcode))],
+    ["taxEnabled", JSON.stringify(Boolean(payload.taxEnabled))],
+    ["taxName", payload.taxName ?? "Pajak Layanan"],
   ];
 
   await executor.begin(async (tx) => {
@@ -1192,20 +1280,38 @@ export async function updateVariantRecord(variantId, payload, tenantId) {
 
 export async function createUserRecord(payload, tenantId) {
   const executor = ensureSql();
+  const userId = createId("u");
+  const now = nowIso();
 
   await executor`
     INSERT INTO users (id, name, username, password_hash, role, is_active, created_at, tenant_id)
     VALUES (
-      ${createId("u")},
+      ${userId},
       ${payload.name},
       ${payload.username},
       ${hashPassword(payload.password)},
       ${payload.role},
-      ${Boolean(payload.isActive)},
-      ${nowIso()},
+      ${true},
+      ${now},
       ${tenantId}
     )
   `;
+
+  // Auto-assign new user to all active store workspaces
+  const storeWorkspaces = await executor`
+    SELECT id FROM workspaces
+    WHERE tenant_id = ${tenantId} AND type = 'store' AND status = 'active' AND is_visible = true
+  `;
+
+  for (const ws of storeWorkspaces) {
+    await executor`
+      INSERT INTO workspace_assignments (id, workspace_id, user_id, assigned_at)
+      VALUES (${createId("wa")}, ${ws.id}, ${userId}, ${now})
+      ON CONFLICT (workspace_id, user_id) DO NOTHING
+    `;
+  }
+
+  return { ok: true, userId };
 }
 
 export async function updateUserRecord(userId, payload, tenantId) {
@@ -1238,11 +1344,12 @@ export async function updateUserRecord(userId, payload, tenantId) {
 
 // ── Tenant management ──────────────────────────────────────────────
 
-export async function createTenant({ name, slug, email, password, ownerName, ownerUsername }) {
+export async function createTenant({ name, slug, email, password, ownerName, ownerUsername, trialDays }) {
   const executor = ensureSql();
   const tenantId = createId("tenant");
   const now = nowIso();
-  const trialEndsAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString();
+  const days = (trialDays && trialDays > 0) ? trialDays : 14;
+  const trialEndsAt = new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString();
 
   try {
     await executor.begin(async (tx) => {
@@ -1263,10 +1370,11 @@ export async function createTenant({ name, slug, email, password, ownerName, own
       `;
 
       // Create admin user for this tenant
+      const userId = createId('u');
       await tx`
         INSERT INTO users (id, name, username, email, password_hash, role, is_active, created_at, tenant_id)
         VALUES (
-          ${createId('u')},
+          ${userId},
           ${ownerName},
           ${ownerUsername},
           ${email.toLowerCase()},
@@ -1279,12 +1387,14 @@ export async function createTenant({ name, slug, email, password, ownerName, own
       `;
 
       // Create default store workspace
+      const workspaceId = createId('workspace');
       await tx`
-        INSERT INTO workspaces (id, type, name, status, stock_mode, is_visible, created_at, tenant_id)
+        INSERT INTO workspaces (id, type, name, code, status, stock_mode, is_visible, created_at, tenant_id)
         VALUES (
-          ${createId('workspace')},
+          ${workspaceId},
           ${'store'},
           ${'Toko Utama'},
+          ${slug.toUpperCase() + '-MAIN'},
           ${'active'},
           ${'manual'},
           ${true},
@@ -1293,12 +1403,24 @@ export async function createTenant({ name, slug, email, password, ownerName, own
         )
       `;
 
+      // Auto-assign admin to default workspace
+      await tx`
+        INSERT INTO workspace_assignments (id, workspace_id, user_id, assigned_at)
+        VALUES (${createId("wa")}, ${workspaceId}, ${userId}, ${now})
+      `;
+
       // Create default settings
       const defaultSettings = [
         ['storeName', name],
         ['storeCode', slug.toUpperCase()],
         ['address', ''],
-        ['paymentMethods', JSON.stringify(['cash', 'qris'])],
+        ['paymentMethods', JSON.stringify([
+          { id: "cash", label: "Cash", desc: "Uang tunai", enabled: true },
+          { id: "qris", label: "QRIS", desc: "Scan QR Code", enabled: true },
+          { id: "transfer", label: "Transfer Bank", desc: "BCA / Mandiri / BNI", enabled: false },
+          { id: "card", label: "Kartu Debit/Kredit", desc: "Visa / Mastercard", enabled: false },
+          { id: "ewallet", label: "E-Wallet", desc: "GoPay / OVO / Dana", enabled: false },
+        ])],
         ['serviceChargeEnabled', 'false'],
         ['taxRate', '0'],
         ['attribute1Label', 'Size'],
@@ -1373,6 +1495,7 @@ export async function updateTenantRecord(tenantId, payload) {
       name = COALESCE(${payload.name || null}, name),
       plan = COALESCE(${payload.plan || null}, plan),
       status = COALESCE(${payload.status || null}, status),
+      trial_ends_at = COALESCE(${payload.trialEndsAt || null}, trial_ends_at),
       subscription_starts_at = COALESCE(${payload.subscriptionStartsAt || null}, subscription_starts_at),
       subscription_ends_at = COALESCE(${payload.subscriptionEndsAt || null}, subscription_ends_at),
       updated_at = ${nowIso()}
@@ -1384,14 +1507,28 @@ export async function updateTenantRecord(tenantId, payload) {
 export async function listTenants() {
   const executor = ensureSql();
   return executor`
-    SELECT id, name, slug, email, plan, status,
-           trial_ends_at AS "trialEndsAt",
-           subscription_starts_at AS "subscriptionStartsAt",
-           subscription_ends_at AS "subscriptionEndsAt",
-           created_at AS "createdAt"
-    FROM tenants
-    ORDER BY created_at DESC
+    SELECT t.id, t.name, t.slug, t.email, t.plan, t.status,
+           t.trial_ends_at AS "trialEndsAt",
+           t.subscription_starts_at AS "subscriptionStartsAt",
+           t.subscription_ends_at AS "subscriptionEndsAt",
+           t.created_at AS "createdAt",
+           (SELECT COUNT(*)::int FROM users WHERE tenant_id = t.id) AS "usersCount",
+           (SELECT COUNT(*)::int FROM products WHERE tenant_id = t.id) AS "productsCount",
+           (SELECT COUNT(*)::int FROM workspaces WHERE tenant_id = t.id) AS "workspacesCount"
+    FROM tenants t
+    ORDER BY t.created_at DESC
   `;
+}
+
+export async function getPlatformAdminById(adminId) {
+  const executor = ensureSql();
+  const rows = await executor`
+    SELECT id, email, name, is_active AS "isActive"
+    FROM platform_admins
+    WHERE id = ${adminId} AND is_active = true
+    LIMIT 1
+  `;
+  return rows[0] ? { ...rows[0], role: 'platform_admin' } : null;
 }
 
 export async function authenticatePlatformAdmin(email, password) {
@@ -1412,10 +1549,10 @@ export async function authenticatePlatformAdmin(email, password) {
 // ── Plan limits ────────────────────────────────────────────────────
 
 const PLAN_LIMITS = {
-  trial:   { workspaces: 1, products: 50,  users: 2  },
-  starter: { workspaces: 1, products: 100, users: 2  },
-  pro:     { workspaces: 5, products: -1,  users: 10 },
-  business:{ workspaces: -1,products: -1,  users: -1 },
+  trial:   { workspaces: 1, products: 50,  users: 2,  customBranding: false },
+  starter: { workspaces: 1, products: 100, users: 2,  customBranding: false },
+  pro:     { workspaces: 5, products: -1,  users: 10, customBranding: true  },
+  business:{ workspaces: -1,products: -1,  users: -1, customBranding: true  },
 };
 
 export function getPlanLimits(plan) {
@@ -1434,14 +1571,75 @@ export async function getTenantUsage(tenantId) {
   };
 }
 
+export async function getTenantAdminUser(tenantId) {
+  const executor = ensureSql();
+  const rows = await executor`
+    SELECT id, name, username, role, is_active AS "isActive", tenant_id AS "tenantId"
+    FROM users
+    WHERE tenant_id = ${tenantId} AND role = 'admin' AND is_active = true
+    ORDER BY created_at ASC
+    LIMIT 1
+  `;
+  return rows[0] || null;
+}
+
+export async function getPlatformStats() {
+  const executor = ensureSql();
+  const [total] = await executor`SELECT COUNT(*)::int AS count FROM tenants`;
+  const [active] = await executor`SELECT COUNT(*)::int AS count FROM tenants WHERE status = 'active'`;
+  const [trial] = await executor`SELECT COUNT(*)::int AS count FROM tenants WHERE plan = 'trial' AND status = 'active'`;
+  const [suspended] = await executor`SELECT COUNT(*)::int AS count FROM tenants WHERE status = 'suspended'`;
+  
+  // Recent tenants (last 5)
+  const recent = await executor`
+    SELECT id, name, slug, plan, status, created_at AS "createdAt"
+    FROM tenants ORDER BY created_at DESC LIMIT 5
+  `;
+  
+  return {
+    totalTenants: total.count,
+    activeTenants: active.count,
+    trialTenants: trial.count,
+    suspendedTenants: suspended.count,
+    recentTenants: recent,
+  };
+}
+
+export async function getTenantDetail(tenantId) {
+  const executor = ensureSql();
+  const tenant = await getTenantById(tenantId);
+  if (!tenant) return null;
+  
+  const usage = await getTenantUsage(tenantId);
+  const limits = getPlanLimits(tenant.plan);
+  
+  // Get tenant's users
+  const users = await executor`
+    SELECT id, name, username, role, is_active AS "isActive", created_at AS "createdAt"
+    FROM users WHERE tenant_id = ${tenantId} ORDER BY created_at ASC
+  `;
+  
+  return { tenant, usage, limits, users };
+}
+
 export function checkTenantStatus(tenant) {
   if (!tenant) return { ok: false, reason: 'not_found' };
   if (tenant.status === 'suspended') return { ok: false, reason: 'suspended' };
   if (tenant.status === 'cancelled') return { ok: false, reason: 'cancelled' };
+
+  // Trial expiry check
   if (tenant.plan === 'trial' && tenant.trialEndsAt) {
     if (new Date(tenant.trialEndsAt) < new Date()) {
       return { ok: false, reason: 'trial_expired' };
     }
   }
+
+  // Paid subscription expiry check
+  if (tenant.plan !== 'trial' && tenant.subscriptionEndsAt) {
+    if (new Date(tenant.subscriptionEndsAt) < new Date()) {
+      return { ok: false, reason: 'subscription_expired' };
+    }
+  }
+
   return { ok: true };
 }

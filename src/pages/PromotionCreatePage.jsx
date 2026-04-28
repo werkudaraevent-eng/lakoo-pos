@@ -7,13 +7,16 @@ import { usePosData } from "../context/PosDataContext";
 import "../features/promotions/promotions.css";
 
 function createDefaultForm() {
+  const now = new Date();
+  const nextMonth = new Date(now);
+  nextMonth.setMonth(nextMonth.getMonth() + 1);
   return {
     code: "",
     type: "percentage",
     value: 10,
     minPurchase: 0,
-    startAt: "2026-03-30T00:00",
-    endAt: "2026-04-30T23:59",
+    startAt: now.toISOString().slice(0, 16),
+    endAt: nextMonth.toISOString().slice(0, 16),
   };
 }
 

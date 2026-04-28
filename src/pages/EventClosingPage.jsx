@@ -29,16 +29,17 @@ export function EventClosingPage() {
 
   const event = workspaces.find((workspace) => workspace.id === eventId && workspace.type === "event") ?? null;
   const isScopedToEvent = activeWorkspaceId === eventId;
-  const paymentSummary = useMemo(
-    () =>
-      sales.reduce(
-        (totals, sale) => ({
-          cash: totals.cash + (sale.paymentMethod === "cash" ? sale.grandTotal : 0),
-          card: totals.card + (sale.paymentMethod === "card" ? sale.grandTotal : 0),
-        }),
-        { cash: 0, card: 0 }
-      ),
-    [sales]
+  const paymentSummary = useMemo(() => {
+    const summary = {};
+    for (const sale of sales) {
+      const method = sale.paymentMethod || "other";
+      summary[method] = (summary[method] || 0) + sale.grandTotal;
+    }
+    return summary;
+  }, [sales]);
+  const paymentGrandTotal = useMemo(
+    () => Object.values(paymentSummary).reduce((sum, v) => sum + v, 0),
+    [paymentSummary]
   );
   const remainingUnits = useMemo(
     () => variants.reduce((sum, variant) => sum + Number(variant.quantityOnHand || 0), 0),
@@ -214,21 +215,23 @@ export function EventClosingPage() {
             <div className="panel-head">
               <div>
                 <p className="eyebrow">Step 3</p>
-                <h3>Cash and card reconciliation</h3>
+                <h3>Rekonsiliasi pembayaran</h3>
               </div>
               <span className="badge-soft">Finance check</span>
             </div>
             <div className="summary-box closing-summary-box">
+              {Object.entries(paymentSummary).map(([method, total]) => (
+                <div key={method} className="summary-row">
+                  <span className="muted-text">{method.toUpperCase()}</span>
+                  <strong>{formatCurrency(total)}</strong>
+                </div>
+              ))}
               <div className="summary-row">
-                <span className="muted-text">Cash</span>
-                <strong>{formatCurrency(paymentSummary.cash)}</strong>
-              </div>
-              <div className="summary-row">
-                <span className="muted-text">Card</span>
-                <strong>{formatCurrency(paymentSummary.card)}</strong>
+                <span className="muted-text">Total Semua Metode</span>
+                <strong>{formatCurrency(paymentGrandTotal)}</strong>
               </div>
               <div className="summary-row total">
-                <span className="muted-text">Transactions</span>
+                <span className="muted-text">Transaksi</span>
                 <strong>{sales.length}</strong>
               </div>
             </div>
@@ -264,7 +267,7 @@ export function EventClosingPage() {
               </div>
               <div className="summary-row total">
                 <span className="muted-text">Payment total</span>
-                <strong>{formatCurrency(paymentSummary.cash + paymentSummary.card)}</strong>
+                <strong>{formatCurrency(paymentGrandTotal)}</strong>
               </div>
             </div>
           </article>

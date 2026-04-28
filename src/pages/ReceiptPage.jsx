@@ -51,7 +51,7 @@ export function ReceiptPage() {
       <article className="panel-card receipt-print-card">
         <div className="receipt-print-head">
           <div>
-            <strong>{settings.storeName || "Lakoo POS"}</strong>
+            <strong>{settings.storeName || "Lakoo."}</strong>
             <p className="muted-text">{settings.storeCode}</p>
             <p className="muted-text">{settings.address}</p>
           </div>

@@ -74,7 +74,7 @@ export function verifyJwt(token) {
   return payload;
 }
 
-export function requireAuth(loadUserById) {
+export function requireAuth(loadUserById, loadTenantById, checkTenantStatusFn) {
   return async (req, res, next) => {
     const header = req.headers.authorization || "";
     const token = header.startsWith("Bearer ") ? header.slice(7) : "";
@@ -91,6 +91,22 @@ export function requireAuth(loadUserById) {
       if (!user || !user.isActive) {
         res.status(401).json({ ok: false, message: "User is not active." });
         return;
+      }
+
+      // Check tenant status on every request (not just login)
+      if (user.tenantId && loadTenantById && checkTenantStatusFn) {
+        const tenant = await loadTenantById(user.tenantId);
+        const tenantCheck = checkTenantStatusFn(tenant);
+        if (!tenantCheck.ok) {
+          const messages = {
+            suspended: "Akun bisnis Anda sedang disuspend.",
+            cancelled: "Akun bisnis Anda sudah dibatalkan.",
+            trial_expired: "Masa trial Anda sudah habis.",
+            subscription_expired: "Langganan Anda sudah berakhir.",
+          };
+          res.status(403).json({ ok: false, message: messages[tenantCheck.reason] || "Akun tidak aktif.", reason: tenantCheck.reason });
+          return;
+        }
       }
 
       req.auth = {

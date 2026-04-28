@@ -1,7 +1,8 @@
-/* ── Workspace Picker — Nyam Session Page Style ── */
+/* ── Workspace Picker — Lakoo Session Page Style ── */
 
 .wsp-page {
-  min-height: 100vh;
+  height: 100vh;
+  overflow-y: auto;
   background: var(--bg);
   display: flex;
   flex-direction: column;
@@ -139,7 +140,6 @@
 
 .wsp-card:hover {
   border-color: var(--accent);
-  box-shadow: 0 0 0 1px var(--accent);
   transform: translateY(-2px);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
 }
@@ -213,8 +213,9 @@
 .wsp-card-chevron {
   color: var(--text-muted);
   transition: color 0.15s;
-  margin-top: 2px;
   flex-shrink: 0;
+  margin-left: auto;
+  align-self: center;
 }
 
 .wsp-card:hover .wsp-card-chevron {

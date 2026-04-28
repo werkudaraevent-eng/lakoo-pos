@@ -250,9 +250,7 @@ p {
   padding: 24px 16px;
   border-radius: var(--radius-xl);
   color: var(--text);
-  background:
-    radial-gradient(circle at top right, rgba(15, 118, 110, 0.08), transparent 28%),
-    linear-gradient(180deg, var(--sidebar) 0%, var(--sidebar-soft) 100%);
+  background: var(--sidebar);
 }
 
 .sidebar-compact-shell {

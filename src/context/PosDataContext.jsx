@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 
 import {
+  apiDelete,
   apiGet,
   apiPatch,
   apiPost,
@@ -238,7 +239,7 @@ export function PosDataProvider({ children }) {
     }
   }
 
-  async function finalizeSale({ cart, promoCode, paymentMethod, actor }) {
+  async function finalizeSale({ cart, promoCode, paymentMethod, paidAmount, actor }) {
     try {
       const requestWorkspaceId = activeWorkspaceIdRef.current || "";
       const response = await apiPost(
@@ -248,6 +249,7 @@ export function PosDataProvider({ children }) {
             cart,
             promoCode,
             paymentMethod,
+            paidAmount,
             actorUserId: actor.id,
           },
           requestWorkspaceId
@@ -269,7 +271,7 @@ export function PosDataProvider({ children }) {
   async function createUser(payload) {
     const response = await apiPost("/api/users", payload);
     setState(normalizeBootstrapState(response.data));
-    return { ok: true };
+    return { ok: true, userId: response.userId };
   }
 
   async function updateUser(userId, payload) {
@@ -302,6 +304,39 @@ export function PosDataProvider({ children }) {
     return { ok: true };
   }
 
+  async function updateEvent(eventId, payload) {
+    try {
+      const requestWorkspaceId = activeWorkspaceIdRef.current || "";
+      const response = await apiPatch(`/api/events/${eventId}`, payload);
+      applyMutationState(response.data, requestWorkspaceId);
+      return { ok: true };
+    } catch (error) {
+      return { ok: false, message: error.message };
+    }
+  }
+
+  async function deleteEvent(eventId) {
+    try {
+      const requestWorkspaceId = activeWorkspaceIdRef.current || "";
+      const response = await apiDelete(`/api/events/${eventId}`);
+      applyMutationState(response.data, requestWorkspaceId);
+      return { ok: true };
+    } catch (error) {
+      return { ok: false, message: error.message };
+    }
+  }
+
+  async function updateWorkspaceAssignments(workspaceId, userIds) {
+    try {
+      const requestWorkspaceId = activeWorkspaceIdRef.current || "";
+      const response = await apiPut(`/api/workspaces/${workspaceId}/assignments`, { userIds });
+      applyMutationState(response.data, requestWorkspaceId);
+      return { ok: true };
+    } catch (error) {
+      return { ok: false, message: error.message };
+    }
+  }
+
   return (
     <PosDataContext.Provider
       value={{
@@ -312,6 +347,8 @@ export function PosDataProvider({ children }) {
         loadError,
         reload,
         createEvent,
+        updateEvent,
+        deleteEvent,
         updateEventStatus,
         closeEvent,
         createPromotion,
@@ -324,6 +361,7 @@ export function PosDataProvider({ children }) {
         updateProduct,
         createVariant,
         updateVariant,
+        updateWorkspaceAssignments,
       }}
     >
       {children}

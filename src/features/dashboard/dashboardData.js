@@ -89,6 +89,17 @@ function buildChartBars(sales) {
   });
 }
 
+function buildProductSummary(sale) {
+  const items = Array.isArray(sale.items) ? sale.items : [];
+  const names = items
+    .map((item) => item.productNameSnapshot || item.skuSnapshot || "Item")
+    .filter(Boolean);
+
+  if (names.length === 0) return "";
+  if (names.length <= 2) return names.join(", ");
+  return `${names.slice(0, 2).join(", ")} +${names.length - 2}`;
+}
+
 export function buildDashboardCollections({ sales = [], now = new Date().toISOString() } = {}) {
   const safeSales = Array.isArray(sales) ? sales : [];
   const todayKey = toDayKey(now);
@@ -96,10 +107,17 @@ export function buildDashboardCollections({ sales = [], now = new Date().toISOSt
     ? safeSales.filter((sale) => toDayKey(sale?.createdAt) === todayKey)
     : [];
 
+  const recentSales = sortByNewest(todaySales)
+    .slice(0, 5)
+    .map((sale) => ({
+      ...sale,
+      productSummary: buildProductSummary(sale),
+    }));
+
   return {
     todaySales,
     topItems: buildTopItems(todaySales),
-    recentSales: sortByNewest(todaySales).slice(0, 4),
+    recentSales,
     chartBars: buildChartBars(todaySales),
   };
 }

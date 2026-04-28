@@ -26,32 +26,40 @@ test("buildDashboardKpiCards returns the Banani-style KPI cards", () => {
 
   assert.deepEqual(result, [
     {
-      label: "Gross revenue",
+      label: "Pendapatan Hari Ini",
       value: 900000,
       kind: "currency",
       tone: "up",
-      meta: "3 transactions today",
+      meta: "3 transaksi hari ini",
+      iconName: "BarChart3",
+      iconBg: "#f5ead8",
     },
     {
-      label: "Transactions",
+      label: "Transaksi Hari Ini",
       value: 3,
       kind: "count",
       tone: "up",
-      meta: "Completed sales today.",
+      meta: "Penjualan selesai hari ini.",
+      iconName: "Monitor",
+      iconBg: "#e8f0f8",
     },
     {
-      label: "Average order value",
-      value: 300000,
-      kind: "currency",
-      tone: "down",
-      meta: "Average basket size.",
-    },
-    {
-      label: "Items sold",
+      label: "Item Terjual",
       value: 7,
       kind: "count",
       tone: "up",
-      meta: "Units sold today.",
+      meta: "Unit terjual hari ini.",
+      iconName: "ShoppingBag",
+      iconBg: "#ebf5ef",
+    },
+    {
+      label: "Rata-rata Order",
+      value: 300000,
+      kind: "currency",
+      tone: "down",
+      meta: "Rata-rata nilai pesanan.",
+      iconName: "Clock",
+      iconBg: "#fbeaea",
     },
   ]);
 });
@@ -63,7 +71,7 @@ test("buildDashboardKpiCards falls back to zero average order value when there a
     itemsSold: 0,
   });
 
-  assert.equal(result[2].value, 0);
+  assert.equal(result[3].value, 0);
 });
 
 test("buildDashboardKpiCards keeps gross revenue first when there is one transaction", () => {
@@ -74,10 +82,12 @@ test("buildDashboardKpiCards keeps gross revenue first when there is one transac
   });
 
   assert.deepEqual(result[0], {
-    label: "Gross revenue",
+    label: "Pendapatan Hari Ini",
     value: 250000,
     kind: "currency",
     tone: "up",
-    meta: "1 transactions today",
+    meta: "1 transaksi hari ini",
+    iconName: "BarChart3",
+    iconBg: "#f5ead8",
   });
 });

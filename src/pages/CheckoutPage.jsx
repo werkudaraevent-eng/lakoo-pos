@@ -1,8 +1,9 @@
-import { useDeferredValue, useMemo, useRef, useState } from "react";
+import { useDeferredValue, useMemo, useState } from "react";
 
 import { useAuth } from "../context/AuthContext";
 import { usePosData } from "../context/PosDataContext";
 import { formatCurrency } from "../utils/formatters";
+import { ConfirmModal } from "../components/ConfirmModal";
 import "../features/checkout/checkout.css";
 import "../features/dashboard/dashboard.css";
 
@@ -16,13 +17,31 @@ export function CheckoutPage() {
   const [selVariant, setSelVariant] = useState(null);
   const [payModal, setPayModal] = useState(false);
   const [paid, setPaid] = useState(false);
-  const [payMethod, setPayMethod] = useState("qris");
-  const [cash, setCash] = useState("");
+  const [payMethod, setPayMethod] = useState("cash");
   const [submitting, setSubmitting] = useState(false);
   const [lastSale, setLastSale] = useState(null);
+  const [alertModal, setAlertModal] = useState(null);
   const deferredSearch = useDeferredValue(search);
 
   const attr1Label = settings?.attribute1Label || "Size";
+  const attr2Label = settings?.attribute2Label || "Warna";
+
+  // Get enabled methods from settings (supports both old string[] and new object[] format)
+  const enabledMethods = useMemo(() => {
+    const methods = settings?.paymentMethods;
+    if (!Array.isArray(methods) || methods.length === 0) {
+      return [
+        { id: "cash", label: "Cash", desc: "Uang tunai" },
+        { id: "qris", label: "QRIS", desc: "Scan QR Code" },
+      ];
+    }
+    // Old format: string array
+    if (typeof methods[0] === "string") {
+      return methods.map(id => ({ id, label: id.toUpperCase(), desc: "" }));
+    }
+    // New format: object array — only show enabled
+    return methods.filter(m => m.enabled);
+  }, [settings?.paymentMethods]);
 
   // Group variants by product
   const productMap = useMemo(() => {
@@ -70,8 +89,7 @@ export function CheckoutPage() {
   const total = subtotal + tax;
   const cartItemCount = cart.reduce((s, i) => s + i.qty, 0);
 
-  const cashNum = parseInt(String(cash).replace(/\D/g, "")) || 0;
-  const kembalian = cashNum - total;
+  const paidAmount = total;
 
   function openProduct(product) {
     if (getTotalStock(product) === 0) return;
@@ -113,12 +131,17 @@ export function CheckoutPage() {
         cart,
         promoCode: "",
         paymentMethod: payMethod,
+        paidAmount,
         actor: user,
       });
       if (result.ok) {
         setLastSale(result.sale);
         setPaid(true);
+      } else {
+        setAlertModal({ title: "Pembayaran Gagal", message: result.message || "Terjadi kesalahan saat memproses pembayaran." });
       }
+    } catch (err) {
+      setAlertModal({ title: "Pembayaran Gagal", message: err.message || "Terjadi kesalahan." });
     } finally {
       setSubmitting(false);
     }
@@ -128,8 +151,7 @@ export function CheckoutPage() {
     setCart([]);
     setPayModal(false);
     setPaid(false);
-    setCash("");
-    setPayMethod("qris");
+    setPayMethod(enabledMethods[0]?.id || "cash");
     setLastSale(null);
   }
 
@@ -193,7 +215,11 @@ export function CheckoutPage() {
             <div key={item.variantId} className="cart-item">
               <div style={{ flex: 1 }}>
                 <div className="cart-item-name">{item.productName}</div>
-                <div className="cart-item-size">{attr1Label}: {item.attribute1Value || "-"}</div>
+                <div className="cart-item-size">
+                  {item.attribute1Value && <span>{attr1Label}: {item.attribute1Value}</span>}
+                  {item.attribute2Value && <span> · {attr2Label}: {item.attribute2Value}</span>}
+                  {!item.attribute1Value && !item.attribute2Value && <span>-</span>}
+                </div>
               </div>
               <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
                 <div className="qty-ctrl">
@@ -233,7 +259,7 @@ export function CheckoutPage() {
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-title">{modal.name}</div>
             <div style={{ fontSize: 20, fontWeight: 800, color: "var(--accent)", marginBottom: 16 }}>{formatCurrency(modal.price)}</div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text-soft)", marginBottom: 6 }}>PILIH UKURAN</div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text-soft)", marginBottom: 6 }}>PILIH {(attr1Label || "UKURAN").toUpperCase()}</div>
             <div className="size-grid">
               {modal.variants.map((v) => {
                 const stock = v.quantityOnHand || 0;
@@ -266,13 +292,7 @@ export function CheckoutPage() {
             <div style={{ fontSize: 13, color: "var(--text-soft)", marginBottom: 4 }}>Total yang harus dibayar</div>
             <div style={{ fontSize: 32, fontWeight: 800, color: "var(--accent)", marginBottom: 20 }}>{formatCurrency(total)}</div>
             <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text-soft)", marginBottom: 10 }}>METODE PEMBAYARAN</div>
-            {[
-              { id: "qris", label: "QRIS", desc: "Scan QR Code" },
-              { id: "cash", label: "Cash", desc: "Uang tunai" },
-              { id: "transfer", label: "Transfer Bank", desc: "BCA / Mandiri / BNI" },
-              { id: "card", label: "Kartu Debit/Kredit", desc: "Visa / Mastercard" },
-              { id: "ewallet", label: "E-Wallet", desc: "GoPay / OVO / Dana" },
-            ].map((m) => (
+            {enabledMethods.map((m) => (
               <div
                 key={m.id}
                 onClick={() => setPayMethod(m.id)}
@@ -290,17 +310,6 @@ export function CheckoutPage() {
                 <div style={{ fontSize: 12, color: "var(--text-soft)" }}>{m.desc}</div>
               </div>
             ))}
-            {payMethod === "cash" ? (
-              <div style={{ marginTop: 12 }}>
-                <div style={{ fontSize: 12, fontWeight: 700, color: "var(--text-soft)", marginBottom: 6 }}>JUMLAH UANG (CASH)</div>
-                <input className="input" placeholder="0" value={cash} onChange={(e) => setCash(e.target.value)} style={{ fontWeight: 700, fontSize: 16 }} />
-                {cashNum > 0 ? (
-                  <div style={{ marginTop: 8, fontSize: 13, color: "var(--success)", fontWeight: 600 }}>
-                    Kembalian: {formatCurrency(Math.max(0, kembalian))}
-                  </div>
-                ) : null}
-              </div>
-            ) : null}
             <div style={{ display: "flex", gap: 8, marginTop: 20 }}>
               <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setPayModal(false)}>Batal</button>
               <button className="btn btn-primary" style={{ flex: 2, height: 44 }} onClick={handlePay} disabled={submitting}>
@@ -331,6 +340,16 @@ export function CheckoutPage() {
           </div>
         </div>
       ) : null}
+
+      <ConfirmModal
+        open={!!alertModal}
+        icon="danger"
+        title={alertModal?.title}
+        message={alertModal?.message}
+        confirmLabel="OK"
+        confirmVariant="primary"
+        onConfirm={() => setAlertModal(null)}
+      />
     </div>
   );
 }

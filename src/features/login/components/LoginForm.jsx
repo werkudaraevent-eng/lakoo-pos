@@ -1,39 +1,50 @@
+import { useState } from "react";
+
 export function LoginForm({ form, authLoading, error, onChange, onSubmit }) {
+  const [showPass, setShowPass] = useState(false);
+
   return (
     <section className="login-form-section">
       <div className="login-card">
         <div>
-          <h2>Masuk ke akun Anda</h2>
-          <p className="muted-text" style={{ marginTop: 6 }}>
-            Masukkan username dan password untuk melanjutkan.
-          </p>
+          <h2>Selamat datang</h2>
+          <p className="login-subtitle">Masuk ke akun kasir Anda</p>
         </div>
 
         <form className="form-stack" onSubmit={onSubmit}>
-          <label className="field">
-            <span>Username</span>
+          <div className="field">
+            <label>Username</label>
             <input
               autoFocus
               value={form.username}
               onChange={(event) => onChange("username", event.target.value)}
               placeholder="Masukkan username"
             />
-          </label>
+          </div>
 
-          <label className="field">
-            <span>Password</span>
-            <input
-              type="password"
-              value={form.password}
-              onChange={(event) => onChange("password", event.target.value)}
-              placeholder="Masukkan password"
-            />
-          </label>
+          <div className="field">
+            <label>Password</label>
+            <div className="password-input-wrapper">
+              <input
+                type={showPass ? "text" : "password"}
+                value={form.password}
+                onChange={(event) => onChange("password", event.target.value)}
+                placeholder="Masukkan password"
+              />
+              <button
+                type="button"
+                className="password-toggle-btn"
+                onClick={() => setShowPass((v) => !v)}
+              >
+                {showPass ? "Sembunyikan" : "Tampilkan"}
+              </button>
+            </div>
+          </div>
 
           {error ? <p className="error-text">{error}</p> : null}
 
           <button className="primary-button" disabled={authLoading} type="submit">
-            {authLoading ? "Memproses..." : "Masuk"}
+            {authLoading ? "Memverifikasi..." : "Masuk →"}
           </button>
         </form>
 

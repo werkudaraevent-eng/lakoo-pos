@@ -1,3 +1,5 @@
+import { useMemo } from "react";
+
 import { formatCurrency } from "../../../utils/formatters";
 
 export function CartSummary({
@@ -11,11 +13,26 @@ export function CartSummary({
   message,
   submitting,
   finalizeDisabled,
+  settings,
   onPromoChange,
   onPaymentMethodChange,
   onUpdateQty,
   onFinalize,
 }) {
+  // Get enabled methods from settings (supports both old string[] and new object[] format)
+  const enabledMethods = useMemo(() => {
+    const methods = settings?.paymentMethods;
+    if (!Array.isArray(methods) || methods.length === 0) {
+      return [
+        { id: "cash", label: "Cash", desc: "Uang tunai" },
+        { id: "qris", label: "QRIS", desc: "Scan QR Code" },
+      ];
+    }
+    if (typeof methods[0] === "string") {
+      return methods.map(id => ({ id, label: id.toUpperCase(), desc: "" }));
+    }
+    return methods.filter(m => m.enabled);
+  }, [settings?.paymentMethods]);
   return (
     <aside className="checkout-summary-card checkout-summary-sticky">
       <div className="checkout-panel-head">
@@ -61,14 +78,15 @@ export function CartSummary({
         <div className="checkout-payment-block">
           <span className="checkout-block-label">Payment method</span>
           <div className="checkout-payment-toggle">
-            {["cash", "card"].map((method) => (
+            {enabledMethods.map((method) => (
               <button
-                className={`checkout-toggle-chip${paymentMethod === method ? " is-selected" : ""}`}
-                key={method}
-                onClick={() => onPaymentMethodChange(method)}
+                className={`checkout-toggle-chip${paymentMethod === method.id ? " is-selected" : ""}`}
+                key={method.id}
+                onClick={() => onPaymentMethodChange(method.id)}
                 type="button"
+                title={method.desc}
               >
-                {method}
+                {method.label}
               </button>
             ))}
           </div>
@@ -84,6 +102,12 @@ export function CartSummary({
           <span>Discount</span>
           <strong>{formatCurrency(discount)}</strong>
         </div>
+        {settings?.taxRate > 0 && (
+          <div className="checkout-summary-row">
+            <span>Pajak ({settings.taxRate}%)</span>
+            <strong>{formatCurrency(Math.round(subtotal * settings.taxRate / 100))}</strong>
+          </div>
+        )}
         <div className="checkout-summary-row total">
           <span>Grand total</span>
           <strong>{formatCurrency(grandTotal)}</strong>
