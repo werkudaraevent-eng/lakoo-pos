@@ -18,9 +18,10 @@ export function CatalogPage() {
   const [importModal, setImportModal] = useState(false);
   const [storeProducts, setStoreProducts] = useState([]);
   const [loadingStore, setLoadingStore] = useState(false);
-  const [selections, setSelections] = useState({}); // { variantId: qty }
+  const [selections, setSelections] = useState({}); // allocate: { variantId: qty }, manual: { variantId: true }
   const [importing, setImporting] = useState(false);
   const [toast, setToast] = useState(null);
+  const isAllocateMode = activeWorkspace?.stockMode === "allocate";
 
   function showToast(type, message) {
     setToast({ type, message });
@@ -40,16 +41,27 @@ export function CatalogPage() {
   }, [importModal]);
 
   async function handleImport() {
-    const items = Object.entries(selections)
-      .filter(([_, qty]) => qty > 0)
-      .map(([variantId, quantity]) => ({ variantId, quantity }));
+    let items;
+    if (isAllocateMode) {
+      // Allocate: send qty per variant
+      items = Object.entries(selections)
+        .filter(([_, qty]) => qty > 0)
+        .map(([variantId, quantity]) => ({ variantId, quantity }));
+    } else {
+      // Manual: add products to catalog with qty=0 (user sets stock in Inventory later)
+      items = Object.entries(selections)
+        .filter(([_, selected]) => selected)
+        .map(([variantId]) => ({ variantId, quantity: 0 }));
+    }
     if (items.length === 0) return;
 
     setImporting(true);
     try {
       await allocateStockToEvent(activeWorkspaceId, items);
-      const totalQty = items.reduce((s, i) => s + i.quantity, 0);
-      showToast("success", `Berhasil menambahkan ${items.length} variant (${totalQty} unit) ke event.`);
+      showToast("success", isAllocateMode
+        ? `Berhasil mengalokasikan ${items.length} variant ke event.`
+        : `Berhasil menambahkan ${items.length} variant ke katalog event. Atur stok di halaman Inventori.`
+      );
       setImportModal(false);
     } catch (err) {
       showToast("error", err.message || "Gagal menambahkan produk.");
@@ -203,9 +215,10 @@ export function CatalogPage() {
               <div>
                 <div className="modal-title" style={{ marginBottom: 2 }}>Ambil Produk dari Toko</div>
                 <div style={{ fontSize: 13, color: "var(--text-soft)" }}>
-                  Pilih produk dan jumlah stok awal untuk event.
-                  {activeWorkspace?.stockMode === "allocate" && " Stok toko akan berkurang."}
-                  {activeWorkspace?.stockMode === "manual" && " Stok toko tidak terpengaruh."}
+                  {isAllocateMode
+                    ? "Pilih produk dan jumlah stok yang ingin dialokasikan. Stok toko akan berkurang."
+                    : "Pilih produk yang ingin ditambahkan ke katalog event. Atur stok nanti di halaman Inventori."
+                  }
                 </div>
               </div>
               <button className="btn btn-ghost btn-icon" onClick={() => setImportModal(false)}>✕</button>
@@ -251,25 +264,27 @@ export function CatalogPage() {
                             }}>
                               <div style={{ minWidth: 28, height: 22, borderRadius: 4, background: "#fff", border: "1px solid var(--line)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 10 }}>{label}</div>
                               <div style={{ flex: 1, color: "var(--text-soft)" }}>
-                                Toko: <strong style={{ color: storeQty === 0 ? "var(--danger)" : "var(--text)" }}>{storeQty}</strong>
+                                {isAllocateMode && <>Toko: <strong style={{ color: storeQty === 0 ? "var(--danger)" : "var(--text)" }}>{storeQty}</strong></>}
                                 {alreadyInEvent && <span className="badge badge-blue" style={{ fontSize: 9, marginLeft: 6 }}>sudah di event</span>}
                               </div>
-                              {storeQty > 0 && !alreadyInEvent && (
-                                <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                                  <div className="qty-btn" style={{ width: 22, height: 22, fontSize: 12 }}
-                                    onClick={() => setSelections(s => ({ ...s, [v.id]: Math.max(0, (s[v.id] || 0) - 1) }))}>−</div>
-                                  <input type="number" min={0} max={activeWorkspace?.stockMode === "allocate" ? storeQty : 9999} value={qty}
-                                    onChange={e => {
-                                      const max = activeWorkspace?.stockMode === "allocate" ? storeQty : 9999;
-                                      setSelections(s => ({ ...s, [v.id]: Math.min(max, Math.max(0, parseInt(e.target.value) || 0)) }));
-                                    }}
-                                    style={{ width: 40, textAlign: "center", padding: "2px", border: "1px solid var(--line)", borderRadius: 4, fontWeight: 700, fontSize: 12, fontFamily: "inherit" }} />
-                                  <div className="qty-btn" style={{ width: 22, height: 22, fontSize: 12 }}
-                                    onClick={() => {
-                                      const max = activeWorkspace?.stockMode === "allocate" ? storeQty : 9999;
-                                      setSelections(s => ({ ...s, [v.id]: Math.min(max, (s[v.id] || 0) + 1) }));
-                                    }}>+</div>
-                                </div>
+                              {!alreadyInEvent && (storeQty > 0 || !isAllocateMode) && (
+                                isAllocateMode ? (
+                                  /* Allocate mode: qty input */
+                                  <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                                    <div className="qty-btn" style={{ width: 22, height: 22, fontSize: 12 }}
+                                      onClick={() => setSelections(s => ({ ...s, [v.id]: Math.max(0, (s[v.id] || 0) - 1) }))}>−</div>
+                                    <input type="number" min={0} max={storeQty} value={qty}
+                                      onChange={e => setSelections(s => ({ ...s, [v.id]: Math.min(storeQty, Math.max(0, parseInt(e.target.value) || 0)) }))}
+                                      style={{ width: 40, textAlign: "center", padding: "2px", border: "1px solid var(--line)", borderRadius: 4, fontWeight: 700, fontSize: 12, fontFamily: "inherit" }} />
+                                    <div className="qty-btn" style={{ width: 22, height: 22, fontSize: 12 }}
+                                      onClick={() => setSelections(s => ({ ...s, [v.id]: Math.min(storeQty, (s[v.id] || 0) + 1) }))}>+</div>
+                                  </div>
+                                ) : (
+                                  /* Manual mode: checkbox only */
+                                  <input type="checkbox" checked={!!selections[v.id]}
+                                    onChange={e => setSelections(s => ({ ...s, [v.id]: e.target.checked }))}
+                                    style={{ width: 18, height: 18, cursor: "pointer" }} />
+                                )
                               )}
                             </div>
                           );
@@ -282,12 +297,16 @@ export function CatalogPage() {
             )}
 
             {(() => {
-              const totalItems = Object.values(selections).filter(q => q > 0).length;
-              const totalQty = Object.values(selections).reduce((a, b) => a + b, 0);
-              return totalItems > 0 ? (
+              const selectedCount = isAllocateMode
+                ? Object.values(selections).filter(q => q > 0).length
+                : Object.values(selections).filter(Boolean).length;
+              const totalQty = isAllocateMode
+                ? Object.values(selections).reduce((a, b) => a + (Number(b) || 0), 0)
+                : selectedCount;
+              return selectedCount > 0 ? (
                 <div style={{ background: "var(--accent-light)", border: "1px solid var(--accent-soft)", borderRadius: 8, padding: "10px 14px", marginTop: 16, display: "flex", justifyContent: "space-between", fontSize: 13 }}>
-                  <span style={{ color: "var(--text-soft)" }}>{totalItems} variant dipilih</span>
-                  <span style={{ fontWeight: 800, color: "var(--accent)" }}>{totalQty} unit</span>
+                  <span style={{ color: "var(--text-soft)" }}>{selectedCount} variant dipilih</span>
+                  {isAllocateMode && <span style={{ fontWeight: 800, color: "var(--accent)" }}>{totalQty} unit</span>}
                 </div>
               ) : null;
             })()}
@@ -295,9 +314,12 @@ export function CatalogPage() {
             <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
               <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setImportModal(false)} disabled={importing}>Batal</button>
               <button className="btn btn-primary" style={{ flex: 2, height: 42 }}
-                disabled={Object.values(selections).reduce((a, b) => a + b, 0) === 0 || importing}
+                disabled={(() => {
+                  if (isAllocateMode) return Object.values(selections).reduce((a, b) => a + (Number(b) || 0), 0) === 0;
+                  return !Object.values(selections).some(Boolean);
+                })() || importing}
                 onClick={handleImport}>
-                {importing ? "Menambahkan..." : "Tambahkan ke Event"}
+                {importing ? "Menambahkan..." : isAllocateMode ? "Alokasikan ke Event" : "Tambahkan ke Katalog Event"}
               </button>
             </div>
           </div>

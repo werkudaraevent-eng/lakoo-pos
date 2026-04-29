@@ -1675,8 +1675,9 @@ export async function allocateStockToEvent(payload, actorUserId, tenantId) {
   try {
     await executor.begin(async (tx) => {
       for (const item of items) {
-        const qty = Number(item.quantity);
-        if (qty < 1) continue;
+        const qty = Math.max(0, Number(item.quantity) || 0);
+        // For allocate mode, qty must be > 0. For manual mode, qty=0 is OK (just add to catalog).
+        if (qty < 1 && workspace.stockMode === "allocate") continue;
 
         // Validate variant belongs to tenant
         const variantRows = await tx`
@@ -1697,8 +1698,8 @@ export async function allocateStockToEvent(payload, actorUserId, tenantId) {
         `;
         const existing = existingRows[0];
 
-        // If allocate mode, deduct from main store
-        if (workspace.stockMode === "allocate") {
+        // If allocate mode AND qty > 0, deduct from main store
+        if (qty > 0 && workspace.stockMode === "allocate") {
           if (variant.quantityOnHand < qty) {
             throw new Error(`Stok toko tidak cukup untuk variant ${item.variantId}. Tersedia: ${variant.quantityOnHand}, diminta: ${qty}`);
           }
@@ -1709,16 +1710,18 @@ export async function allocateStockToEvent(payload, actorUserId, tenantId) {
         }
 
         if (existing) {
-          // Update existing allocation
-          await tx`
-            UPDATE workspace_variant_stocks SET
-              quantity_on_hand = quantity_on_hand + ${qty},
-              allocated_from_main = CASE WHEN ${workspace.stockMode === "allocate"} THEN allocated_from_main + ${qty} ELSE allocated_from_main END,
-              updated_at = ${nowIso()}
-            WHERE id = ${existing.id}
-          `;
+          // Update existing allocation (only if qty > 0)
+          if (qty > 0) {
+            await tx`
+              UPDATE workspace_variant_stocks SET
+                quantity_on_hand = quantity_on_hand + ${qty},
+                allocated_from_main = CASE WHEN ${workspace.stockMode === "allocate"} THEN allocated_from_main + ${qty} ELSE allocated_from_main END,
+                updated_at = ${nowIso()}
+              WHERE id = ${existing.id}
+            `;
+          }
         } else {
-          // Create new allocation
+          // Create new entry (even with qty=0 for manual mode — adds product to event catalog)
           await tx`
             INSERT INTO workspace_variant_stocks
             (id, workspace_id, variant_id, quantity_on_hand, source_mode, allocated_from_main, created_at, updated_at)
@@ -1735,23 +1738,25 @@ export async function allocateStockToEvent(payload, actorUserId, tenantId) {
           `;
         }
 
-        // Create inventory movement for audit
-        await tx`
-          INSERT INTO inventory_movements
-          (id, variant_id, workspace_id, type, qty_delta, note, actor_user_id, reference_id, created_at, tenant_id)
-          VALUES (
-            ${createId("mov")},
-            ${item.variantId},
-            ${workspace.id},
-            ${"restock"},
-            ${qty},
-            ${"Alokasi stok dari toko ke event"},
-            ${actorUserId},
-            ${null},
-            ${nowIso()},
-            ${tenantId}
-          )
-        `;
+        // Create inventory movement for audit (only if qty > 0)
+        if (qty > 0) {
+          await tx`
+            INSERT INTO inventory_movements
+            (id, variant_id, workspace_id, type, qty_delta, note, actor_user_id, reference_id, created_at, tenant_id)
+            VALUES (
+              ${createId("mov")},
+              ${item.variantId},
+              ${workspace.id},
+              ${"restock"},
+              ${qty},
+              ${workspace.stockMode === "allocate" ? "Alokasi stok dari toko ke event" : "Produk ditambahkan ke katalog event"},
+              ${actorUserId},
+              ${null},
+              ${nowIso()},
+              ${tenantId}
+            )
+          `;
+        }
       }
     });
 
