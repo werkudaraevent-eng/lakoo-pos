@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 
 import { useAuth } from "../context/AuthContext";
 import { usePosData } from "../context/PosDataContext";
+import { useWorkspace } from "../context/WorkspaceContext";
 import { formatCurrency } from "../utils/formatters";
 import "../features/dashboard/dashboard.css";
 import "../features/inventory/inventory.css";
@@ -26,7 +27,7 @@ function getBadge(total) {
 }
 
 // ── Tambah Stok Modal ──
-function TambahStokModal({ product, settings, onClose, onSave }) {
+function TambahStokModal({ product, settings, isEvent, onClose, onSave }) {
   const attr1Label = settings?.attribute1Label || "Size";
   const variants = (product.variants || []).filter((v) => v.isActive !== false);
   const [deltas, setDeltas] = useState(() => {
@@ -74,7 +75,14 @@ function TambahStokModal({ product, settings, onClose, onSave }) {
                 <div style={{ width: 40, height: 30, borderRadius: 6, background: "#fff", border: "1px solid var(--line)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 12, flexShrink: 0 }}>{label}</div>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 13, fontWeight: 600 }}>{attr1Label} {label}</div>
-                  <div style={{ fontSize: 11.5, color: "var(--text-soft)" }}>Stok saat ini: <strong>{current}</strong></div>
+                  <div style={{ fontSize: 11.5, color: "var(--text-soft)" }}>
+                    Stok{isEvent ? " event" : ""}: <strong>{current}</strong>
+                    {isEvent && v.mainStockOnHand != null && (
+                      <span style={{ marginLeft: 6, color: v.mainStockOnHand === 0 ? "var(--danger)" : "var(--text-muted)" }}>
+                        · Toko: <strong>{v.mainStockOnHand}</strong>
+                      </span>
+                    )}
+                  </div>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                   <span style={{ fontSize: 12, color: "var(--text-soft)", fontWeight: 600 }}>+ Tambah</span>
@@ -106,8 +114,11 @@ function TambahStokModal({ product, settings, onClose, onSave }) {
 }
 
 export function InventoryPage() {
-  const { products, settings, adjustInventory, loading, loadError } = usePosData();
+  const { products, workspaces, settings, adjustInventory, loading, loadError } = usePosData();
   const { user } = useAuth();
+  const { activeWorkspaceId } = useWorkspace();
+  const activeWorkspace = workspaces.find((w) => w.id === activeWorkspaceId);
+  const isEventWorkspace = activeWorkspace?.type === "event";
   const [search, setSearch] = useState("");
   const [catFilter, setCatFilter] = useState("Semua");
   const [statusFilter, setStatusFilter] = useState("Semua");
@@ -219,6 +230,19 @@ export function InventoryPage() {
         </div>
       ) : null}
 
+      {/* Event workspace info banner */}
+      {isEventWorkspace && (
+        <div style={{ background: "var(--accent-light)", border: "1px solid var(--accent-soft)", borderRadius: 10, padding: "12px 16px", marginBottom: 14, fontSize: 13, color: "var(--accent-deep)", display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ fontSize: 16 }}>📦</span>
+          <div>
+            <strong>Mode Event: {activeWorkspace?.stockMode === "allocate" ? "Alokasi dari Toko Utama" : "Stok Manual"}</strong>
+            {activeWorkspace?.stockMode === "allocate" && (
+              <div style={{ fontSize: 12, marginTop: 2, opacity: 0.8 }}>Menambah stok event akan memotong stok toko utama. Kolom "Stok Toko" menunjukkan sisa stok di toko utama.</div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Summary */}
       <div style={{ display: "flex", gap: 10, marginBottom: 16 }}>
         {[
@@ -239,7 +263,12 @@ export function InventoryPage() {
         <div className="table-wrap">
           <table>
             <thead>
-              <tr><th>Produk</th><th>SKU</th><th>Kategori</th><th>{attr1Label || "Ukuran"} & Stok</th><th>Total</th><th>Status</th><th>Aksi</th></tr>
+              <tr>
+                <th>Produk</th><th>SKU</th><th>Kategori</th>
+                <th>{attr1Label || "Ukuran"} & Stok{isEventWorkspace ? " Event" : ""}</th>
+                {isEventWorkspace && <th>Stok Toko</th>}
+                <th>Total</th><th>Status</th><th>Aksi</th>
+              </tr>
             </thead>
             <tbody>
               {filtered.map((p) => {
@@ -263,6 +292,21 @@ export function InventoryPage() {
                         })}
                       </div>
                     </td>
+                    {isEventWorkspace && (
+                      <td>
+                        <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
+                          {variants.map((v) => {
+                            const mainQty = v.mainStockOnHand ?? v.quantityOnHand ?? 0;
+                            const label = v.attribute1Value || v.sku;
+                            return (
+                              <span key={v.id} style={{ fontSize: 11.5, padding: "2px 7px", borderRadius: 4, fontWeight: 600, background: mainQty === 0 ? "var(--danger-soft)" : mainQty <= 3 ? "var(--accent-soft)" : "var(--surface)", color: mainQty === 0 ? "var(--danger)" : mainQty <= 3 ? "var(--accent)" : "var(--text-soft)" }}>
+                                {label}: {mainQty}
+                              </span>
+                            );
+                          })}
+                        </div>
+                      </td>
+                    )}
                     <td><span style={{ fontWeight: 700 }}>{total}</span></td>
                     <td><span className={`badge ${getBadge(total)}`}>{getStatus(total)}</span></td>
                     <td>
@@ -281,7 +325,7 @@ export function InventoryPage() {
                 );
               })}
               {!loading && filtered.length === 0 ? (
-                <tr><td colSpan={7} className="text-muted text-sm" style={{ textAlign: "center", padding: 32 }}>Tidak ada produk ditemukan</td></tr>
+                <tr><td colSpan={isEventWorkspace ? 8 : 7} className="text-muted text-sm" style={{ textAlign: "center", padding: 32 }}>Tidak ada produk ditemukan</td></tr>
               ) : null}
             </tbody>
           </table>
@@ -290,7 +334,7 @@ export function InventoryPage() {
 
       {/* Tambah Stok Modal */}
       {tambahModal && tambahModal !== "picker" ? (
-        <TambahStokModal product={tambahModal} settings={settings} onClose={() => setTambahModal(null)} onSave={handleTambahSave} />
+        <TambahStokModal product={tambahModal} settings={settings} isEvent={isEventWorkspace} onClose={() => setTambahModal(null)} onSave={handleTambahSave} />
       ) : null}
 
       {/* Toast */}

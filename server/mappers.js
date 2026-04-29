@@ -98,6 +98,7 @@ export function overlayProductsWithWorkspaceStock(products, workspaceVariantStoc
       return [
         {
           ...variant,
+          mainStockOnHand: variant.quantityOnHand,
           quantityOnHand: workspaceStock.quantityOnHand,
           sourceMode: workspaceStock.sourceMode,
           allocatedFromMain: workspaceStock.allocatedFromMain,
