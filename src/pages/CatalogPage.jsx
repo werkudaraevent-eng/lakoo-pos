@@ -1,15 +1,62 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { usePosData } from "../context/PosDataContext";
+import { useWorkspace } from "../context/WorkspaceContext";
 import { formatCurrency } from "../utils/formatters";
 import "../features/dashboard/dashboard.css";
 
 export function CatalogPage() {
-  const { products, categories, settings, loading, loadError, updateProduct } = usePosData();
+  const { products, workspaces, categories, settings, loading, loadError, updateProduct, getStoreProducts, allocateStockToEvent } = usePosData();
+  const { activeWorkspaceId } = useWorkspace();
+  const activeWorkspace = workspaces.find((w) => w.id === activeWorkspaceId);
+  const isEventWorkspace = activeWorkspace?.type === "event";
+
   const [search, setSearch] = useState("");
   const [cat, setCat] = useState("Semua");
   const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [importModal, setImportModal] = useState(false);
+  const [storeProducts, setStoreProducts] = useState([]);
+  const [loadingStore, setLoadingStore] = useState(false);
+  const [selections, setSelections] = useState({}); // { variantId: qty }
+  const [importing, setImporting] = useState(false);
+  const [toast, setToast] = useState(null);
+
+  function showToast(type, message) {
+    setToast({ type, message });
+    setTimeout(() => setToast(null), 3000);
+  }
+
+  // Load store products when import modal opens
+  useEffect(() => {
+    if (importModal) {
+      setLoadingStore(true);
+      setSelections({});
+      getStoreProducts()
+        .then(setStoreProducts)
+        .catch(() => {})
+        .finally(() => setLoadingStore(false));
+    }
+  }, [importModal]);
+
+  async function handleImport() {
+    const items = Object.entries(selections)
+      .filter(([_, qty]) => qty > 0)
+      .map(([variantId, quantity]) => ({ variantId, quantity }));
+    if (items.length === 0) return;
+
+    setImporting(true);
+    try {
+      await allocateStockToEvent(activeWorkspaceId, items);
+      const totalQty = items.reduce((s, i) => s + i.quantity, 0);
+      showToast("success", `Berhasil menambahkan ${items.length} variant (${totalQty} unit) ke event.`);
+      setImportModal(false);
+    } catch (err) {
+      showToast("error", err.message || "Gagal menambahkan produk.");
+    } finally {
+      setImporting(false);
+    }
+  }
 
   async function handleDelete(product) {
     await updateProduct(product.id, { isActive: false });
@@ -46,6 +93,19 @@ export function CatalogPage() {
       {loading ? <p className="text-sm text-muted" style={{ padding: 16 }}>Memuat data...</p> : null}
       {loadError ? <p style={{ padding: 16, color: "var(--danger)" }}>{loadError}</p> : null}
 
+      {/* Event info banner */}
+      {isEventWorkspace && (
+        <div style={{ background: "var(--accent-light)", border: "1px solid var(--accent-soft)", borderRadius: 10, padding: "12px 16px", marginBottom: 14, fontSize: 13, display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ fontSize: 16 }}>🏪</span>
+          <div style={{ flex: 1 }}>
+            <strong>Katalog Event: {activeWorkspace?.name}</strong>
+            <div style={{ fontSize: 12, marginTop: 2, opacity: 0.8 }}>
+              Menampilkan produk yang tersedia di event ini. Gunakan "Ambil dari Toko" untuk menambahkan produk dari toko utama.
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Search + Add */}
       <div style={{ display: "flex", gap: 10, marginBottom: 16, flexWrap: "wrap" }}>
         <div className="input-wrap" style={{ flex: "1 1 200px" }}>
@@ -54,10 +114,17 @@ export function CatalogPage() {
           </span>
           <input className="input has-icon" placeholder="Cari produk..." value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
-        <Link to="/catalog/new" className="btn btn-primary" style={{ textDecoration: "none" }}>
-          <svg width={14} height={14} fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
-          {" "}Tambah Produk
-        </Link>
+        {isEventWorkspace && (
+          <button className="btn btn-primary" onClick={() => setImportModal(true)}>
+            🏪 Ambil dari Toko
+          </button>
+        )}
+        {!isEventWorkspace && (
+          <Link to="/catalog/new" className="btn btn-primary" style={{ textDecoration: "none" }}>
+            <svg width={14} height={14} fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+            {" "}Tambah Produk
+          </Link>
+        )}
       </div>
 
       {/* Category filter */}
@@ -120,6 +187,122 @@ export function CatalogPage() {
           </div>
         ) : null}
       </div>
+
+      {/* Toast */}
+      {toast && (
+        <div style={{ position: "fixed", bottom: 24, right: 24, zIndex: 200, padding: "12px 20px", borderRadius: 10, background: toast.type === "success" ? "var(--success)" : "var(--danger)", color: "#fff", fontSize: 13.5, fontWeight: 600, boxShadow: "0 8px 24px rgba(0,0,0,0.15)", maxWidth: 400 }}>
+          {toast.type === "success" ? "✓ " : "✗ "}{toast.message}
+        </div>
+      )}
+
+      {/* Import from Store Modal */}
+      {importModal && (
+        <div className="modal-overlay" onClick={() => setImportModal(false)}>
+          <div className="modal" style={{ width: 540 }} onClick={(e) => e.stopPropagation()}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 }}>
+              <div>
+                <div className="modal-title" style={{ marginBottom: 2 }}>Ambil Produk dari Toko</div>
+                <div style={{ fontSize: 13, color: "var(--text-soft)" }}>
+                  Pilih produk dan jumlah stok awal untuk event.
+                  {activeWorkspace?.stockMode === "allocate" && " Stok toko akan berkurang."}
+                  {activeWorkspace?.stockMode === "manual" && " Stok toko tidak terpengaruh."}
+                </div>
+              </div>
+              <button className="btn btn-ghost btn-icon" onClick={() => setImportModal(false)}>✕</button>
+            </div>
+
+            {loadingStore ? (
+              <div style={{ padding: 24, textAlign: "center", color: "var(--text-soft)", fontSize: 13 }}>Memuat produk toko...</div>
+            ) : (
+              <div style={{ maxHeight: 400, overflowY: "auto", display: "flex", flexDirection: "column", gap: 12 }}>
+                {(() => {
+                  // Filter out products already fully in event
+                  const eventVariantIds = new Set((products || []).flatMap(p => (p.variants || []).map(v => v.id)));
+                  const available = storeProducts.filter(p =>
+                    p.variants.some(v => !eventVariantIds.has(v.id) && v.quantityOnHand > 0)
+                  );
+
+                  if (available.length === 0) {
+                    return (
+                      <div style={{ padding: 24, textAlign: "center", color: "var(--text-soft)", fontSize: 13 }}>
+                        Semua produk toko sudah ada di event ini.
+                      </div>
+                    );
+                  }
+
+                  return available.map(product => (
+                    <div key={product.id}>
+                      <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 6 }}>
+                        {product.name}
+                        <span style={{ fontWeight: 400, color: "var(--text-soft)", marginLeft: 6 }}>{product.category}</span>
+                      </div>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                        {product.variants.map(v => {
+                          const label = v.attribute1Value || v.sku;
+                          const storeQty = v.quantityOnHand || 0;
+                          const alreadyInEvent = eventVariantIds.has(v.id);
+                          const qty = selections[v.id] || 0;
+
+                          return (
+                            <div key={v.id} style={{
+                              display: "flex", alignItems: "center", gap: 8,
+                              padding: "6px 10px", background: "var(--surface)", borderRadius: 8,
+                              fontSize: 12, opacity: storeQty === 0 || alreadyInEvent ? 0.5 : 1,
+                            }}>
+                              <div style={{ minWidth: 28, height: 22, borderRadius: 4, background: "#fff", border: "1px solid var(--line)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 10 }}>{label}</div>
+                              <div style={{ flex: 1, color: "var(--text-soft)" }}>
+                                Toko: <strong style={{ color: storeQty === 0 ? "var(--danger)" : "var(--text)" }}>{storeQty}</strong>
+                                {alreadyInEvent && <span className="badge badge-blue" style={{ fontSize: 9, marginLeft: 6 }}>sudah di event</span>}
+                              </div>
+                              {storeQty > 0 && !alreadyInEvent && (
+                                <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                                  <div className="qty-btn" style={{ width: 22, height: 22, fontSize: 12 }}
+                                    onClick={() => setSelections(s => ({ ...s, [v.id]: Math.max(0, (s[v.id] || 0) - 1) }))}>−</div>
+                                  <input type="number" min={0} max={activeWorkspace?.stockMode === "allocate" ? storeQty : 9999} value={qty}
+                                    onChange={e => {
+                                      const max = activeWorkspace?.stockMode === "allocate" ? storeQty : 9999;
+                                      setSelections(s => ({ ...s, [v.id]: Math.min(max, Math.max(0, parseInt(e.target.value) || 0)) }));
+                                    }}
+                                    style={{ width: 40, textAlign: "center", padding: "2px", border: "1px solid var(--line)", borderRadius: 4, fontWeight: 700, fontSize: 12, fontFamily: "inherit" }} />
+                                  <div className="qty-btn" style={{ width: 22, height: 22, fontSize: 12 }}
+                                    onClick={() => {
+                                      const max = activeWorkspace?.stockMode === "allocate" ? storeQty : 9999;
+                                      setSelections(s => ({ ...s, [v.id]: Math.min(max, (s[v.id] || 0) + 1) }));
+                                    }}>+</div>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ));
+                })()}
+              </div>
+            )}
+
+            {(() => {
+              const totalItems = Object.values(selections).filter(q => q > 0).length;
+              const totalQty = Object.values(selections).reduce((a, b) => a + b, 0);
+              return totalItems > 0 ? (
+                <div style={{ background: "var(--accent-light)", border: "1px solid var(--accent-soft)", borderRadius: 8, padding: "10px 14px", marginTop: 16, display: "flex", justifyContent: "space-between", fontSize: 13 }}>
+                  <span style={{ color: "var(--text-soft)" }}>{totalItems} variant dipilih</span>
+                  <span style={{ fontWeight: 800, color: "var(--accent)" }}>{totalQty} unit</span>
+                </div>
+              ) : null;
+            })()}
+
+            <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+              <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setImportModal(false)} disabled={importing}>Batal</button>
+              <button className="btn btn-primary" style={{ flex: 2, height: 42 }}
+                disabled={Object.values(selections).reduce((a, b) => a + b, 0) === 0 || importing}
+                onClick={handleImport}>
+                {importing ? "Menambahkan..." : "Tambahkan ke Event"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {deleteConfirm && (
         <div className="modal-overlay" onClick={() => setDeleteConfirm(null)}>
