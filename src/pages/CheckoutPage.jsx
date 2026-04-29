@@ -303,7 +303,7 @@ export function CheckoutPage() {
                   marginBottom: 8,
                   cursor: "pointer",
                   background: payMethod === m.id ? "var(--accent-light)" : "#fff",
-                  transition: "all 0.15s",
+                  transition: "background-color 0.15s ease, border-color 0.15s ease",
                 }}
               >
                 <div style={{ fontWeight: 700, fontSize: 13 }}>{m.label}</div>

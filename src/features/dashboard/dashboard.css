@@ -1,7 +1,7 @@
 /* ── Dashboard + Nyam Utility Classes ── */
 
 /* Cards */
-.card { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 20px; }
+.card { background: #fff; border: 1px solid var(--line); border-radius: var(--radius-md); padding: 20px; box-shadow: var(--shadow-sm); }
 .card-sm { padding: 16px; }
 
 /* Grids */
@@ -12,7 +12,7 @@
 /* KPI */
 .kpi-icon { width: 40px; height: 40px; border-radius: 10px; margin-bottom: 14px; display: flex; align-items: center; justify-content: center; }
 .kpi-label { font-size: 12px; font-weight: 600; color: var(--text-soft); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
-.kpi-value { font-size: 26px; font-weight: 800; color: var(--text); letter-spacing: -0.5px; line-height: 1; }
+.kpi-value { font-size: 26px; font-weight: 800; color: var(--text); letter-spacing: -0.5px; line-height: 1; font-variant-numeric: tabular-nums; }
 .kpi-sub { font-size: 12px; color: var(--text-soft); margin-top: 6px; display: flex; align-items: center; gap: 4px; }
 .kpi-up { color: var(--success); font-weight: 600; }
 .kpi-down { color: var(--danger); font-weight: 600; }
@@ -33,7 +33,10 @@
 .table-wrap { overflow-x: auto; }
 
 /* Buttons */
-.btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 8px 16px; border-radius: 8px; font-family: inherit; font-size: 13.5px; font-weight: 600; cursor: pointer; border: none; transition: all 0.15s; white-space: nowrap; }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 8px 16px; border-radius: var(--radius-sm); font-family: inherit; font-size: 13.5px; font-weight: 600; cursor: pointer; border: none; transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease, transform 0.15s ease; white-space: nowrap; }
+.btn:active { transform: scale(0.97); }
+.btn-sm:active { transform: scale(0.96); }
+.btn-icon:active { transform: scale(0.93); }
 .btn-primary { background: var(--accent); color: #fff; }
 .btn-primary:hover { background: var(--accent-deep); }
 .btn-secondary { background: var(--surface); color: var(--text); border: 1px solid var(--line); }
@@ -41,10 +44,10 @@
 .btn-ghost { background: transparent; color: var(--text-soft); padding: 6px 10px; }
 .btn-ghost:hover { background: var(--surface); color: var(--text); }
 .btn-sm { padding: 6px 12px; font-size: 12.5px; border-radius: 6px; }
-.btn-icon { width: 34px; height: 34px; padding: 0; border-radius: 8px; }
+.btn-icon { width: 34px; height: 34px; padding: 0; border-radius: var(--radius-sm); }
 
 /* Input */
-.input { width: 100%; padding: 9px 12px; border-radius: 8px; border: 1px solid var(--line); background: #fff; font-family: inherit; font-size: 13.5px; color: var(--text); outline: none; transition: border-color 0.15s; }
+.input { width: 100%; padding: 9px 12px; border-radius: var(--radius-sm); border: 1px solid var(--line); background: #fff; font-family: inherit; font-size: 13.5px; color: var(--text); outline: none; transition: border-color 0.15s; }
 .input:focus { border-color: var(--accent); }
 .input-wrap { position: relative; }
 .input-icon { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--text-muted); pointer-events: none; }
@@ -52,7 +55,8 @@
 
 /* Category filter */
 .cat-filter { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
-.cat-chip { padding: 6px 14px; border-radius: 20px; font-size: 12.5px; font-weight: 600; cursor: pointer; border: 1.5px solid var(--line); background: #fff; color: var(--text-soft); transition: all 0.15s; font-family: inherit; }
+.cat-chip { padding: 6px 14px; border-radius: 20px; font-size: 12.5px; font-weight: 600; cursor: pointer; border: 1.5px solid var(--line); background: #fff; color: var(--text-soft); transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease, transform 0.15s ease; font-family: inherit; }
+.cat-chip:active { transform: scale(0.96); }
 .cat-chip:hover { border-color: var(--accent); color: var(--accent); }
 .cat-chip.active { background: var(--accent); border-color: var(--accent); color: #fff; }
 
@@ -77,20 +81,22 @@
 
 /* Modal */
 .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.35); z-index: 100; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(2px); }
-.modal { background: #fff; border-radius: 16px; width: 400px; max-width: 90vw; max-height: 90vh; overflow-y: auto; padding: 28px; box-shadow: 0 20px 60px rgba(0,0,0,0.15); }
+.modal { background: #fff; border-radius: var(--radius-xl); width: 400px; max-width: 90vw; max-height: 90vh; overflow-y: auto; padding: 28px; box-shadow: var(--shadow-xl); }
 .modal-title { font-size: 18px; font-weight: 800; margin-bottom: 20px; }
 .modal-divider { height: 1px; background: var(--line); margin: 16px 0; }
 
 /* Size selector */
 .size-grid { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
-.size-chip { padding: 6px 14px; border-radius: 8px; border: 1.5px solid var(--line); background: #fff; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.15s; font-family: inherit; }
+.size-chip { padding: 6px 14px; border-radius: var(--radius-sm); border: 1.5px solid var(--line); background: #fff; font-size: 13px; font-weight: 600; cursor: pointer; transition: background-color 0.15s ease, border-color 0.15s ease, transform 0.15s ease; font-family: inherit; }
+.size-chip:active { transform: scale(0.96); }
 .size-chip:hover { border-color: var(--accent); }
 .size-chip.selected { background: var(--accent); border-color: var(--accent); color: #fff; }
 .size-chip.unavail { opacity: 0.3; cursor: not-allowed; }
 
 /* Product card (catalog) */
-.product-card-nyam { background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 14px; cursor: pointer; transition: all 0.15s; user-select: none; }
+.product-card-nyam { background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 14px; cursor: pointer; transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease; user-select: none; }
 .product-card-nyam:hover { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.product-card-nyam:active { transform: scale(0.98); }
 .product-card-nyam.out-of-stock { opacity: 0.5; cursor: not-allowed; }
 
 /* Responsive */
@@ -102,4 +108,80 @@
 
 @media (max-width: 640px) {
   .grid-4 { grid-template-columns: 1fr; }
+}
+
+/* Table cells with numbers */
+td {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Entrance animations ── */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Cards entrance */
+.card {
+  animation: fadeInUp 0.3s cubic-bezier(0.23, 1, 0.32, 1) both;
+}
+
+/* ── Modal animations ── */
+.modal-overlay {
+  animation: fadeIn 0.15s ease both;
+}
+
+.modal {
+  animation: modalIn 0.2s cubic-bezier(0.23, 1, 0.32, 1) both;
+}
+
+@keyframes modalIn {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* ── Skeleton loader ── */
+.skeleton {
+  background: linear-gradient(90deg, var(--surface) 25%, var(--surface-2) 50%, var(--surface) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease infinite;
+  border-radius: var(--radius-sm, 8px);
+}
+
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+.skeleton-text {
+  height: 14px;
+  margin-bottom: 8px;
+}
+
+.skeleton-title {
+  height: 24px;
+  width: 60%;
+  margin-bottom: 12px;
+}
+
+.skeleton-card {
+  height: 100px;
+  border-radius: var(--radius-md, 12px);
 }

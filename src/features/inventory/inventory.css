@@ -120,7 +120,7 @@
 .inventory-banani-table-card {
   overflow: hidden;
   border: 1px solid #e8e8e8;
-  border-radius: 16px;
+  border-radius: var(--radius-xl);
   background: #ffffff;
 }
 
@@ -167,7 +167,7 @@
   width: 40px;
   height: 40px;
   border: 1px solid #e8e8e8;
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   background: linear-gradient(180deg, #f5f0e7 0%, #efe7db 100%);
   color: #2f2923;
   display: inline-flex;
@@ -273,7 +273,7 @@
   gap: 10px;
   padding: 16px;
   border: 1px solid #e8e8e8;
-  border-radius: 16px;
+  border-radius: var(--radius-xl);
   background: #faf8f5;
 }
 
@@ -317,12 +317,14 @@
   border: 1.5px solid var(--line);
   border-radius: 10px;
   cursor: pointer;
-  transition: border-color 0.15s;
+  transition: border-color 0.15s ease, transform 0.15s ease;
 }
 
 .inventory-picker-item:hover {
   border-color: var(--accent);
 }
+
+.inventory-picker-item:active { transform: scale(0.98); }
 
 @media (max-width: 720px) {
   .inventory-banani-toolbar,

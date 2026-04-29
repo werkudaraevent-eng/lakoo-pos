@@ -56,9 +56,9 @@
 .login-card {
   background: #fff;
   border: 1px solid var(--line);
-  border-radius: 16px;
+  border-radius: var(--radius-xl);
   padding: 32px;
-  box-shadow: 0 4px 32px rgba(0, 0, 0, 0.06);
+  box-shadow: var(--shadow-md);
 }
 
 .login-card h2 {
@@ -96,7 +96,7 @@
 .login-card .field input {
   width: 100%;
   padding: 9px 12px;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   border: 1px solid var(--line);
   background: #fff;
   font-family: inherit;
@@ -142,8 +142,8 @@
 /* Error box */
 .login-card .error-text {
   background: var(--danger-soft);
-  border: 1px solid #f5c6c6;
-  border-radius: 8px;
+  border: 1px solid var(--danger-soft);
+  border-radius: var(--radius-sm);
   padding: 10px 14px;
   font-size: 13px;
   color: var(--danger);
@@ -191,3 +191,32 @@
 .login-register-link a:hover {
   text-decoration: underline;
 }
+
+/* ── Entrance animations ── */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.login-card {
+  animation: fadeInUp 0.4s cubic-bezier(0.23, 1, 0.32, 1) both;
+}
+
+.login-logo {
+  animation: fadeIn 0.5s cubic-bezier(0.23, 1, 0.32, 1) both;
+}
+
+/* Active states */
+.login-card .primary-button:active,
+.login-card .btn:active { transform: scale(0.97); }

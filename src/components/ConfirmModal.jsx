@@ -132,6 +132,7 @@ export function ConfirmModal({
         alignItems: "center",
         justifyContent: "center",
         backdropFilter: "blur(2px)",
+        animation: "fadeIn 0.15s ease both",
       }}
     >
       <div
@@ -144,7 +145,7 @@ export function ConfirmModal({
           padding: "28px",
           boxShadow: "0 20px 60px rgba(0,0,0,0.15)",
           textAlign: "center",
-          animation: "confirmModalIn 0.15s ease",
+          animation: "confirmModalIn 0.2s cubic-bezier(0.23, 1, 0.32, 1) both",
         }}
       >
         {/* Icon */}
@@ -195,7 +196,7 @@ export function ConfirmModal({
                 fontWeight: 600,
                 cursor: "pointer",
                 fontFamily: "inherit",
-                transition: "all 0.15s",
+                transition: "background-color 0.15s ease, border-color 0.15s ease",
               }}
             >
               {cancelLabel}
@@ -214,7 +215,7 @@ export function ConfirmModal({
               cursor: loading ? "not-allowed" : "pointer",
               fontFamily: "inherit",
               opacity: loading ? 0.7 : 1,
-              transition: "all 0.15s",
+              transition: "background-color 0.15s ease, opacity 0.15s ease",
               ...(confirmBtnStyle[confirmVariant] || confirmBtnStyle.primary),
             }}
           >
@@ -225,8 +226,12 @@ export function ConfirmModal({
 
       {/* Animation keyframe */}
       <style>{`
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
         @keyframes confirmModalIn {
-          from { opacity: 0; transform: scale(0.95) translateY(8px); }
+          from { opacity: 0; transform: scale(0.96) translateY(8px); }
           to { opacity: 1; transform: scale(1) translateY(0); }
         }
       `}</style>

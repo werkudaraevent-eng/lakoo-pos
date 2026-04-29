@@ -48,13 +48,32 @@ export function DashboardPage() {
 
   return (
     <div className="content">
-      {loading ? <p className="text-sm text-muted" style={{ padding: 16 }}>Memuat data...</p> : null}
+      {loading ? (
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          {/* KPI skeleton */}
+          <div className="grid-4">
+            {[1,2,3,4].map(i => (
+              <div key={i} className="card card-sm" style={{ animation: "none" }}>
+                <div className="skeleton" style={{ width: 40, height: 40, borderRadius: 10, marginBottom: 14 }} />
+                <div className="skeleton skeleton-text" style={{ width: "50%" }} />
+                <div className="skeleton skeleton-title" />
+                <div className="skeleton skeleton-text" style={{ width: "70%" }} />
+              </div>
+            ))}
+          </div>
+          {/* Chart skeleton */}
+          <div className="grid-2">
+            <div className="card" style={{ animation: "none" }}><div className="skeleton skeleton-card" style={{ height: 160 }} /></div>
+            <div className="card" style={{ animation: "none" }}><div className="skeleton skeleton-card" style={{ height: 160 }} /></div>
+          </div>
+        </div>
+      ) : null}
       {loadError ? <p style={{ padding: 16, color: "var(--danger)" }}>{loadError}</p> : null}
 
       {/* KPIs */}
       <div className="grid-4 mb-16">
-        {kpiCards.map((k) => (
-          <div key={k.label} className="card card-sm">
+        {kpiCards.map((k, index) => (
+          <div key={k.label} className="card card-sm" style={{ animationDelay: `${index * 60}ms` }}>
             <div className="kpi-icon" style={{ background: k.iconBg }}>
               <AppIcon name={k.iconName} size={18} strokeWidth={2} />
             </div>
