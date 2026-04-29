@@ -34,8 +34,21 @@ function TambahStokModal({ product, settings, onClose, onSave }) {
     variants.forEach((v) => { d[v.id] = 0; });
     return d;
   });
+  const [saving, setSaving] = useState(false);
   const total = Object.values(deltas).reduce((a, b) => a + b, 0);
   const set = (id, val) => setDeltas((prev) => ({ ...prev, [id]: Math.max(0, parseInt(val) || 0) }));
+
+  async function handleSave() {
+    setSaving(true);
+    try {
+      await onSave(product, deltas);
+      onClose();
+    } catch (err) {
+      // error handled by parent
+    } finally {
+      setSaving(false);
+    }
+  }
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -82,9 +95,9 @@ function TambahStokModal({ product, settings, onClose, onSave }) {
           <span style={{ fontWeight: 800, color: "var(--accent)" }}>+ {total} unit</span>
         </div>
         <div style={{ display: "flex", gap: 8 }}>
-          <button className="btn btn-secondary" style={{ flex: 1 }} onClick={onClose}>Batal</button>
-          <button className="btn btn-primary" style={{ flex: 2, height: 42 }} disabled={total === 0} onClick={() => { onSave(product, deltas); onClose(); }}>
-            Simpan Penambahan Stok
+          <button className="btn btn-secondary" style={{ flex: 1 }} onClick={onClose} disabled={saving}>Batal</button>
+          <button className="btn btn-primary" style={{ flex: 2, height: 42 }} disabled={total === 0 || saving} onClick={handleSave}>
+            {saving ? "Menyimpan..." : "Simpan Penambahan Stok"}
           </button>
         </div>
       </div>
@@ -100,6 +113,12 @@ export function InventoryPage() {
   const [statusFilter, setStatusFilter] = useState("Semua");
   const [showFilter, setShowFilter] = useState(false);
   const [tambahModal, setTambahModal] = useState(null); // null | 'picker' | product
+  const [toast, setToast] = useState(null);
+
+  function showToast(type, message) {
+    setToast({ type, message });
+    setTimeout(() => setToast(null), 3000);
+  }
 
   const attr1Label = settings?.attribute1Label || "Size";
 
@@ -130,10 +149,20 @@ export function InventoryPage() {
   }), [allProducts]);
 
   async function handleTambahSave(product, deltas) {
-    for (const [variantId, qty] of Object.entries(deltas)) {
-      if (qty > 0) {
-        await adjustInventory({ variantId, mode: "restock", quantity: qty, note: "Tambah stok manual", actor: user });
+    let totalAdded = 0;
+    try {
+      for (const [variantId, qty] of Object.entries(deltas)) {
+        if (qty > 0) {
+          await adjustInventory({ variantId, mode: "restock", quantity: qty, note: "Tambah stok manual", actor: user });
+          totalAdded += qty;
+        }
       }
+      if (totalAdded > 0) {
+        showToast("success", `Berhasil menambah ${totalAdded} unit stok untuk ${product.name}.`);
+      }
+    } catch (err) {
+      showToast("error", `Gagal menambah stok: ${err.message}`);
+      throw err;
     }
   }
 
@@ -254,6 +283,19 @@ export function InventoryPage() {
       {tambahModal && tambahModal !== "picker" ? (
         <TambahStokModal product={tambahModal} settings={settings} onClose={() => setTambahModal(null)} onSave={handleTambahSave} />
       ) : null}
+
+      {/* Toast */}
+      {toast && (
+        <div style={{
+          position: "fixed", bottom: 24, right: 24, zIndex: 200,
+          padding: "12px 20px", borderRadius: 10,
+          background: toast.type === "success" ? "var(--success)" : "var(--danger)",
+          color: "#fff", fontSize: 13.5, fontWeight: 600,
+          boxShadow: "0 8px 24px rgba(0,0,0,0.15)", maxWidth: 400,
+        }}>
+          {toast.type === "success" ? "✓ " : "✗ "}{toast.message}
+        </div>
+      )}
 
       {/* Product Picker Modal */}
       {tambahModal === "picker" ? (
