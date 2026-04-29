@@ -294,15 +294,18 @@ async function fetchSales(executor, { workspaceId, fallbackWorkspaceId, tenantId
     WHERE tenant_id = ${tenantId}
     ORDER BY id ASC
   `).filter((item) => saleIds.has(item.saleId));
-  const promotions = (await executor`
-    SELECT
-      sale_id AS "saleId",
-      promotion_id AS "promotionId",
-      code_snapshot AS "codeSnapshot",
-      discount_amount AS "discountAmount"
-    FROM sale_promotion_usages
-    WHERE tenant_id = ${tenantId}
-  `).filter((promotion) => saleIds.has(promotion.saleId));
+  const saleIdArray = [...saleIds];
+  const promotions = saleIdArray.length > 0
+    ? await executor`
+        SELECT
+          sale_id AS "saleId",
+          promotion_id AS "promotionId",
+          code_snapshot AS "codeSnapshot",
+          discount_amount AS "discountAmount"
+        FROM sale_promotion_usages
+        WHERE sale_id = ANY(${saleIdArray})
+      `
+    : [];
 
   return mapSales(filteredSales, items, promotions);
 }
@@ -1090,14 +1093,13 @@ export async function finalizeSaleRecord(payload, actorUserId, tenantId) {
       if (matchedPromo) {
         await tx`
           INSERT INTO sale_promotion_usages
-          (id, sale_id, promotion_id, code_snapshot, discount_amount, tenant_id)
+          (id, sale_id, promotion_id, code_snapshot, discount_amount)
           VALUES (
             ${createId("spu")},
             ${saleId},
             ${matchedPromo.id},
             ${matchedPromo.code},
-            ${discount},
-            ${tenantId}
+            ${discount}
           )
         `;
       }
