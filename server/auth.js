@@ -1,6 +1,12 @@
 import crypto from "node:crypto";
 
-const JWT_SECRET = process.env.POS_JWT_SECRET || "pos-local-dev-secret";
+// ── JWT Secret Validation ────────────────────────────────────────
+const JWT_SECRET = process.env.POS_JWT_SECRET;
+if (!JWT_SECRET || JWT_SECRET.length < 32) {
+  console.error("FATAL: POS_JWT_SECRET must be set and at least 32 characters long.");
+  console.error('Generate one with: node -e "console.log(require(\'crypto\').randomBytes(48).toString(\'hex\'))"');
+  process.exit(1);
+}
 
 function base64UrlEncode(value) {
   return Buffer.from(value)
@@ -26,9 +32,11 @@ export function signJwt(payload, expiresInSeconds = 60 * 60 * 12) {
     typ: "JWT",
   };
 
+  const now = Math.floor(Date.now() / 1000);
   const body = {
     ...payload,
-    exp: Math.floor(Date.now() / 1000) + expiresInSeconds,
+    iat: now,
+    exp: now + expiresInSeconds,
   };
 
   const headerPart = base64UrlEncode(JSON.stringify(header));
@@ -61,7 +69,13 @@ export function verifyJwt(token) {
     .replaceAll("+", "-")
     .replaceAll("/", "_");
 
-  if (signature !== expectedSignature) {
+  // Timing-safe signature comparison to prevent timing attacks
+  const sigBuffer = Buffer.from(signature, "utf8");
+  const expectedBuffer = Buffer.from(expectedSignature, "utf8");
+  if (
+    sigBuffer.length !== expectedBuffer.length ||
+    !crypto.timingSafeEqual(sigBuffer, expectedBuffer)
+  ) {
     throw new Error("Invalid signature.");
   }
 
@@ -117,7 +131,10 @@ export function requireAuth(loadUserById, loadTenantById, checkTenantStatusFn) {
 
       next();
     } catch (error) {
-      res.status(401).json({ ok: false, message: error.message || "Unauthorized." });
+      // Don't leak internal error details — use generic message for auth failures
+      const safeMessages = ["Token expired.", "Malformed token.", "Invalid signature."];
+      const message = safeMessages.includes(error.message) ? error.message : "Unauthorized.";
+      res.status(401).json({ ok: false, message });
     }
   };
 }

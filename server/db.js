@@ -187,8 +187,16 @@ async function fetchProducts(executor, tenantId) {
   return mapProducts(rows);
 }
 
-async function fetchWorkspaceVariantStocks(executor, workspaceId) {
+async function fetchWorkspaceVariantStocks(executor, workspaceId, tenantId) {
   if (!workspaceId) {
+    return [];
+  }
+
+  // Validate workspace belongs to the tenant before returning stock data
+  const wsCheck = await executor`
+    SELECT id FROM workspaces WHERE id = ${workspaceId} AND tenant_id = ${tenantId} LIMIT 1
+  `;
+  if (!wsCheck[0]) {
     return [];
   }
 
@@ -283,6 +291,7 @@ async function fetchSales(executor, { workspaceId, fallbackWorkspaceId, tenantId
       qty,
       line_total AS "lineTotal"
     FROM sale_items
+    WHERE tenant_id = ${tenantId}
     ORDER BY id ASC
   `).filter((item) => saleIds.has(item.saleId));
   const promotions = (await executor`
@@ -292,6 +301,7 @@ async function fetchSales(executor, { workspaceId, fallbackWorkspaceId, tenantId
       code_snapshot AS "codeSnapshot",
       discount_amount AS "discountAmount"
     FROM sale_promotion_usages
+    WHERE tenant_id = ${tenantId}
   `).filter((promotion) => saleIds.has(promotion.saleId));
 
   return mapSales(filteredSales, items, promotions);
@@ -326,7 +336,11 @@ async function fetchInventoryMovements(executor, { workspaceId, fallbackWorkspac
 
 async function resolveWriteWorkspaceId(executor, workspaceId, tenantId) {
   if (workspaceId) {
-    return workspaceId;
+    const rows = await executor`
+      SELECT id FROM workspaces WHERE id = ${workspaceId} AND tenant_id = ${tenantId} LIMIT 1
+    `;
+    if (!rows[0]) return null;
+    return rows[0].id;
   }
 
   const rows = await executor`
@@ -354,18 +368,18 @@ async function resolveWriteWorkspace(executor, workspaceId, tenantId) {
       status,
       stock_mode AS "stockMode"
     FROM workspaces
-    WHERE id = ${resolvedWorkspaceId}
+    WHERE id = ${resolvedWorkspaceId} AND tenant_id = ${tenantId}
     LIMIT 1
   `;
 
   return rows[0] ?? null;
 }
 
-async function consumeMainStockForEvent(tx, workspace, variantId, amount) {
+async function consumeMainStockForEvent(tx, workspace, variantId, amount, tenantId) {
   const rows = await tx`
     SELECT id, quantity_on_hand AS "quantityOnHand"
     FROM product_variants
-    WHERE id = ${variantId}
+    WHERE id = ${variantId} AND tenant_id = ${tenantId}
     FOR UPDATE
   `;
   const variant = rows[0];
@@ -382,7 +396,7 @@ async function consumeMainStockForEvent(tx, workspace, variantId, amount) {
     await tx`
       UPDATE product_variants
       SET quantity_on_hand = quantity_on_hand - ${amount}
-      WHERE id = ${variantId}
+      WHERE id = ${variantId} AND tenant_id = ${tenantId}
     `;
   }
 }
@@ -407,7 +421,7 @@ export async function getBootstrap({ workspaceId, tenantId } = {}) {
     activeWorkspace?.type === "event"
       ? overlayProductsWithWorkspaceStock(
           baseProducts,
-          await fetchWorkspaceVariantStocks(executor, activeWorkspace.id)
+          await fetchWorkspaceVariantStocks(executor, activeWorkspace.id, tenantId)
         )
       : baseProducts;
   const promotions = await fetchPromotions(executor, tenantId);
@@ -542,11 +556,19 @@ export async function createEventRecord(payload, _actorUserId, tenantId) {
         )
       `;
 
-      for (const userId of assignedUserIds) {
-        await tx`
-          INSERT INTO workspace_assignments (id, workspace_id, user_id, assigned_at)
-          VALUES (${createId("wa")}, ${eventId}, ${userId}, ${nowIso()})
+      if (assignedUserIds.length > 0) {
+        const validUsers = await tx`
+          SELECT id FROM users WHERE id = ANY(${assignedUserIds}) AND tenant_id = ${tenantId}
         `;
+        const validIds = new Set(validUsers.map(u => u.id));
+
+        for (const userId of assignedUserIds) {
+          if (!validIds.has(userId)) continue;
+          await tx`
+            INSERT INTO workspace_assignments (id, workspace_id, user_id, assigned_at)
+            VALUES (${createId("wa")}, ${eventId}, ${userId}, ${nowIso()})
+          `;
+        }
       }
     });
 
@@ -560,7 +582,7 @@ export async function createEventRecord(payload, _actorUserId, tenantId) {
   }
 }
 
-export async function updateEventStatusRecord(eventId, payload) {
+export async function updateEventStatusRecord(eventId, payload, _actorUserId, tenantId) {
   const executor = ensureSql();
   const nextStatus = String(payload?.nextStatus || "").trim().toLowerCase();
 
@@ -575,7 +597,7 @@ export async function updateEventStatusRecord(eventId, payload) {
   const rows = await executor`
     SELECT id, type, status
     FROM workspaces
-    WHERE id = ${eventId}
+    WHERE id = ${eventId} AND tenant_id = ${tenantId}
     LIMIT 1
   `;
   const event = rows[0];
@@ -603,13 +625,13 @@ export async function updateEventStatusRecord(eventId, payload) {
         WHEN ${archivedAt}::timestamptz IS NOT NULL THEN ${archivedAt}
         ELSE archived_at
       END
-    WHERE id = ${eventId}
+    WHERE id = ${eventId} AND tenant_id = ${tenantId}
   `;
 
   return { ok: true, eventId, nextStatus };
 }
 
-export async function closeEventRecord(eventId, payload) {
+export async function closeEventRecord(eventId, payload, _actorUserId, tenantId) {
   const executor = ensureSql();
 
   if (!canCompleteClosingReviewRecord(payload)) {
@@ -619,7 +641,7 @@ export async function closeEventRecord(eventId, payload) {
   const rows = await executor`
     SELECT id, type, status
     FROM workspaces
-    WHERE id = ${eventId}
+    WHERE id = ${eventId} AND tenant_id = ${tenantId}
     LIMIT 1
   `;
   const event = rows[0];
@@ -637,7 +659,7 @@ export async function closeEventRecord(eventId, payload) {
     SET
       status = ${"closed"},
       closed_at = ${nowIso()}
-    WHERE id = ${eventId}
+    WHERE id = ${eventId} AND tenant_id = ${tenantId}
   `;
 
   return { ok: true, eventId };
@@ -703,12 +725,22 @@ export async function setWorkspaceAssignments(workspaceId, userIds, tenantId) {
   await executor.begin(async (tx) => {
     await tx`DELETE FROM workspace_assignments WHERE workspace_id = ${workspaceId}`;
     
+    const filteredUserIds = (userIds || []).filter(Boolean);
     const now = nowIso();
-    for (const userId of (userIds || [])) {
-      await tx`
-        INSERT INTO workspace_assignments (id, workspace_id, user_id, assigned_at)
-        VALUES (${createId("wa")}, ${workspaceId}, ${userId}, ${now})
+
+    if (filteredUserIds.length > 0) {
+      const validUsers = await tx`
+        SELECT id FROM users WHERE id = ANY(${filteredUserIds}) AND tenant_id = ${tenantId}
       `;
+      const validIds = new Set(validUsers.map(u => u.id));
+
+      for (const userId of filteredUserIds) {
+        if (!validIds.has(userId)) continue;
+        await tx`
+          INSERT INTO workspace_assignments (id, workspace_id, user_id, assigned_at)
+          VALUES (${createId("wa")}, ${workspaceId}, ${userId}, ${now})
+        `;
+      }
     }
   });
   
@@ -767,7 +799,7 @@ export async function adjustInventoryRecord(payload, actorUserId, tenantId) {
             throw new Error("Stock event belum tersedia untuk variant ini.");
           }
 
-          await consumeMainStockForEvent(tx, workspace, payload.variantId, delta);
+          await consumeMainStockForEvent(tx, workspace, payload.variantId, delta, tenantId);
 
           await tx`
             INSERT INTO workspace_variant_stocks
@@ -791,7 +823,7 @@ export async function adjustInventoryRecord(payload, actorUserId, tenantId) {
           }
 
           if (delta > 0) {
-            await consumeMainStockForEvent(tx, workspace, payload.variantId, delta);
+            await consumeMainStockForEvent(tx, workspace, payload.variantId, delta, tenantId);
           }
 
           await tx`
@@ -811,7 +843,7 @@ export async function adjustInventoryRecord(payload, actorUserId, tenantId) {
         const rows = await tx`
           SELECT id, quantity_on_hand AS "quantityOnHand"
           FROM product_variants
-          WHERE id = ${payload.variantId}
+          WHERE id = ${payload.variantId} AND tenant_id = ${tenantId}
           FOR UPDATE
         `;
         const variant = rows[0];
@@ -829,7 +861,7 @@ export async function adjustInventoryRecord(payload, actorUserId, tenantId) {
         await tx`
           UPDATE product_variants
           SET quantity_on_hand = ${nextQty}
-          WHERE id = ${payload.variantId}
+          WHERE id = ${payload.variantId} AND tenant_id = ${tenantId}
         `;
       }
 
@@ -890,7 +922,7 @@ export async function finalizeSaleRecord(payload, actorUserId, tenantId) {
                 FROM workspace_variant_stocks wvs
                 JOIN product_variants pv ON pv.id = wvs.variant_id
                 JOIN products p ON p.id = pv.product_id
-                WHERE wvs.workspace_id = ${workspace.id} AND pv.id = ${item.variantId}
+                WHERE wvs.workspace_id = ${workspace.id} AND pv.id = ${item.variantId} AND pv.tenant_id = ${tenantId}
                 FOR UPDATE
               `
             : await tx`
@@ -905,7 +937,7 @@ export async function finalizeSaleRecord(payload, actorUserId, tenantId) {
                   p.base_price AS "basePrice"
                 FROM product_variants pv
                 JOIN products p ON p.id = pv.product_id
-                WHERE pv.id = ${item.variantId}
+                WHERE pv.id = ${item.variantId} AND pv.tenant_id = ${tenantId}
                 FOR UPDATE
               `;
 
@@ -941,7 +973,7 @@ export async function finalizeSaleRecord(payload, actorUserId, tenantId) {
             end_at AS "endAt",
             is_active AS "isActive"
           FROM promotions
-          WHERE code = ${payload.promoCode.toUpperCase()}
+          WHERE code = ${payload.promoCode.toUpperCase()} AND tenant_id = ${tenantId}
           LIMIT 1
         `;
         matchedPromo = promoRows[0] || null;
@@ -966,7 +998,7 @@ export async function finalizeSaleRecord(payload, actorUserId, tenantId) {
       }
 
       // Tax calculation
-      const settingsRows = await tx`SELECT key, value FROM settings WHERE key = 'taxRate' LIMIT 1`;
+      const settingsRows = await tx`SELECT key, value FROM settings WHERE key = 'taxRate' AND tenant_id = ${tenantId} LIMIT 1`;
       const taxRate = settingsRows[0] ? Number(settingsRows[0].value) : 0;
       const afterDiscount = subtotal - discount;
       const taxTotal = taxRate > 0 ? Math.round((afterDiscount * taxRate) / 100) : 0;
@@ -1033,7 +1065,7 @@ export async function finalizeSaleRecord(payload, actorUserId, tenantId) {
           await tx`
             UPDATE product_variants
             SET quantity_on_hand = quantity_on_hand - ${item.qty}
-            WHERE id = ${item.variantId}
+            WHERE id = ${item.variantId} AND tenant_id = ${tenantId}
           `;
         }
 
@@ -1110,7 +1142,7 @@ export async function updateSettingsRecord(payload, tenantId) {
       `;
       if (existing[0]) {
         await tx`
-          UPDATE settings SET value = ${value} WHERE id = ${existing[0].id}
+          UPDATE settings SET value = ${value} WHERE id = ${existing[0].id} AND tenant_id = ${tenantId}
         `;
       } else {
         await tx`
@@ -1198,7 +1230,7 @@ export async function updateProductRecord(productId, payload, tenantId) {
         description = ${payload.description},
         base_price = ${Number(payload.basePrice)},
         is_active = ${Boolean(payload.isActive)}
-      WHERE id = ${productId}
+      WHERE id = ${productId} AND tenant_id = ${tenantId}
     `;
 
     return { ok: true };
@@ -1269,7 +1301,7 @@ export async function updateVariantRecord(variantId, payload, tenantId) {
         quantity_on_hand = ${Number(payload.quantityOnHand)},
         low_stock_threshold = ${Number(payload.lowStockThreshold)},
         is_active = ${Boolean(payload.isActive)}
-      WHERE id = ${variantId}
+      WHERE id = ${variantId} AND tenant_id = ${tenantId}
     `;
 
     return { ok: true };
@@ -1336,7 +1368,7 @@ export async function updateUserRecord(userId, payload, tenantId) {
       role = ${payload.role ?? current.role},
       is_active = ${payload.isActive == null ? current.isActive : Boolean(payload.isActive)},
       password_hash = ${payload.password ? hashPassword(payload.password) : current.passwordHash}
-    WHERE id = ${userId}
+    WHERE id = ${userId} AND tenant_id = ${tenantId}
   `;
 
   return { ok: true };

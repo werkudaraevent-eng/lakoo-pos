@@ -4,6 +4,56 @@ import express from "express";
 import { pathToFileURL } from "node:url";
 
 import { requireAuth, requireRole, signJwt } from "./auth.js";
+
+// ── In-memory rate limiter (no external dependency) ──────────────
+function createRateLimiter({ windowMs = 15 * 60 * 1000, max = 100 } = {}) {
+  const hits = new Map();
+
+  // Cleanup old entries periodically
+  const cleanup = setInterval(() => {
+    const now = Date.now();
+    for (const [key, data] of hits) {
+      if (now - data.start > windowMs) hits.delete(key);
+    }
+  }, windowMs);
+  if (cleanup.unref) cleanup.unref(); // Don't keep process alive for cleanup
+
+  return (req, res, next) => {
+    const key = req.ip || req.connection?.remoteAddress || "unknown";
+    const now = Date.now();
+    const record = hits.get(key);
+
+    if (!record || now - record.start > windowMs) {
+      hits.set(key, { start: now, count: 1 });
+      return next();
+    }
+
+    record.count++;
+    if (record.count > max) {
+      return res.status(429).json({
+        ok: false,
+        message: "Terlalu banyak permintaan. Coba lagi nanti.",
+      });
+    }
+
+    next();
+  };
+}
+
+// ── Password validation ──────────────────────────────────────────
+function validatePassword(password) {
+  if (!password) return "Password wajib diisi.";
+  if (typeof password !== "string") return "Password tidak valid.";
+  if (password.length < 8) return "Password minimal 8 karakter.";
+  if (password.length > 128) return "Password terlalu panjang.";
+  return null;
+}
+
+// ── Rate limiters ────────────────────────────────────────────────
+const loginLimiter = createRateLimiter({ windowMs: 15 * 60 * 1000, max: 10 });
+const registerLimiter = createRateLimiter({ windowMs: 60 * 60 * 1000, max: 5 });
+const apiLimiter = createRateLimiter({ windowMs: 1 * 60 * 1000, max: 120 });
+
 import {
   adjustInventoryRecord,
   authenticateUser,
@@ -73,7 +123,11 @@ function withRequestWorkspace(payload, workspaceId) {
 }
 
 function requirePlatformAdmin(req, res, next) {
-  if (req.auth?.payload?.role !== 'platform_admin') {
+  // Check both payload (from JWT) and user (from DB) for platform_admin role
+  const isPlatformAdmin =
+    req.auth?.user?.role === "platform_admin" ||
+    req.auth?.payload?.role === "platform_admin";
+  if (!isPlatformAdmin) {
     res.status(403).json({ ok: false, message: "Forbidden." });
     return;
   }
@@ -114,7 +168,20 @@ export function createApp({
   const app = express();
   const auth = authMiddleware ?? requireAuthFn(getUserByIdFn, getTenantByIdFn, checkTenantStatusFn);
 
-  app.use(express.json());
+  app.use(express.json({ limit: "1mb" }));
+
+  // ── Security headers ────────────────────────────────────────────
+  app.use((req, res, next) => {
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.setHeader("X-Frame-Options", "DENY");
+    res.setHeader("X-XSS-Protection", "1; mode=block");
+    res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+    res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+    next();
+  });
+
+  // ── General API rate limiter ────────────────────────────────────
+  app.use("/api", apiLimiter);
 
   app.get("/api/health", (_req, res) => {
     res.json({ ok: true });
@@ -122,6 +189,7 @@ export function createApp({
 
   app.post(
     "/api/auth/login",
+    loginLimiter,
     asyncHandler(async (req, res) => {
       const { username, password, tenantSlug } = req.body || {};
       const user = await authenticateUserFn(username, password, tenantSlug || null);
@@ -161,11 +229,18 @@ export function createApp({
   // Registration (create new tenant + admin user)
   app.post(
     "/api/auth/register",
+    registerLimiter,
     asyncHandler(async (req, res) => {
       const { businessName, slug, email, password, ownerName } = req.body || {};
 
       if (!businessName || !slug || !email || !password) {
         res.status(400).json({ ok: false, message: "Semua field wajib diisi." });
+        return;
+      }
+
+      const passwordError = validatePassword(password);
+      if (passwordError) {
+        res.status(400).json({ ok: false, message: passwordError });
         return;
       }
 
@@ -265,7 +340,7 @@ export function createApp({
     requireRoleMiddleware(["admin", "manager"]),
     asyncHandler(async (req, res) => {
       const tenantId = req.auth.user.tenantId;
-      const result = await updateEventStatusRecordFn(req.params.id, req.body, req.auth.user.id);
+      const result = await updateEventStatusRecordFn(req.params.id, req.body, req.auth.user.id, tenantId);
 
       if (!result.ok) {
         res.status(400).json(result);
@@ -287,7 +362,7 @@ export function createApp({
     requireRoleMiddleware(["admin", "manager"]),
     asyncHandler(async (req, res) => {
       const tenantId = req.auth.user.tenantId;
-      const result = await closeEventRecordFn(req.params.id, req.body, req.auth.user.id);
+      const result = await closeEventRecordFn(req.params.id, req.body, req.auth.user.id, tenantId);
 
       if (!result.ok) {
         res.status(400).json(result);
@@ -425,6 +500,21 @@ export function createApp({
     requireRoleMiddleware(["admin"]),
     asyncHandler(async (req, res) => {
       const tenantId = req.auth.user.tenantId;
+
+      // Validate password
+      const passwordError = validatePassword(req.body?.password);
+      if (passwordError) {
+        res.status(400).json({ ok: false, message: passwordError });
+        return;
+      }
+
+      // Validate role
+      const allowedRoles = ["admin", "manager", "cashier"];
+      if (req.body.role && !allowedRoles.includes(req.body.role)) {
+        res.status(400).json({ ok: false, message: "Role tidak valid." });
+        return;
+      }
+
       const result = await createUserRecordFn(req.body, tenantId);
       res.json({
         ok: true,
@@ -440,6 +530,23 @@ export function createApp({
     requireRoleMiddleware(["admin"]),
     asyncHandler(async (req, res) => {
       const tenantId = req.auth.user.tenantId;
+
+      // Validate password if provided
+      if (req.body?.password) {
+        const passwordError = validatePassword(req.body.password);
+        if (passwordError) {
+          res.status(400).json({ ok: false, message: passwordError });
+          return;
+        }
+      }
+
+      // Validate role if provided
+      const allowedRoles = ["admin", "manager", "cashier"];
+      if (req.body?.role && !allowedRoles.includes(req.body.role)) {
+        res.status(400).json({ ok: false, message: "Role tidak valid." });
+        return;
+      }
+
       const result = await updateUserRecordFn(req.params.id, req.body, tenantId);
 
       if (!result.ok) {
@@ -538,6 +645,7 @@ export function createApp({
 
   app.post(
     "/api/platform/login",
+    loginLimiter,
     asyncHandler(async (req, res) => {
       const { email, password } = req.body || {};
       const admin = await authenticatePlatformAdmin(email, password);
@@ -624,6 +732,12 @@ export function createApp({
         res.status(400).json({ ok: false, message: "Nama bisnis, slug, email, dan password wajib diisi." });
         return;
       }
+
+      const passwordError = validatePassword(password);
+      if (passwordError) {
+        res.status(400).json({ ok: false, message: passwordError });
+        return;
+      }
       const result = await createTenant({
         name: businessName,
         slug,
@@ -692,10 +806,13 @@ export function createApp({
     })
   );
 
+  // ── Global error handler with production sanitization ──────────
   app.use((error, _req, res, _next) => {
+    console.error("Unhandled error:", error);
+    const isDev = process.env.NODE_ENV !== "production";
     res.status(500).json({
       ok: false,
-      message: error.message || "Internal server error.",
+      message: isDev ? (error.message || "Internal server error.") : "Terjadi kesalahan pada server.",
     });
   });
 
