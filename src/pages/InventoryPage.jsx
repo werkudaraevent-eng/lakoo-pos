@@ -65,33 +65,32 @@ function TambahStokModal({ product, settings, isEvent, onClose, onSave }) {
             <svg width={15} height={15} fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
           </button>
         </div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 20 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 20 }}>
           {variants.map((v) => {
             const current = v.quantityOnHand || 0;
             const label = v.attribute1Value || v.sku;
             const delta = deltas[v.id] || 0;
+            const mainQty = v.mainStockOnHand;
             return (
-              <div key={v.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 14px", background: "var(--surface)", borderRadius: 8 }}>
-                <div style={{ width: 40, height: 30, borderRadius: 6, background: "#fff", border: "1px solid var(--line)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 12, flexShrink: 0 }}>{label}</div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600 }}>{attr1Label} {label}</div>
-                  <div style={{ fontSize: 11.5, color: "var(--text-soft)" }}>
-                    Stok{isEvent ? " event" : ""}: <strong>{current}</strong>
-                    {isEvent && v.mainStockOnHand != null && (
-                      <span style={{ marginLeft: 6, color: v.mainStockOnHand === 0 ? "var(--danger)" : "var(--text-muted)" }}>
-                        · Toko: <strong>{v.mainStockOnHand}</strong>
-                      </span>
-                    )}
-                  </div>
+              <div key={v.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", background: "var(--surface)", borderRadius: 8, fontSize: 13 }}>
+                {/* Label badge */}
+                <div style={{ minWidth: 32, height: 26, borderRadius: 6, background: "#fff", border: "1px solid var(--line)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 11, flexShrink: 0 }}>{label}</div>
+                {/* Stock info — compact inline */}
+                <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--text-soft)", fontVariantNumeric: "tabular-nums" }}>
+                  <span>{isEvent ? "Event" : "Stok"}: <strong style={{ color: current === 0 ? "var(--danger)" : "var(--text)" }}>{current}</strong></span>
+                  {isEvent && mainQty != null && (
+                    <span style={{ color: mainQty === 0 ? "var(--danger)" : "var(--text-muted)" }}>· Toko: <strong>{mainQty}</strong></span>
+                  )}
                 </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  <span style={{ fontSize: 12, color: "var(--text-soft)", fontWeight: 600 }}>+ Tambah</span>
-                  <div className="qty-btn" style={{ width: 26, height: 26 }} onClick={() => set(v.id, delta - 1)}>−</div>
+                {/* Qty controls */}
+                <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
+                  <div className="qty-btn" style={{ width: 24, height: 24, fontSize: 13 }} onClick={() => set(v.id, delta - 1)}>−</div>
                   <input type="number" min={0} value={delta} onChange={(e) => set(v.id, e.target.value)}
-                    style={{ width: 52, textAlign: "center", padding: 4, border: "1px solid var(--line)", borderRadius: 6, fontFamily: "inherit", fontWeight: 700, fontSize: 14 }} />
-                  <div className="qty-btn" style={{ width: 26, height: 26 }} onClick={() => set(v.id, delta + 1)}>+</div>
+                    style={{ width: 44, textAlign: "center", padding: "2px 4px", border: "1px solid var(--line)", borderRadius: 6, fontFamily: "inherit", fontWeight: 700, fontSize: 13 }} />
+                  <div className="qty-btn" style={{ width: 24, height: 24, fontSize: 13 }} onClick={() => set(v.id, delta + 1)}>+</div>
                 </div>
-                <div style={{ minWidth: 60, textAlign: "right", fontSize: 13, fontWeight: 700, color: "var(--success)" }}>
+                {/* Result preview */}
+                <div style={{ minWidth: 44, textAlign: "right", fontSize: 12, fontWeight: 700, color: "var(--success)", fontVariantNumeric: "tabular-nums" }}>
                   {delta > 0 ? `→ ${current + delta}` : ""}
                 </div>
               </div>
