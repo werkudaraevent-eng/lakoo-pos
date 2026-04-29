@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { useAuth } from "../context/AuthContext";
@@ -113,7 +113,7 @@ function TambahStokModal({ product, settings, isEvent, onClose, onSave }) {
 }
 
 export function InventoryPage() {
-  const { products, workspaces, settings, adjustInventory, loading, loadError } = usePosData();
+  const { products, workspaces, settings, adjustInventory, allocateStockToEvent, getStoreProducts, loading, loadError } = usePosData();
   const { user } = useAuth();
   const { activeWorkspaceId } = useWorkspace();
   const activeWorkspace = workspaces.find((w) => w.id === activeWorkspaceId);
@@ -124,10 +124,47 @@ export function InventoryPage() {
   const [showFilter, setShowFilter] = useState(false);
   const [tambahModal, setTambahModal] = useState(null); // null | 'picker' | product
   const [toast, setToast] = useState(null);
+  const [allocateModal, setAllocateModal] = useState(false);
+  const [storeProducts, setStoreProducts] = useState([]);
+  const [loadingStore, setLoadingStore] = useState(false);
+  const [allocations, setAllocations] = useState({});
+  const [allocating, setAllocating] = useState(false);
 
   function showToast(type, message) {
     setToast({ type, message });
     setTimeout(() => setToast(null), 3000);
+  }
+
+  useEffect(() => {
+    if (allocateModal) {
+      setLoadingStore(true);
+      getStoreProducts()
+        .then(setStoreProducts)
+        .catch(() => {})
+        .finally(() => setLoadingStore(false));
+    } else {
+      setAllocations({});
+    }
+  }, [allocateModal]);
+
+  async function handleAllocate() {
+    const items = Object.entries(allocations)
+      .filter(([_, qty]) => qty > 0)
+      .map(([variantId, quantity]) => ({ variantId, quantity }));
+
+    if (items.length === 0) return;
+
+    setAllocating(true);
+    try {
+      await allocateStockToEvent(activeWorkspaceId, items);
+      showToast("success", `Berhasil mengalokasikan ${items.reduce((s, i) => s + i.quantity, 0)} unit ke event.`);
+      setAllocateModal(false);
+      setAllocations({});
+    } catch (err) {
+      showToast("error", err.message || "Gagal mengalokasikan stok.");
+    } finally {
+      setAllocating(false);
+    }
   }
 
   const attr1Label = settings?.attribute1Label || "Size";
@@ -206,6 +243,11 @@ export function InventoryPage() {
           <svg width={14} height={14} fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
           {" "}Tambah Stok
         </button>
+        {isEventWorkspace && (
+          <button className="btn btn-secondary" onClick={() => setAllocateModal(true)}>
+            🏪 Ambil dari Toko
+          </button>
+        )}
       </div>
 
       {/* Filter bar */}
@@ -377,6 +419,94 @@ export function InventoryPage() {
           </div>
         </div>
       ) : null}
+
+      {/* Ambil dari Toko (Allocate from Store) Modal */}
+      {allocateModal && (
+        <div className="modal-overlay" onClick={() => setAllocateModal(false)}>
+          <div className="modal" style={{ width: 540 }} onClick={(e) => e.stopPropagation()}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 }}>
+              <div>
+                <div className="modal-title" style={{ marginBottom: 2 }}>Ambil dari Toko</div>
+                <div style={{ fontSize: 13, color: "var(--text-soft)" }}>
+                  Pilih produk dan jumlah yang ingin dialokasikan ke event ini.
+                </div>
+              </div>
+              <button className="btn btn-ghost btn-icon" onClick={() => setAllocateModal(false)}>✕</button>
+            </div>
+
+            {loadingStore ? (
+              <div style={{ padding: 24, textAlign: "center", color: "var(--text-soft)", fontSize: 13 }}>Memuat produk toko...</div>
+            ) : (
+              <div style={{ maxHeight: 400, overflowY: "auto", display: "flex", flexDirection: "column", gap: 12 }}>
+                {storeProducts.map((product) => {
+                  const eventVariantIds = new Set((products || []).flatMap((p) => (p.variants || []).map((v) => v.id)));
+
+                  return (
+                    <div key={product.id}>
+                      <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 6 }}>{product.name}</div>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                        {product.variants.map((v) => {
+                          const label = v.attribute1Value || v.sku;
+                          const storeQty = v.quantityOnHand || 0;
+                          const alreadyInEvent = eventVariantIds.has(v.id);
+                          const allocQty = allocations[v.id] || 0;
+
+                          return (
+                            <div key={v.id} style={{
+                              display: "flex", alignItems: "center", gap: 8,
+                              padding: "6px 10px", background: "var(--surface)", borderRadius: 8,
+                              fontSize: 12, opacity: storeQty === 0 ? 0.5 : 1,
+                            }}>
+                              <div style={{ minWidth: 28, height: 22, borderRadius: 4, background: "#fff", border: "1px solid var(--line)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 10 }}>{label}</div>
+                              <div style={{ flex: 1, color: "var(--text-soft)" }}>
+                                Toko: <strong style={{ color: storeQty === 0 ? "var(--danger)" : "var(--text)" }}>{storeQty}</strong>
+                                {alreadyInEvent && <span className="badge badge-blue" style={{ fontSize: 9, marginLeft: 6 }}>sudah di event</span>}
+                              </div>
+                              {storeQty > 0 && (
+                                <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                                  <div className="qty-btn" style={{ width: 22, height: 22, fontSize: 12 }}
+                                    onClick={() => setAllocations((a) => ({ ...a, [v.id]: Math.max(0, (a[v.id] || 0) - 1) }))}>−</div>
+                                  <input type="number" min={0} max={storeQty} value={allocQty}
+                                    onChange={(e) => setAllocations((a) => ({ ...a, [v.id]: Math.min(storeQty, Math.max(0, parseInt(e.target.value) || 0)) }))}
+                                    style={{ width: 40, textAlign: "center", padding: "2px", border: "1px solid var(--line)", borderRadius: 4, fontWeight: 700, fontSize: 12, fontFamily: "inherit" }} />
+                                  <div className="qty-btn" style={{ width: 22, height: 22, fontSize: 12 }}
+                                    onClick={() => setAllocations((a) => ({ ...a, [v.id]: Math.min(storeQty, (a[v.id] || 0) + 1) }))}>+</div>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Summary + Save */}
+            {(() => {
+              const totalAlloc = Object.values(allocations).reduce((a, b) => a + b, 0);
+              return totalAlloc > 0 ? (
+                <div style={{ marginTop: 16 }}>
+                  <div style={{ background: "var(--accent-light)", border: "1px solid var(--accent-soft)", borderRadius: 8, padding: "10px 14px", marginBottom: 12, display: "flex", justifyContent: "space-between", fontSize: 13 }}>
+                    <span style={{ color: "var(--text-soft)" }}>Total alokasi</span>
+                    <span style={{ fontWeight: 800, color: "var(--accent)" }}>{totalAlloc} unit</span>
+                  </div>
+                </div>
+              ) : null;
+            })()}
+
+            <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+              <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setAllocateModal(false)} disabled={allocating}>Batal</button>
+              <button className="btn btn-primary" style={{ flex: 2, height: 42 }}
+                disabled={Object.values(allocations).reduce((a, b) => a + b, 0) === 0 || allocating}
+                onClick={handleAllocate}>
+                {allocating ? "Mengalokasikan..." : "Alokasikan ke Event"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -1656,6 +1656,145 @@ export async function getTenantDetail(tenantId) {
   return { tenant, usage, limits, users };
 }
 
+export async function allocateStockToEvent(payload, actorUserId, tenantId) {
+  const executor = ensureSql();
+  const workspace = await resolveWriteWorkspace(executor, payload.workspaceId, tenantId);
+
+  if (!workspace || workspace.type !== "event") {
+    return { ok: false, message: "Workspace harus bertipe event." };
+  }
+  if (!["draft", "active"].includes(workspace.status)) {
+    return { ok: false, message: "Event harus berstatus draft atau aktif." };
+  }
+
+  const items = payload.items || [];
+  if (items.length === 0) {
+    return { ok: false, message: "Tidak ada item untuk dialokasikan." };
+  }
+
+  try {
+    await executor.begin(async (tx) => {
+      for (const item of items) {
+        const qty = Number(item.quantity);
+        if (qty < 1) continue;
+
+        // Validate variant belongs to tenant
+        const variantRows = await tx`
+          SELECT id, quantity_on_hand AS "quantityOnHand"
+          FROM product_variants
+          WHERE id = ${item.variantId} AND tenant_id = ${tenantId}
+          FOR UPDATE
+        `;
+        const variant = variantRows[0];
+        if (!variant) continue;
+
+        // Check if already allocated to this event
+        const existingRows = await tx`
+          SELECT id, quantity_on_hand AS "quantityOnHand"
+          FROM workspace_variant_stocks
+          WHERE workspace_id = ${workspace.id} AND variant_id = ${item.variantId}
+          FOR UPDATE
+        `;
+        const existing = existingRows[0];
+
+        // If allocate mode, deduct from main store
+        if (workspace.stockMode === "allocate") {
+          if (variant.quantityOnHand < qty) {
+            throw new Error(`Stok toko tidak cukup untuk variant ${item.variantId}. Tersedia: ${variant.quantityOnHand}, diminta: ${qty}`);
+          }
+          await tx`
+            UPDATE product_variants SET quantity_on_hand = quantity_on_hand - ${qty}
+            WHERE id = ${item.variantId} AND tenant_id = ${tenantId}
+          `;
+        }
+
+        if (existing) {
+          // Update existing allocation
+          await tx`
+            UPDATE workspace_variant_stocks SET
+              quantity_on_hand = quantity_on_hand + ${qty},
+              allocated_from_main = CASE WHEN ${workspace.stockMode === "allocate"} THEN allocated_from_main + ${qty} ELSE allocated_from_main END,
+              updated_at = ${nowIso()}
+            WHERE id = ${existing.id}
+          `;
+        } else {
+          // Create new allocation
+          await tx`
+            INSERT INTO workspace_variant_stocks
+            (id, workspace_id, variant_id, quantity_on_hand, source_mode, allocated_from_main, created_at, updated_at)
+            VALUES (
+              ${createId("wvs")},
+              ${workspace.id},
+              ${item.variantId},
+              ${qty},
+              ${workspace.stockMode || "manual"},
+              ${workspace.stockMode === "allocate" ? qty : 0},
+              ${nowIso()},
+              ${nowIso()}
+            )
+          `;
+        }
+
+        // Create inventory movement for audit
+        await tx`
+          INSERT INTO inventory_movements
+          (id, variant_id, workspace_id, type, qty_delta, note, actor_user_id, reference_id, created_at, tenant_id)
+          VALUES (
+            ${createId("mov")},
+            ${item.variantId},
+            ${workspace.id},
+            ${"restock"},
+            ${qty},
+            ${"Alokasi stok dari toko ke event"},
+            ${actorUserId},
+            ${null},
+            ${nowIso()},
+            ${tenantId}
+          )
+        `;
+      }
+    });
+
+    return { ok: true, workspaceId: workspace.id };
+  } catch (error) {
+    return { ok: false, message: error.message };
+  }
+}
+
+export async function getStoreProducts(tenantId) {
+  const executor = ensureSql();
+
+  const products = await executor`
+    SELECT p.id, p.name, p.category_id, p.base_price AS "basePrice", p.is_active AS "isActive",
+           c.name AS category
+    FROM products p
+    LEFT JOIN categories c ON c.id = p.category_id
+    WHERE p.tenant_id = ${tenantId} AND p.is_active = true
+    ORDER BY p.name ASC
+  `;
+
+  const variants = await executor`
+    SELECT id, product_id AS "productId", sku,
+           attribute1_value AS "attribute1Value", attribute2_value AS "attribute2Value",
+           quantity_on_hand AS "quantityOnHand", is_active AS "isActive"
+    FROM product_variants
+    WHERE tenant_id = ${tenantId} AND is_active = true
+    ORDER BY product_id, created_at ASC
+  `;
+
+  // Group variants under products
+  const variantMap = new Map();
+  for (const v of variants) {
+    if (!variantMap.has(v.productId)) variantMap.set(v.productId, []);
+    variantMap.get(v.productId).push(v);
+  }
+
+  return products.map(p => ({
+    ...p,
+    variants: variantMap.get(p.id) || [],
+  })).filter(p => p.variants.length > 0);
+}
+
 export function checkTenantStatus(tenant) {
   if (!tenant) return { ok: false, reason: 'not_found' };
   if (tenant.status === 'suspended') return { ok: false, reason: 'suspended' };

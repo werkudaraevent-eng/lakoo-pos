@@ -56,6 +56,7 @@ const apiLimiter = createRateLimiter({ windowMs: 1 * 60 * 1000, max: 120 });
 
 import {
   adjustInventoryRecord,
+  allocateStockToEvent,
   authenticateUser,
   authenticatePlatformAdmin,
   checkTenantStatus,
@@ -72,6 +73,7 @@ import {
   getPlanLimits,
   getPlatformAdminById,
   getPlatformStats,
+  getStoreProducts,
   getTenantAdminUser,
   getTenantById,
   getTenantDetail,
@@ -136,6 +138,7 @@ function requirePlatformAdmin(req, res, next) {
 
 export function createApp({
   adjustInventoryRecordFn = adjustInventoryRecord,
+  allocateStockToEventFn = allocateStockToEvent,
   authenticateUserFn = authenticateUser,
   closeEventRecordFn = closeEventRecord,
   createEventRecordFn = createEventRecord,
@@ -147,6 +150,7 @@ export function createApp({
   finalizeSaleRecordFn = finalizeSaleRecord,
   getBootstrapFn = getBootstrap,
   getPlatformAdminByIdFn = getPlatformAdminById,
+  getStoreProductsFn = getStoreProducts,
   getPlatformStatsFn = getPlatformStats,
   getTenantAdminUserFn = getTenantAdminUser,
   getTenantByIdFn = getTenantById,
@@ -400,6 +404,40 @@ export function createApp({
       if (!result.ok) { res.status(400).json(result); return; }
       const data = await getBootstrapFn({ workspaceId: getRequestWorkspaceId(req), tenantId });
       res.json({ ok: true, data });
+    })
+  );
+
+  app.post(
+    "/api/events/:id/allocate",
+    auth,
+    requireRoleMiddleware(["admin", "manager"]),
+    asyncHandler(async (req, res) => {
+      const tenantId = req.auth.user.tenantId;
+      const result = await allocateStockToEventFn(
+        { ...req.body, workspaceId: req.params.id },
+        req.auth.user.id,
+        tenantId
+      );
+      if (!result.ok) {
+        res.status(400).json(result);
+        return;
+      }
+      const data = await getBootstrapFn({
+        workspaceId: getRequestWorkspaceId(req, result.workspaceId),
+        tenantId,
+      });
+      res.json({ ok: true, data });
+    })
+  );
+
+  app.get(
+    "/api/store-products",
+    auth,
+    requireRoleMiddleware(["admin", "manager"]),
+    asyncHandler(async (req, res) => {
+      const tenantId = req.auth.user.tenantId;
+      const products = await getStoreProductsFn(tenantId);
+      res.json({ ok: true, products });
     })
   );
 

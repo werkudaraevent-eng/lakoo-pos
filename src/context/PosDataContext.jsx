@@ -333,6 +333,18 @@ export function PosDataProvider({ children }) {
     }
   }
 
+  async function allocateStockToEvent(eventId, items) {
+    const requestWorkspaceId = activeWorkspaceIdRef.current || "";
+    const response = await apiPost(`/api/events/${eventId}/allocate`, { items });
+    applyMutationState(response.data, requestWorkspaceId);
+    return { ok: true };
+  }
+
+  async function getStoreProducts() {
+    const response = await apiGet("/api/store-products");
+    return response.products || [];
+  }
+
   return (
     <PosDataContext.Provider
       value={{
@@ -358,6 +370,8 @@ export function PosDataProvider({ children }) {
         createVariant,
         updateVariant,
         updateWorkspaceAssignments,
+        allocateStockToEvent,
+        getStoreProducts,
       }}
     >
       {children}
