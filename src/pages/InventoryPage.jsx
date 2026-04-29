@@ -239,13 +239,17 @@ export function InventoryPage() {
           <svg width={14} height={14} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" /></svg>
           {" "}Filter {catFilter !== "Semua" || statusFilter !== "Semua" ? "●" : ""}
         </button>
-        <button className="btn btn-primary" onClick={() => setTambahModal("picker")}>
-          <svg width={14} height={14} fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
-          {" "}Tambah Stok
-        </button>
-        {isEventWorkspace && (
-          <button className="btn btn-secondary" onClick={() => setAllocateModal(true)}>
+        {/* Allocate mode: primary action is "Ambil dari Toko", no manual tambah */}
+        {/* Manual mode: primary action is "Tambah Stok Manual", no ambil dari toko */}
+        {/* Store workspace: just "Tambah Stok" */}
+        {isEventWorkspace && activeWorkspace?.stockMode === "allocate" ? (
+          <button className="btn btn-primary" onClick={() => setAllocateModal(true)}>
             🏪 Ambil dari Toko
+          </button>
+        ) : (
+          <button className="btn btn-primary" onClick={() => setTambahModal("picker")}>
+            <svg width={14} height={14} fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+            {isEventWorkspace ? " Tambah Stok Manual" : " Tambah Stok"}
           </button>
         )}
       </div>
@@ -274,11 +278,22 @@ export function InventoryPage() {
       {/* Event workspace info banner */}
       {isEventWorkspace && (
         <div style={{ background: "var(--accent-light)", border: "1px solid var(--accent-soft)", borderRadius: 10, padding: "12px 16px", marginBottom: 14, fontSize: 13, color: "var(--accent-deep)", display: "flex", alignItems: "center", gap: 8 }}>
-          <span style={{ fontSize: 16 }}>📦</span>
+          <span style={{ fontSize: 16 }}>{activeWorkspace?.stockMode === "allocate" ? "🔗" : "📦"}</span>
           <div>
-            <strong>Mode Event: {activeWorkspace?.stockMode === "allocate" ? "Alokasi dari Toko Utama" : "Stok Manual"}</strong>
-            {activeWorkspace?.stockMode === "allocate" && (
-              <div style={{ fontSize: 12, marginTop: 2, opacity: 0.8 }}>Menambah stok event akan memotong stok toko utama. Kolom "Stok Toko" menunjukkan sisa stok di toko utama.</div>
+            {activeWorkspace?.stockMode === "allocate" ? (
+              <>
+                <strong>Mode Alokasi — Stok terhubung dengan toko utama</strong>
+                <div style={{ fontSize: 12, marginTop: 2, opacity: 0.8 }}>
+                  Gunakan "Ambil dari Toko" untuk menarik stok dari toko utama ke event. Stok toko akan berkurang otomatis.
+                </div>
+              </>
+            ) : (
+              <>
+                <strong>Mode Manual — Stok independen</strong>
+                <div style={{ fontSize: 12, marginTop: 2, opacity: 0.8 }}>
+                  Stok event dikelola terpisah dari toko. Tambah stok secara manual tanpa mempengaruhi stok toko.
+                </div>
+              </>
             )}
           </div>
         </div>
