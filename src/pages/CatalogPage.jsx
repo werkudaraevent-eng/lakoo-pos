@@ -126,16 +126,14 @@ export function CatalogPage() {
           </span>
           <input className="input has-icon" placeholder="Cari produk..." value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
+        <Link to="/catalog/new" className="btn btn-primary" style={{ textDecoration: "none" }}>
+          <svg width={14} height={14} fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+          {" "}Tambah Produk
+        </Link>
         {isEventWorkspace && (
-          <button className="btn btn-primary" onClick={() => setImportModal(true)}>
+          <button className="btn btn-secondary" onClick={() => setImportModal(true)}>
             🏪 Ambil dari Toko
           </button>
-        )}
-        {!isEventWorkspace && (
-          <Link to="/catalog/new" className="btn btn-primary" style={{ textDecoration: "none" }}>
-            <svg width={14} height={14} fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
-            {" "}Tambah Produk
-          </Link>
         )}
       </div>
 
