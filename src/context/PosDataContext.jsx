@@ -178,26 +178,22 @@ export function PosDataProvider({ children }) {
   }
 
   async function adjustInventory({ variantId, mode, quantity, note, actor }) {
-    try {
-      const requestWorkspaceId = activeWorkspaceIdRef.current || "";
-      const response = await apiPost(
-        "/api/inventory/movements",
-        withActiveWorkspace(
-          {
-            variantId,
-            mode,
-            quantity,
-            note,
-            actorUserId: actor.id,
-          },
-          requestWorkspaceId
-        )
-      );
-      applyMutationState(response.data, requestWorkspaceId);
-      return { ok: true };
-    } catch (error) {
-      return { ok: false, message: error.message };
-    }
+    const requestWorkspaceId = activeWorkspaceIdRef.current || "";
+    const response = await apiPost(
+      "/api/inventory/movements",
+      withActiveWorkspace(
+        {
+          variantId,
+          mode,
+          quantity,
+          note,
+          actorUserId: actor.id,
+        },
+        requestWorkspaceId
+      )
+    );
+    applyMutationState(response.data, requestWorkspaceId);
+    return { ok: true };
   }
 
   async function createEvent(payload) {

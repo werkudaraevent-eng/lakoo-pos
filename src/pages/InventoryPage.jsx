@@ -150,19 +150,28 @@ export function InventoryPage() {
 
   async function handleTambahSave(product, deltas) {
     let totalAdded = 0;
-    try {
-      for (const [variantId, qty] of Object.entries(deltas)) {
-        if (qty > 0) {
-          await adjustInventory({ variantId, mode: "restock", quantity: qty, note: "Tambah stok manual", actor: user });
-          totalAdded += qty;
+    let lastError = null;
+    for (const [variantId, qty] of Object.entries(deltas)) {
+      if (qty > 0) {
+        try {
+          const result = await adjustInventory({ variantId, mode: "restock", quantity: qty, note: "Tambah stok manual", actor: user });
+          if (result.ok) {
+            totalAdded += qty;
+          } else {
+            lastError = result.message || "Gagal menambah stok.";
+          }
+        } catch (err) {
+          lastError = err.message;
         }
       }
-      if (totalAdded > 0) {
-        showToast("success", `Berhasil menambah ${totalAdded} unit stok untuk ${product.name}.`);
-      }
-    } catch (err) {
-      showToast("error", `Gagal menambah stok: ${err.message}`);
-      throw err;
+    }
+    if (totalAdded > 0 && !lastError) {
+      showToast("success", `Berhasil menambah ${totalAdded} unit stok untuk ${product.name}.`);
+    } else if (totalAdded > 0 && lastError) {
+      showToast("success", `${totalAdded} unit berhasil ditambah, tapi ada error: ${lastError}`);
+    } else {
+      showToast("error", lastError || "Gagal menambah stok.");
+      throw new Error(lastError || "Gagal");
     }
   }
 
