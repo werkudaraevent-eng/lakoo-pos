@@ -113,6 +113,7 @@ export function AuthProvider({ children }) {
       const payload = await apiPost("/api/auth/login", { username, password, tenantSlug: tenantSlug || undefined });
       setAuthToken(payload.token);
       setToken(payload.token);
+      localStorage.removeItem("pos-impersonating"); // Clear impersonation flag on normal login
       const enrichedUser = { ...payload.user, planLimits: payload.limits };
       setUser(enrichedUser);
       return { ok: true, user: enrichedUser };
@@ -139,6 +140,7 @@ export function AuthProvider({ children }) {
   function logout() {
     setToken("");
     setUser(null);
+    localStorage.removeItem("pos-impersonating");
     clearStoredWorkspaceSelection();
   }
 
