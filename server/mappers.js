@@ -50,6 +50,7 @@ export function mapProducts(rows) {
         category: row.category,
         description: row.description,
         basePrice: row.basePrice,
+        imageUrl: row.imageUrl || null,
         isActive: toBoolean(row.isActive),
         createdAt: row.createdAt,
         variants: [],
