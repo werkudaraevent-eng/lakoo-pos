@@ -140,10 +140,10 @@ test("buildCatalogCsv returns quoted csv rows", () => {
       category: "Shirts",
       basePrice: 329000,
       isActive: true,
-      variants: [{ quantityOnHand: 4, lowStockThreshold: 2 }],
+      variants: [{ sku: "AST-001", attribute1Value: "M", attribute2Value: "Black", quantityOnHand: 4, priceOverride: "", lowStockThreshold: 2 }],
     },
   ]);
 
-  assert.match(csv, /"Product","Category","Base Price","Status","Stock","Variants"/);
-  assert.match(csv, /"Aster Overshirt","Shirts","329000","active","4","1"/);
+  assert.match(csv, /"Nama Produk","Kategori","Harga Dasar","SKU","Atribut 1","Atribut 2","Stok","Harga Override","Status"/);
+  assert.match(csv, /"Aster Overshirt","Shirts","329000","AST-001","M","Black","4","","active"/);
 });

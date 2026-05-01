@@ -166,6 +166,7 @@ async function fetchProducts(executor, tenantId) {
       c.name AS category,
       p.description,
       p.base_price AS "basePrice",
+      p.image_url AS "imageUrl",
       p.is_active AS "isActive",
       p.created_at AS "createdAt",
       pv.id AS "variantId",
@@ -1167,13 +1168,14 @@ export async function createProductRecord(payload, tenantId) {
 
       await tx`
         INSERT INTO products
-        (id, name, category_id, description, base_price, is_active, created_at, tenant_id)
+        (id, name, category_id, description, base_price, image_url, is_active, created_at, tenant_id)
         VALUES (
           ${productId},
           ${payload.name},
           ${category.id},
           ${payload.description},
           ${Number(payload.basePrice)},
+          ${payload.imageUrl || null},
           ${Boolean(payload.isActive)},
           ${createdAt},
           ${tenantId}
@@ -1231,6 +1233,7 @@ export async function updateProductRecord(productId, payload, tenantId) {
         category_id = ${category.id},
         description = ${payload.description},
         base_price = ${Number(payload.basePrice)},
+        image_url = COALESCE(${payload.imageUrl || null}, image_url),
         is_active = ${Boolean(payload.isActive)}
       WHERE id = ${productId} AND tenant_id = ${tenantId}
     `;
@@ -1798,6 +1801,60 @@ export async function getStoreProducts(tenantId) {
     ...p,
     variants: variantMap.get(p.id) || [],
   })).filter(p => p.variants.length > 0);
+}
+
+export async function bulkCreateProducts(products, tenantId) {
+  const executor = ensureSql();
+  const results = { created: 0, errors: [] };
+
+  for (const product of products) {
+    try {
+      // Ensure category exists
+      const category = await ensureCategory(executor, product.category || "Uncategorized", tenantId);
+
+      const productId = createId("p");
+      await executor`
+        INSERT INTO products (id, name, category_id, description, base_price, image_url, is_active, created_at, tenant_id)
+        VALUES (
+          ${productId},
+          ${product.name},
+          ${category.id},
+          ${product.description || ""},
+          ${Number(product.basePrice) || 0},
+          ${product.imageUrl || null},
+          ${true},
+          ${nowIso()},
+          ${tenantId}
+        )
+      `;
+
+      // Create variants
+      for (const variant of (product.variants || [])) {
+        await executor`
+          INSERT INTO product_variants (id, product_id, sku, attribute1_value, attribute2_value, price_override, quantity_on_hand, low_stock_threshold, is_active, created_at, tenant_id)
+          VALUES (
+            ${createId("v")},
+            ${productId},
+            ${variant.sku || `${product.name.substring(0, 3).toUpperCase()}-${createId("").substring(0, 4)}`},
+            ${variant.attribute1Value || ""},
+            ${variant.attribute2Value || ""},
+            ${variant.priceOverride ? Number(variant.priceOverride) : null},
+            ${Number(variant.quantityOnHand) || 0},
+            ${Number(variant.lowStockThreshold) || 5},
+            ${true},
+            ${nowIso()},
+            ${tenantId}
+          )
+        `;
+      }
+
+      results.created++;
+    } catch (err) {
+      results.errors.push({ product: product.name, error: err.message });
+    }
+  }
+
+  return results;
 }
 
 export function checkTenantStatus(tenant) {

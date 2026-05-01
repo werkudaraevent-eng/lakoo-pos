@@ -1,13 +1,14 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { usePosData } from "../context/PosDataContext";
 import { useWorkspace } from "../context/WorkspaceContext";
+import { buildCatalogCsv } from "../features/catalog/catalogHelpers";
 import { formatCurrency } from "../utils/formatters";
 import "../features/dashboard/dashboard.css";
 
 export function CatalogPage() {
-  const { products, workspaces, categories, settings, loading, loadError, updateProduct, getStoreProducts, allocateStockToEvent } = usePosData();
+  const { products, workspaces, categories, settings, loading, loadError, updateProduct, getStoreProducts, allocateStockToEvent, bulkImportProducts } = usePosData();
   const { activeWorkspaceId } = useWorkspace();
   const activeWorkspace = workspaces.find((w) => w.id === activeWorkspaceId);
   const isEventWorkspace = activeWorkspace?.type === "event";
@@ -21,11 +22,115 @@ export function CatalogPage() {
   const [selections, setSelections] = useState({}); // allocate: { variantId: qty }, manual: { variantId: true }
   const [importing, setImporting] = useState(false);
   const [toast, setToast] = useState(null);
+  const [importCsvModal, setImportCsvModal] = useState(false);
+  const [csvPreview, setCsvPreview] = useState([]);
+  const [importingCsv, setImportingCsv] = useState(false);
+  const csvFileRef = useRef(null);
   const isAllocateMode = activeWorkspace?.stockMode === "allocate";
 
   function showToast(type, message) {
     setToast({ type, message });
     setTimeout(() => setToast(null), 3000);
+  }
+
+  function parseCsv(text) {
+    const lines = text.split("\n").filter(l => l.trim());
+    if (lines.length < 2) return [];
+
+    const headers = lines[0].split(",").map(h => h.replace(/^"|"$/g, "").trim());
+    const rows = [];
+
+    for (let i = 1; i < lines.length; i++) {
+      const values = lines[i].match(/("([^"]*("")*)*"|[^,]*)/g) || [];
+      const row = {};
+      headers.forEach((h, idx) => {
+        row[h] = (values[idx] || "").replace(/^"|"$/g, "").replace(/""/g, '"').trim();
+      });
+      rows.push(row);
+    }
+    return rows;
+  }
+
+  function csvRowsToProducts(rows) {
+    const productMap = new Map();
+
+    for (const row of rows) {
+      const name = row["Nama Produk"];
+      if (!name) continue;
+
+      if (!productMap.has(name)) {
+        productMap.set(name, {
+          name,
+          category: row["Kategori"] || "",
+          basePrice: Number(row["Harga Dasar"]) || 0,
+          description: "",
+          variants: [],
+        });
+      }
+
+      const product = productMap.get(name);
+      if (row["SKU"] || row["Atribut 1"]) {
+        product.variants.push({
+          sku: row["SKU"] || "",
+          attribute1Value: row["Atribut 1"] || "",
+          attribute2Value: row["Atribut 2"] || "",
+          quantityOnHand: Number(row["Stok"]) || 0,
+          priceOverride: row["Harga Override"] ? Number(row["Harga Override"]) : null,
+        });
+      }
+    }
+
+    return [...productMap.values()];
+  }
+
+  function handleExportCsv() {
+    const csv = buildCatalogCsv(products);
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `katalog-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function handleCsvFileChange(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const text = ev.target?.result;
+      if (typeof text !== "string") return;
+      const rows = parseCsv(text);
+      setCsvPreview(rows);
+    };
+    reader.readAsText(file);
+  }
+
+  async function handleCsvImportConfirm() {
+    const productsToImport = csvRowsToProducts(csvPreview);
+    if (productsToImport.length === 0) {
+      showToast("error", "Tidak ada produk valid untuk diimport.");
+      return;
+    }
+    if (productsToImport.length > 500) {
+      showToast("error", "Maksimal 500 produk per import.");
+      return;
+    }
+
+    setImportingCsv(true);
+    try {
+      const result = await bulkImportProducts(productsToImport);
+      showToast("success", `Berhasil import ${result.created} produk.${result.errors?.length ? ` ${result.errors.length} gagal.` : ""}`);
+      setImportCsvModal(false);
+      setCsvPreview([]);
+      if (csvFileRef.current) csvFileRef.current.value = "";
+    } catch (err) {
+      showToast("error", err.message || "Gagal import produk.");
+    } finally {
+      setImportingCsv(false);
+    }
   }
 
   // Load store products when import modal opens
@@ -130,6 +235,12 @@ export function CatalogPage() {
           <svg width={14} height={14} fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
           {" "}Tambah Produk
         </Link>
+        <button className="btn btn-secondary" onClick={handleExportCsv} title="Export katalog ke CSV">
+          📥 Export CSV
+        </button>
+        <button className="btn btn-secondary" onClick={() => { setImportCsvModal(true); setCsvPreview([]); }} title="Import produk dari CSV">
+          📤 Import CSV
+        </button>
         {isEventWorkspace && (
           <button className="btn btn-secondary" onClick={() => setImportModal(true)}>
             🏪 Ambil dari Toko
@@ -155,9 +266,13 @@ export function CatalogPage() {
               <div style={{
                 width: "100%", aspectRatio: "4/3", borderRadius: 8, background: "var(--surface)",
                 display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 12,
-                fontSize: 10, color: "var(--text-muted)", fontFamily: "monospace",
+                overflow: "hidden",
               }}>
-                {p.category || "produk"}
+                {p.imageUrl ? (
+                  <img src={p.imageUrl} alt={p.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                ) : (
+                  <span style={{ fontSize: 10, color: "var(--text-muted)", fontFamily: "monospace" }}>{p.category || "produk"}</span>
+                )}
               </div>
 
               {/* Name */}
@@ -318,6 +433,84 @@ export function CatalogPage() {
                 })() || importing}
                 onClick={handleImport}>
                 {importing ? "Menambahkan..." : isAllocateMode ? "Alokasikan ke Event" : "Tambahkan ke Katalog Event"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Import CSV Modal */}
+      {importCsvModal && (
+        <div className="modal-overlay" onClick={() => setImportCsvModal(false)}>
+          <div className="modal" style={{ width: 600 }} onClick={(e) => e.stopPropagation()}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 }}>
+              <div>
+                <div className="modal-title" style={{ marginBottom: 2 }}>Import Produk dari CSV</div>
+                <div style={{ fontSize: 13, color: "var(--text-soft)" }}>
+                  Upload file CSV dengan format: Nama Produk, Kategori, Harga Dasar, SKU, Atribut 1, Atribut 2, Stok, Harga Override, Status
+                </div>
+              </div>
+              <button className="btn btn-ghost btn-icon" onClick={() => setImportCsvModal(false)}>✕</button>
+            </div>
+
+            <div style={{ marginBottom: 16 }}>
+              <input
+                ref={csvFileRef}
+                type="file"
+                accept=".csv,text/csv"
+                onChange={handleCsvFileChange}
+                style={{ fontSize: 13 }}
+              />
+            </div>
+
+            {csvPreview.length > 0 && (
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>
+                  Preview: {csvRowsToProducts(csvPreview).length} produk, {csvPreview.length} baris
+                </div>
+                <div style={{ maxHeight: 280, overflowY: "auto", border: "1px solid var(--line)", borderRadius: 8 }}>
+                  <table style={{ width: "100%", fontSize: 12, borderCollapse: "collapse" }}>
+                    <thead>
+                      <tr style={{ background: "var(--surface)", position: "sticky", top: 0 }}>
+                        <th style={{ padding: "6px 8px", textAlign: "left", borderBottom: "1px solid var(--line)" }}>Nama</th>
+                        <th style={{ padding: "6px 8px", textAlign: "left", borderBottom: "1px solid var(--line)" }}>Kategori</th>
+                        <th style={{ padding: "6px 8px", textAlign: "right", borderBottom: "1px solid var(--line)" }}>Harga</th>
+                        <th style={{ padding: "6px 8px", textAlign: "left", borderBottom: "1px solid var(--line)" }}>SKU</th>
+                        <th style={{ padding: "6px 8px", textAlign: "right", borderBottom: "1px solid var(--line)" }}>Stok</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {csvPreview.slice(0, 50).map((row, idx) => (
+                        <tr key={idx} style={{ borderBottom: "1px solid var(--line)" }}>
+                          <td style={{ padding: "5px 8px" }}>{row["Nama Produk"] || "-"}</td>
+                          <td style={{ padding: "5px 8px", color: "var(--text-soft)" }}>{row["Kategori"] || "-"}</td>
+                          <td style={{ padding: "5px 8px", textAlign: "right" }}>{row["Harga Dasar"] || "0"}</td>
+                          <td style={{ padding: "5px 8px", fontFamily: "monospace" }}>{row["SKU"] || "-"}</td>
+                          <td style={{ padding: "5px 8px", textAlign: "right" }}>{row["Stok"] || "0"}</td>
+                        </tr>
+                      ))}
+                      {csvPreview.length > 50 && (
+                        <tr>
+                          <td colSpan={5} style={{ padding: "8px", textAlign: "center", color: "var(--text-soft)", fontSize: 11 }}>
+                            ...dan {csvPreview.length - 50} baris lainnya
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            <div style={{ display: "flex", gap: 8 }}>
+              <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setImportCsvModal(false)} disabled={importingCsv}>Batal</button>
+              <button
+                className="btn btn-primary"
+                style={{ flex: 2, height: 42 }}
+                disabled={csvPreview.length === 0 || importingCsv}
+                onClick={handleCsvImportConfirm}
+              >
+                {importingCsv ? "Mengimport..." : `Import ${csvRowsToProducts(csvPreview).length} Produk`}
               </button>
             </div>
           </div>

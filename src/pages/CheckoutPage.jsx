@@ -54,6 +54,7 @@ export function CheckoutPage() {
           name: v.productName,
           category: v.category,
           price: v.basePrice,
+          imageUrl: v.imageUrl,
           variants: [],
         });
       }
@@ -182,7 +183,11 @@ export function CheckoutPage() {
             return (
               <div key={p.id} className={`product-card${stock === 0 ? " out-of-stock" : ""}`} onClick={() => openProduct(p)}>
                 <div className="product-thumb">
-                  <span style={{ fontSize: 20, fontWeight: 800, color: "var(--text-muted)" }}>{p.name.charAt(0)}</span>
+                  {p.imageUrl ? (
+                    <img src={p.imageUrl} alt={p.name} style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: 7 }} />
+                  ) : (
+                    <span style={{ fontSize: 20, fontWeight: 800, color: "var(--text-muted)" }}>{p.name.charAt(0)}</span>
+                  )}
                 </div>
                 <div className="product-name">{p.name}</div>
                 <div className="product-price">{formatCurrency(p.price)}</div>

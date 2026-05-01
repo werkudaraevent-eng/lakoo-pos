@@ -16,6 +16,7 @@ export function CatalogManagePage() {
     settings,
     updateProduct,
     updateVariant,
+    uploadImage,
   } = usePosData();
 
   const isNew = !productId;
@@ -32,6 +33,9 @@ export function CatalogManagePage() {
   const [submitting, setSubmitting] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
   const [saveError, setSaveError] = useState("");
+  const [imageFile, setImageFile] = useState(null);
+  const [imagePreview, setImagePreview] = useState(null);
+  const [uploading, setUploading] = useState(false);
   const loadedProductIdRef = useRef(null);
 
   // Load product data — only when product actually changes (by id)
@@ -52,6 +56,8 @@ export function CatalogManagePage() {
       description: product.description || "",
       basePrice: String(product.basePrice || ""),
     });
+    setImagePreview(product.imageUrl || null);
+    setImageFile(null);
     setVariants(
       (product.variants || []).map((v) => ({
         id: v.id,
@@ -95,14 +101,58 @@ export function CatalogManagePage() {
     setVariants((prev) => prev.map((v) => v.label === label ? { ...v, [field]: val } : v));
   }
 
+  function handleImageSelect(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      setSaveError("File harus berupa gambar.");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setSaveError("Ukuran file maksimal 5 MB.");
+      return;
+    }
+
+    setImageFile(file);
+    setSaveError("");
+
+    const reader = new FileReader();
+    reader.onload = (ev) => setImagePreview(ev.target.result);
+    reader.readAsDataURL(file);
+  }
+
   async function handleSave() {
     if (!form.name || !form.basePrice) return;
     setSubmitting(true);
+    setSaveError("");
+
+    // Upload image if a new file was selected
+    let imageUrl = imagePreview && !imageFile ? imagePreview : null;
+    if (imageFile) {
+      setUploading(true);
+      try {
+        const base64 = await new Promise((resolve) => {
+          const reader = new FileReader();
+          reader.onload = (e) => resolve(e.target.result);
+          reader.readAsDataURL(imageFile);
+        });
+        imageUrl = await uploadImage(base64);
+      } catch (err) {
+        setSaveError("Gagal upload gambar: " + (err.message || "Coba lagi."));
+        setUploading(false);
+        setSubmitting(false);
+        return;
+      }
+      setUploading(false);
+    }
+
     try {
       if (isNew) {
         await createProduct({
           ...form,
           basePrice: parseInt(String(form.basePrice).replace(/\D/g, "")) || 0,
+          imageUrl: imageUrl || null,
           isActive: true,
           variants: variants.map((v) => ({
             sku: v.sku || `${form.name.substring(0, 3).toUpperCase()}-${v.label}`,
@@ -118,6 +168,7 @@ export function CatalogManagePage() {
         await updateProduct(productId, {
           ...form,
           basePrice: parseInt(String(form.basePrice).replace(/\D/g, "")) || 0,
+          imageUrl: imageUrl || null,
           isActive: true,
         });
         // Update variants one by one
@@ -258,15 +309,43 @@ export function CatalogManagePage() {
         {/* Right column */}
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           {/* Image upload */}
-          <div className="card" style={{ padding: 0, overflow: "hidden" }}>
-            <div style={{ aspectRatio: "1", background: "var(--surface)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 10, cursor: "pointer" }}>
-              <svg width={48} height={48} fill="none" stroke="var(--text-muted)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="8.5" cy="8.5" r="1.5" /><polyline points="21 15 16 10 5 21" /></svg>
-              <div style={{ fontSize: 13, color: "var(--text-soft)", fontWeight: 600 }}>Upload Foto Produk</div>
-              <div style={{ fontSize: 11.5, color: "var(--text-muted)" }}>JPG, PNG — maks 5 MB</div>
+          <div className="card" style={{ padding: 16 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: "var(--text-soft)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 10 }}>
+              Foto Produk
             </div>
-            <div style={{ padding: "12px 14px", borderTop: "1px solid var(--line)" }}>
-              <button className="btn btn-secondary btn-sm w-full">Pilih Foto</button>
+
+            <div style={{
+              aspectRatio: "1",
+              background: "var(--surface)",
+              borderRadius: 10,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              overflow: "hidden",
+              marginBottom: 10,
+              border: "1px dashed var(--line)",
+            }}>
+              {imagePreview ? (
+                <img src={imagePreview} alt="Preview" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+              ) : (
+                <div style={{ textAlign: "center", color: "var(--text-muted)", padding: 16 }}>
+                  <svg width={32} height={32} fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+                  <div style={{ fontSize: 12, marginTop: 8 }}>JPG, PNG — maks 5 MB</div>
+                </div>
+              )}
             </div>
+
+            <label className="btn btn-secondary btn-sm w-full" style={{ cursor: "pointer", textAlign: "center" }}>
+              {uploading ? "Mengupload..." : imagePreview ? "Ganti Foto" : "Pilih Foto"}
+              <input type="file" accept="image/*" onChange={handleImageSelect} style={{ display: "none" }} disabled={uploading} />
+            </label>
+
+            {imagePreview && (
+              <button className="btn btn-ghost btn-sm w-full" style={{ marginTop: 6, color: "var(--danger)" }}
+                onClick={() => { setImageFile(null); setImagePreview(null); }}>
+                Hapus Foto
+              </button>
+            )}
           </div>
 
           {/* Status */}

@@ -1,5 +1,6 @@
 import "dotenv/config";
 
+import crypto from "node:crypto";
 import express from "express";
 import { pathToFileURL } from "node:url";
 
@@ -59,6 +60,7 @@ import {
   allocateStockToEvent,
   authenticateUser,
   authenticatePlatformAdmin,
+  bulkCreateProducts,
   checkTenantStatus,
   closeEventRecord,
   createEventRecord,
@@ -140,6 +142,7 @@ export function createApp({
   adjustInventoryRecordFn = adjustInventoryRecord,
   allocateStockToEventFn = allocateStockToEvent,
   authenticateUserFn = authenticateUser,
+  bulkCreateProductsFn = bulkCreateProducts,
   closeEventRecordFn = closeEventRecord,
   createEventRecordFn = createEventRecord,
   deactivateEventRecordFn = deactivateEventRecord,
@@ -172,6 +175,8 @@ export function createApp({
   const app = express();
   const auth = authMiddleware ?? requireAuthFn(getUserByIdFn, getTenantByIdFn, checkTenantStatusFn);
 
+  // Higher limit for image upload endpoint (must be before the general limit)
+  app.use("/api/upload", express.json({ limit: "10mb" }));
   app.use(express.json({ limit: "1mb" }));
 
   // ── Security headers ────────────────────────────────────────────
@@ -190,6 +195,65 @@ export function createApp({
   app.get("/api/health", (_req, res) => {
     res.json({ ok: true });
   });
+
+  // ── Image upload to Cloudinary ─────────────────────────────────
+  app.post(
+    "/api/upload/image",
+    auth,
+    requireRoleMiddleware(["admin", "manager"]),
+    asyncHandler(async (req, res) => {
+      const { image } = req.body; // base64 data URI
+
+      if (!image) {
+        res.status(400).json({ ok: false, message: "Tidak ada gambar." });
+        return;
+      }
+
+      const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
+      const apiKey = process.env.CLOUDINARY_API_KEY;
+      const apiSecret = process.env.CLOUDINARY_API_SECRET;
+
+      if (!cloudName || !apiKey || !apiSecret) {
+        res.status(500).json({ ok: false, message: "Cloudinary belum dikonfigurasi." });
+        return;
+      }
+
+      // Generate signature for signed upload
+      const timestamp = Math.floor(Date.now() / 1000);
+      const folder = `lakoo/${req.auth.user.tenantId}`;
+      const paramsToSign = `folder=${folder}&timestamp=${timestamp}`;
+      const signature = crypto
+        .createHash("sha256")
+        .update(paramsToSign + apiSecret)
+        .digest("hex");
+
+      // Upload to Cloudinary via REST API
+      const formData = new URLSearchParams();
+      formData.append("file", image);
+      formData.append("api_key", apiKey);
+      formData.append("timestamp", timestamp.toString());
+      formData.append("signature", signature);
+      formData.append("folder", folder);
+
+      const uploadRes = await fetch(
+        `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`,
+        { method: "POST", body: formData }
+      );
+
+      const uploadData = await uploadRes.json();
+
+      if (!uploadRes.ok || uploadData.error) {
+        res.status(500).json({ ok: false, message: uploadData.error?.message || "Upload gagal." });
+        return;
+      }
+
+      res.json({
+        ok: true,
+        url: uploadData.secure_url,
+        publicId: uploadData.public_id,
+      });
+    })
+  );
 
   app.post(
     "/api/auth/login",
@@ -616,6 +680,27 @@ export function createApp({
         ok: true,
         data: await getBootstrapFn({ workspaceId: getRequestWorkspaceId(req), tenantId }),
       });
+    })
+  );
+
+  app.post(
+    "/api/products/import",
+    auth,
+    requireRoleMiddleware(["admin", "manager"]),
+    asyncHandler(async (req, res) => {
+      const tenantId = req.auth.user.tenantId;
+      const products = req.body.products || [];
+      if (!Array.isArray(products) || products.length === 0) {
+        res.status(400).json({ ok: false, message: "Data produk tidak valid." });
+        return;
+      }
+      if (products.length > 500) {
+        res.status(400).json({ ok: false, message: "Maksimal 500 produk per import." });
+        return;
+      }
+      const result = await bulkCreateProductsFn(products, tenantId);
+      const data = await getBootstrapFn({ workspaceId: getRequestWorkspaceId(req), tenantId });
+      res.json({ ok: true, ...result, data });
     })
   );
 

@@ -26,6 +26,7 @@ function flattenVariants(products) {
       basePrice: product.basePrice,
       price: variant.priceOverride ?? product.basePrice,
       productActive: product.isActive,
+      imageUrl: product.imageUrl,
     }))
   );
 }
@@ -340,6 +341,18 @@ export function PosDataProvider({ children }) {
     return { ok: true };
   }
 
+  async function bulkImportProducts(products) {
+    const requestWorkspaceId = activeWorkspaceIdRef.current || "";
+    const response = await apiPost("/api/products/import", { products });
+    applyMutationState(response.data, requestWorkspaceId);
+    return { ok: true, created: response.created, errors: response.errors };
+  }
+
+  async function uploadImage(base64DataUri) {
+    const response = await apiPost("/api/upload/image", { image: base64DataUri });
+    return response.url;
+  }
+
   async function getStoreProducts() {
     const response = await apiGet("/api/store-products");
     return response.products || [];
@@ -371,7 +384,9 @@ export function PosDataProvider({ children }) {
         updateVariant,
         updateWorkspaceAssignments,
         allocateStockToEvent,
+        bulkImportProducts,
         getStoreProducts,
+        uploadImage,
       }}
     >
       {children}

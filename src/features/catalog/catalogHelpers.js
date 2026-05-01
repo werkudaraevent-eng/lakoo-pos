@@ -142,25 +142,34 @@ export function paginateCatalogProducts(products = [], { page = 1, pageSize = 8 
 }
 
 export function buildCatalogCsv(products = []) {
-  const rows = [["Product", "Category", "Base Price", "Status", "Stock", "Variants"]];
+  const header = '"Nama Produk","Kategori","Harga Dasar","SKU","Atribut 1","Atribut 2","Stok","Harga Override","Status"';
+  const rows = [];
 
-  for (const product of Array.isArray(products) ? products : []) {
-    const stock = buildCatalogStockSummary(product);
-    rows.push([
-      product.name || "",
-      product.category || "",
-      String(toNumber(product.basePrice)),
-      product.isActive ? "active" : "inactive",
-      String(stock.total),
-      String(Array.isArray(product.variants) ? product.variants.length : 0),
-    ]);
+  for (const product of (Array.isArray(products) ? products : [])) {
+    for (const variant of (product.variants || [])) {
+      rows.push([
+        product.name,
+        product.category || "",
+        product.basePrice || 0,
+        variant.sku || "",
+        variant.attribute1Value || "",
+        variant.attribute2Value || "",
+        variant.quantityOnHand || 0,
+        variant.priceOverride || "",
+        product.isActive ? "active" : "inactive",
+      ].map(v => `"${String(v).replace(/"/g, '""')}"`).join(","));
+    }
+    // Product with no variants — still export it
+    if (!product.variants || product.variants.length === 0) {
+      rows.push([
+        product.name,
+        product.category || "",
+        product.basePrice || 0,
+        "", "", "", "", "",
+        product.isActive ? "active" : "inactive",
+      ].map(v => `"${String(v).replace(/"/g, '""')}"`).join(","));
+    }
   }
 
-  return rows
-    .map((row) =>
-      row
-        .map((cell) => `"${String(cell).replaceAll('"', '""')}"`)
-        .join(",")
-    )
-    .join("\n");
+  return header + "\n" + rows.join("\n");
 }
