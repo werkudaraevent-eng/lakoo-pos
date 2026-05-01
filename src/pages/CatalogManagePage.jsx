@@ -26,7 +26,7 @@ export function CatalogManagePage() {
 
   const catList = useMemo(() => [...new Set((categories || []).map((c) => c.name))].sort(), [categories]);
 
-  const [form, setForm] = useState({ name: "", category: catList[0] || "", description: "", basePrice: "" });
+  const [form, setForm] = useState({ name: "", category: "", description: "", basePrice: "" });
   const [variants, setVariants] = useState([]);
   const [newSize, setNewSize] = useState("");
   const [saved, setSaved] = useState(false);
@@ -42,7 +42,7 @@ export function CatalogManagePage() {
   useEffect(() => {
     if (isNew) {
       if (loadedProductIdRef.current !== "new") {
-        setForm({ name: "", category: catList[0] || "", description: "", basePrice: "" });
+        setForm({ name: "", category: "", description: "", basePrice: "" });
         setVariants([{ label: "", qty: 0, sku: "" }]);
         loadedProductIdRef.current = "new";
       }
@@ -245,9 +245,21 @@ export function CatalogManagePage() {
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                 <div>
                   <label style={{ fontSize: 12, fontWeight: 700, color: "var(--text-soft)", display: "block", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.5px" }}>Kategori</label>
-                  <select className="input" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} style={{ appearance: "auto" }}>
-                    {catList.map((c) => <option key={c} value={c}>{c}</option>)}
-                  </select>
+                  <input
+                    className="input"
+                    list="category-list"
+                    placeholder="Ketik atau pilih kategori"
+                    value={form.category}
+                    onChange={(e) => setForm({ ...form, category: e.target.value })}
+                  />
+                  <datalist id="category-list">
+                    {catList.map((c) => <option key={c} value={c} />)}
+                  </datalist>
+                  {form.category && !catList.includes(form.category) && (
+                    <div style={{ fontSize: 11, color: "var(--accent)", marginTop: 4, fontWeight: 600 }}>
+                      ✨ Kategori baru akan dibuat
+                    </div>
+                  )}
                 </div>
                 <div>
                   <label style={{ fontSize: 12, fontWeight: 700, color: "var(--text-soft)", display: "block", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.5px" }}>Harga Jual (Rp) *</label>
