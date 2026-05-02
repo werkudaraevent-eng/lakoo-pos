@@ -28,14 +28,18 @@ export function CatalogManagePage() {
 
   const [form, setForm] = useState({ name: "", category: "", description: "", basePrice: "" });
 
-  // Option groups — user defines these
-  const [option1Values, setOption1Values] = useState([]); // e.g., ["S", "M", "L"]
-  const [option2Values, setOption2Values] = useState([]); // e.g., ["Hitam", "Putih"]
+  // Toggle-based variant state
+  const [hasVariants, setHasVariants] = useState(false);
+  const [singleSku, setSingleSku] = useState("");
+  const [singleQty, setSingleQty] = useState(0);
+  const [option1Label, setOption1Label] = useState("");
+  const [option1Values, setOption1Values] = useState([]);
+  const [option2Label, setOption2Label] = useState("");
+  const [option2Values, setOption2Values] = useState([]);
   const [newOpt1, setNewOpt1] = useState("");
   const [newOpt2, setNewOpt2] = useState("");
-
-  // Generated variants — auto-computed from option combinations
-  const [variantData, setVariantData] = useState({}); // { "S|Hitam": { qty: 10, sku: "PRD-S-BLK", priceOverride: null }, ... }
+  const [variantData, setVariantData] = useState({});
+  const [showOption2, setShowOption2] = useState(false);
 
   const [catOpen, setCatOpen] = useState(false);
   const [catSearch, setCatSearch] = useState("");
@@ -54,9 +58,15 @@ export function CatalogManagePage() {
     if (isNew) {
       if (loadedProductIdRef.current !== "new") {
         setForm({ name: "", category: "", description: "", basePrice: "" });
+        setHasVariants(false);
+        setSingleSku("");
+        setSingleQty(0);
+        setOption1Label(attr1Label || "");
         setOption1Values([]);
+        setOption2Label(attr2Label || "");
         setOption2Values([]);
         setVariantData({});
+        setShowOption2(false);
         loadedProductIdRef.current = "new";
       }
       return;
@@ -72,38 +82,46 @@ export function CatalogManagePage() {
     setImagePreview(product.imageUrl || null);
     setImageFile(null);
 
-    // Extract option values from existing variants
-    const attr1Set = new Set();
-    const attr2Set = new Set();
-    const data = {};
+    // Detect variant mode from existing variants
+    const existingVariants = product.variants || [];
+    const hasMultipleOrAttributed = existingVariants.length > 1 ||
+      existingVariants.some(v => v.attribute1Value || v.attribute2Value);
 
-    for (const v of product.variants || []) {
-      const a1 = v.attribute1Value || "";
-      const a2 = v.attribute2Value || "";
-      if (a1) attr1Set.add(a1);
-      if (a2) attr2Set.add(a2);
-      const key = `${a1}|${a2}`;
-      data[key] = {
-        id: v.id,
-        qty: v.quantityOnHand || 0,
-        sku: v.sku || "",
-        priceOverride: v.priceOverride != null ? v.priceOverride : null,
-        lowStockThreshold: v.lowStockThreshold || 3,
-      };
+    if (hasMultipleOrAttributed) {
+      setHasVariants(true);
+      // Extract option labels from settings
+      setOption1Label(attr1Label || "");
+      setOption2Label(attr2Label || "");
+      // Extract unique values
+      const a1Set = new Set();
+      const a2Set = new Set();
+      const data = {};
+      for (const v of existingVariants) {
+        if (v.attribute1Value) a1Set.add(v.attribute1Value);
+        if (v.attribute2Value) a2Set.add(v.attribute2Value);
+        data[`${v.attribute1Value || ""}|${v.attribute2Value || ""}`] = {
+          id: v.id,
+          qty: v.quantityOnHand || 0,
+          sku: v.sku || "",
+          priceOverride: v.priceOverride != null ? v.priceOverride : null,
+          lowStockThreshold: v.lowStockThreshold || 3,
+        };
+      }
+      setOption1Values([...a1Set]);
+      setOption2Values([...a2Set]);
+      if (a2Set.size > 0) setShowOption2(true);
+      setVariantData(data);
+    } else {
+      setHasVariants(false);
+      setSingleSku(existingVariants[0]?.sku || "");
+      setSingleQty(existingVariants[0]?.quantityOnHand || 0);
     }
-
-    setOption1Values([...attr1Set]);
-    setOption2Values([...attr2Set]);
-    setVariantData(data);
   }, [product, isNew, catList]);
 
-  // Auto-generate variants when options change
+  // Auto-generate variants when options change (only in variant mode)
   useEffect(() => {
-    // Generate all combinations
-    if (option1Values.length === 0 && option2Values.length === 0) {
-      // No options — no variants to generate
-      return;
-    }
+    if (!hasVariants) return;
+    if (option1Values.length === 0 && option2Values.length === 0) return;
 
     const list1 = option1Values.length > 0 ? option1Values : [""];
     const list2 = option2Values.length > 0 ? option2Values : [""];
@@ -135,9 +153,11 @@ export function CatalogManagePage() {
       }
       return next;
     });
-  }, [option1Values, option2Values]);
+  }, [option1Values, option2Values, hasVariants]);
 
-  const totalStock = Object.values(variantData).reduce((s, v) => s + (parseInt(v.qty) || 0), 0);
+  const totalStock = hasVariants
+    ? Object.values(variantData).reduce((s, v) => s + (parseInt(v.qty) || 0), 0)
+    : singleQty;
 
   const labelStyle = { fontSize: 12, fontWeight: 700, color: "var(--text-soft)", display: "block", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.5px" };
 
@@ -159,7 +179,7 @@ export function CatalogManagePage() {
     return Object.entries(variantData).map(([key, data]) => {
       const [a1, a2] = key.split("|");
       return {
-        id: data.id, // existing variant ID (for update)
+        id: data.id,
         sku: data.sku,
         attribute1Value: a1,
         attribute2Value: a2,
@@ -169,6 +189,28 @@ export function CatalogManagePage() {
         isActive: true,
       };
     });
+  }
+
+  function handleToggleVariants() {
+    if (hasVariants) {
+      // Turning OFF — warn if variants exist
+      if (Object.keys(variantData).length > 0) {
+        const confirmed = window.confirm("Varian akan dihapus dan produk akan menjadi 1 SKU saja. Lanjutkan?");
+        if (!confirmed) return;
+      }
+      setHasVariants(false);
+      // Optionally preserve first variant's data as single
+      const firstEntry = Object.values(variantData)[0];
+      if (firstEntry) {
+        setSingleSku(firstEntry.sku || "");
+        setSingleQty(firstEntry.qty || 0);
+      }
+    } else {
+      // Turning ON
+      setHasVariants(true);
+      if (!option1Label) setOption1Label(attr1Label || "");
+      if (!option2Label) setOption2Label(attr2Label || "");
+    }
   }
 
   function handleImageSelect(e) {
@@ -218,7 +260,20 @@ export function CatalogManagePage() {
     }
 
     try {
-      const variantsToSave = getVariantsForSave();
+      let variantsPayload;
+      if (hasVariants) {
+        variantsPayload = getVariantsForSave();
+      } else {
+        // Single variant (no options)
+        variantsPayload = [{
+          sku: singleSku || `${(form.name || "PRD").substring(0, 3).toUpperCase()}-001`,
+          attribute1Value: "",
+          attribute2Value: "",
+          quantityOnHand: singleQty,
+          lowStockThreshold: 3,
+          isActive: true,
+        }];
+      }
 
       if (isNew) {
         await createProduct({
@@ -226,7 +281,7 @@ export function CatalogManagePage() {
           basePrice: parseInt(String(form.basePrice).replace(/\D/g, "")) || 0,
           imageUrl: imageUrl || null,
           isActive: true,
-          variants: variantsToSave,
+          variants: variantsPayload,
         });
       } else {
         // Update product info first
@@ -237,8 +292,7 @@ export function CatalogManagePage() {
           isActive: true,
         });
         // Update variants one by one
-        // Note: each call triggers bootstrap reload, but we block form reset with `initialized` flag
-        for (const v of variantsToSave) {
+        for (const v of variantsPayload) {
           const variantPayload = {
             sku: v.sku,
             attribute1Value: v.attribute1Value || "",
@@ -252,7 +306,7 @@ export function CatalogManagePage() {
           try {
             if (v.id) {
               await updateVariant(v.id, variantPayload);
-            } else if (v.attribute1Value || v.attribute2Value) {
+            } else if (v.attribute1Value || v.attribute2Value || !hasVariants) {
               await createVariant(productId, variantPayload);
             }
           } catch (err) {
@@ -356,7 +410,7 @@ export function CatalogManagePage() {
                               color: "var(--accent)", fontWeight: 600,
                             }}
                           >
-                            + Buat kategori "{form.category}"
+                            + Buat kategori &ldquo;{form.category}&rdquo;
                           </div>
                         )}
                         {!form.category && catList.length === 0 && (
@@ -383,120 +437,173 @@ export function CatalogManagePage() {
             </div>
           </div>
 
-          {/* Opsi & Varian */}
+          {/* Varian Produk — Toggle-based */}
           <div className="card">
-            <div style={{ fontSize: 11, fontWeight: 800, color: "var(--text-soft)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 16 }}>
-              OPSI & VARIAN
-            </div>
-
-            {/* Option 1 (e.g., Size) */}
-            <div style={{ marginBottom: 16 }}>
-              <label style={labelStyle}>{attr1Label || "Opsi 1"} (mis: S, M, L)</label>
-              <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
-                {option1Values.map((v) => (
-                  <span key={v} style={{
-                    display: "inline-flex", alignItems: "center", gap: 4,
-                    padding: "4px 10px", background: "var(--accent-soft)", color: "var(--accent)",
-                    borderRadius: 20, fontSize: 12, fontWeight: 700,
-                  }}>
-                    {v}
-                    <button onClick={() => setOption1Values((prev) => prev.filter((x) => x !== v))}
-                      style={{ background: "none", border: "none", cursor: "pointer", color: "var(--accent)", fontSize: 14, lineHeight: 1, padding: 0 }}>×</button>
-                  </span>
-                ))}
-              </div>
-              <div style={{ display: "flex", gap: 6 }}>
-                <input className="input" placeholder={`Tambah ${attr1Label || "opsi"}...`} value={newOpt1}
-                  onChange={(e) => setNewOpt1(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === "Enter") { addOption1(); } }}
-                  style={{ flex: 1, fontSize: 13 }} />
-                <button className="btn btn-secondary btn-sm" onClick={addOption1}>+ Tambah</button>
-              </div>
-            </div>
-
-            {/* Option 2 (e.g., Color) — only show if attr2Label exists */}
-            {attr2Label && (
-              <div style={{ marginBottom: 16 }}>
-                <label style={labelStyle}>{attr2Label} (mis: Hitam, Putih)</label>
-                <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
-                  {option2Values.map((v) => (
-                    <span key={v} style={{
-                      display: "inline-flex", alignItems: "center", gap: 4,
-                      padding: "4px 10px", background: "#e8f0f8", color: "var(--blue)",
-                      borderRadius: 20, fontSize: 12, fontWeight: 700,
-                    }}>
-                      {v}
-                      <button onClick={() => setOption2Values((prev) => prev.filter((x) => x !== v))}
-                        style={{ background: "none", border: "none", cursor: "pointer", color: "var(--blue)", fontSize: 14, lineHeight: 1, padding: 0 }}>×</button>
-                    </span>
-                  ))}
-                </div>
-                <div style={{ display: "flex", gap: 6 }}>
-                  <input className="input" placeholder={`Tambah ${attr2Label}...`} value={newOpt2}
-                    onChange={(e) => setNewOpt2(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === "Enter") { addOption2(); } }}
-                    style={{ flex: 1, fontSize: 13 }} />
-                  <button className="btn btn-secondary btn-sm" onClick={addOption2}>+ Tambah</button>
-                </div>
-              </div>
-            )}
-
-            {/* Divider */}
-            {Object.keys(variantData).length > 0 && <div className="divider" />}
-
-            {/* Variant Matrix Table */}
-            {Object.keys(variantData).length > 0 && (
+            {/* Toggle header */}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: hasVariants ? 20 : 0 }}>
               <div>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: "var(--text-soft)" }}>
-                    {Object.keys(variantData).length} varian · Total: <strong style={{ color: "var(--text)" }}>{totalStock} unit</strong>
-                  </div>
+                <div style={{ fontSize: 13, fontWeight: 700 }}>Varian Produk</div>
+                <div style={{ fontSize: 12, color: "var(--text-soft)" }}>
+                  {hasVariants ? "Produk ini memiliki beberapa varian" : "Produk tanpa varian (1 SKU)"}
                 </div>
+              </div>
+              <button
+                onClick={handleToggleVariants}
+                style={{
+                  width: 44, height: 24, borderRadius: 12, border: "none",
+                  background: hasVariants ? "var(--accent)" : "var(--surface-2)",
+                  position: "relative", cursor: "pointer", transition: "background 0.2s",
+                }}
+              >
+                <span style={{
+                  position: "absolute", top: 3, left: hasVariants ? 23 : 3,
+                  width: 18, height: 18, borderRadius: "50%", background: "#fff",
+                  boxShadow: "0 1px 3px rgba(0,0,0,0.2)", transition: "left 0.2s",
+                }} />
+              </button>
+            </div>
 
-                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                  {Object.entries(variantData).map(([key, data]) => {
-                    const [a1, a2] = key.split("|");
-                    return (
-                      <div key={key} style={{
-                        display: "flex", alignItems: "center", gap: 8,
-                        padding: "8px 12px", background: "var(--surface)", borderRadius: 8, fontSize: 13,
-                      }}>
-                        {/* Attribute badges */}
-                        {a1 && <span style={{ padding: "2px 8px", background: "var(--accent-soft)", color: "var(--accent)", borderRadius: 4, fontSize: 11, fontWeight: 700 }}>{a1}</span>}
-                        {a2 && <span style={{ padding: "2px 8px", background: "#e8f0f8", color: "var(--blue)", borderRadius: 4, fontSize: 11, fontWeight: 700 }}>{a2}</span>}
-
-                        {/* SKU */}
-                        <input className="input" value={data.sku} placeholder="SKU"
-                          onChange={(e) => setVariantData((prev) => ({ ...prev, [key]: { ...prev[key], sku: e.target.value } }))}
-                          style={{ width: 100, fontSize: 11, padding: "4px 8px", fontFamily: "monospace" }} />
-
-                        {/* Stock */}
-                        <div style={{ display: "flex", alignItems: "center", gap: 4, marginLeft: "auto" }}>
-                          <span style={{ fontSize: 11, color: "var(--text-soft)" }}>Stok:</span>
-                          <div className="qty-btn" style={{ width: 22, height: 22, fontSize: 12 }}
-                            onClick={() => setVariantData((prev) => ({ ...prev, [key]: { ...prev[key], qty: Math.max(0, (prev[key]?.qty || 0) - 1) } }))}>−</div>
-                          <input type="number" min={0} value={data.qty}
-                            onChange={(e) => setVariantData((prev) => ({ ...prev, [key]: { ...prev[key], qty: Math.max(0, parseInt(e.target.value) || 0) } }))}
-                            style={{ width: 50, textAlign: "center", padding: "2px 4px", border: "1px solid var(--line)", borderRadius: 4, fontWeight: 700, fontSize: 12, fontFamily: "inherit" }} />
-                          <div className="qty-btn" style={{ width: 22, height: 22, fontSize: 12 }}
-                            onClick={() => setVariantData((prev) => ({ ...prev, [key]: { ...prev[key], qty: (prev[key]?.qty || 0) + 1 } }))}>+</div>
-                        </div>
-
-                        {/* Status badge */}
-                        <span className={`badge ${data.qty === 0 ? "badge-red" : data.qty <= 3 ? "badge-amber" : "badge-green"}`} style={{ fontSize: 10 }}>
-                          {data.qty === 0 ? "Habis" : data.qty <= 3 ? "Hampir" : "OK"}
-                        </span>
-                      </div>
-                    );
-                  })}
+            {/* Simple mode — no variants */}
+            {!hasVariants && (
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 16 }}>
+                <div>
+                  <label style={labelStyle}>SKU</label>
+                  <input className="input" placeholder="TSH-001" value={singleSku}
+                    onChange={e => setSingleSku(e.target.value)} style={{ fontFamily: "monospace", fontSize: 13 }} />
+                </div>
+                <div>
+                  <label style={labelStyle}>Stok</label>
+                  <input className="input" type="number" min={0} value={singleQty}
+                    onChange={e => setSingleQty(Math.max(0, parseInt(e.target.value) || 0))}
+                    style={{ fontWeight: 700, fontSize: 14 }} />
                 </div>
               </div>
             )}
 
-            {/* Empty state */}
-            {Object.keys(variantData).length === 0 && option1Values.length === 0 && (
-              <div style={{ textAlign: "center", padding: "16px 0", color: "var(--text-muted)", fontSize: 13 }}>
-                Tambahkan opsi di atas untuk membuat varian produk.
+            {/* Variant mode */}
+            {hasVariants && (
+              <div>
+                {/* Option 1 */}
+                <div style={{ marginBottom: 16 }}>
+                  <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+                    <div style={{ flex: 1 }}>
+                      <label style={labelStyle}>Tipe Varian 1</label>
+                      <input className="input" placeholder="mis: Size, Berat, Rasa" value={option1Label}
+                        onChange={e => setOption1Label(e.target.value)} style={{ fontSize: 13 }} />
+                    </div>
+                  </div>
+                  {option1Label && (
+                    <>
+                      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
+                        {option1Values.map(v => (
+                          <span key={v} style={{
+                            display: "inline-flex", alignItems: "center", gap: 4,
+                            padding: "5px 12px", background: "var(--accent-soft)", color: "var(--accent)",
+                            borderRadius: 20, fontSize: 12.5, fontWeight: 700,
+                          }}>
+                            {v}
+                            <button onClick={() => setOption1Values(prev => prev.filter(x => x !== v))}
+                              style={{ background: "none", border: "none", cursor: "pointer", color: "var(--accent)", fontSize: 15, lineHeight: 1, padding: 0, marginLeft: 2 }}>×</button>
+                          </span>
+                        ))}
+                      </div>
+                      <div style={{ display: "flex", gap: 6 }}>
+                        <input className="input" placeholder={`Tambah nilai ${option1Label}...`} value={newOpt1}
+                          onChange={e => setNewOpt1(e.target.value)}
+                          onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); addOption1(); } }}
+                          style={{ flex: 1, fontSize: 13 }} />
+                        <button className="btn btn-secondary btn-sm" onClick={addOption1}>Tambah</button>
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                {/* Add Option 2 button / Option 2 */}
+                {!showOption2 && option1Values.length > 0 && (
+                  <button className="btn btn-ghost btn-sm" style={{ marginBottom: 16 }}
+                    onClick={() => setShowOption2(true)}>
+                    + Tambah Tipe Varian 2 (opsional)
+                  </button>
+                )}
+
+                {showOption2 && (
+                  <div style={{ marginBottom: 16 }}>
+                    <div style={{ display: "flex", gap: 8, marginBottom: 8, alignItems: "flex-end" }}>
+                      <div style={{ flex: 1 }}>
+                        <label style={labelStyle}>Tipe Varian 2 (opsional)</label>
+                        <input className="input" placeholder="mis: Warna, Ukuran Cup" value={option2Label}
+                          onChange={e => setOption2Label(e.target.value)} style={{ fontSize: 13 }} />
+                      </div>
+                      <button className="btn btn-ghost btn-sm" style={{ color: "var(--danger)", marginBottom: 1 }}
+                        onClick={() => { setShowOption2(false); setOption2Label(""); setOption2Values([]); setNewOpt2(""); }}>
+                        Hapus
+                      </button>
+                    </div>
+                    {option2Label && (
+                      <>
+                        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
+                          {option2Values.map(v => (
+                            <span key={v} style={{
+                              display: "inline-flex", alignItems: "center", gap: 4,
+                              padding: "5px 12px", background: "#e8f0f8", color: "var(--blue)",
+                              borderRadius: 20, fontSize: 12.5, fontWeight: 700,
+                            }}>
+                              {v}
+                              <button onClick={() => setOption2Values(prev => prev.filter(x => x !== v))}
+                                style={{ background: "none", border: "none", cursor: "pointer", color: "var(--blue)", fontSize: 15, lineHeight: 1, padding: 0, marginLeft: 2 }}>×</button>
+                            </span>
+                          ))}
+                        </div>
+                        <div style={{ display: "flex", gap: 6 }}>
+                          <input className="input" placeholder={`Tambah nilai ${option2Label}...`} value={newOpt2}
+                            onChange={e => setNewOpt2(e.target.value)}
+                            onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); addOption2(); } }}
+                            style={{ flex: 1, fontSize: 13 }} />
+                          <button className="btn btn-secondary btn-sm" onClick={addOption2}>Tambah</button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
+
+                {/* Generated Variants Table */}
+                {Object.keys(variantData).length > 0 && (
+                  <>
+                    <div className="divider" />
+                    <div style={{ fontSize: 12, fontWeight: 700, color: "var(--text-soft)", marginBottom: 10 }}>
+                      DAFTAR VARIAN ({Object.keys(variantData).length} kombinasi · {totalStock} unit)
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                      {Object.entries(variantData).map(([key, data]) => {
+                        const [a1, a2] = key.split("|");
+                        return (
+                          <div key={key} style={{
+                            display: "flex", alignItems: "center", gap: 8,
+                            padding: "8px 12px", background: "var(--surface)", borderRadius: 8, fontSize: 13,
+                          }}>
+                            {a1 && <span style={{ padding: "2px 8px", background: "var(--accent-soft)", color: "var(--accent)", borderRadius: 4, fontSize: 11, fontWeight: 700, flexShrink: 0 }}>{a1}</span>}
+                            {a2 && <span style={{ padding: "2px 8px", background: "#e8f0f8", color: "var(--blue)", borderRadius: 4, fontSize: 11, fontWeight: 700, flexShrink: 0 }}>{a2}</span>}
+                            <input className="input" value={data.sku} placeholder="SKU"
+                              onChange={e => setVariantData(prev => ({ ...prev, [key]: { ...prev[key], sku: e.target.value } }))}
+                              style={{ width: 100, fontSize: 11, padding: "4px 8px", fontFamily: "monospace" }} />
+                            <div style={{ display: "flex", alignItems: "center", gap: 4, marginLeft: "auto" }}>
+                              <div className="qty-btn" style={{ width: 22, height: 22, fontSize: 12 }}
+                                onClick={() => setVariantData(prev => ({ ...prev, [key]: { ...prev[key], qty: Math.max(0, (prev[key]?.qty || 0) - 1) } }))}>−</div>
+                              <input type="number" min={0} value={data.qty}
+                                onChange={e => setVariantData(prev => ({ ...prev, [key]: { ...prev[key], qty: Math.max(0, parseInt(e.target.value) || 0) } }))}
+                                style={{ width: 50, textAlign: "center", padding: "2px 4px", border: "1px solid var(--line)", borderRadius: 4, fontWeight: 700, fontSize: 12, fontFamily: "inherit" }} />
+                              <div className="qty-btn" style={{ width: 22, height: 22, fontSize: 12 }}
+                                onClick={() => setVariantData(prev => ({ ...prev, [key]: { ...prev[key], qty: (prev[key]?.qty || 0) + 1 } }))}>+</div>
+                            </div>
+                            <span className={`badge ${data.qty === 0 ? "badge-red" : data.qty <= 3 ? "badge-amber" : "badge-green"}`} style={{ fontSize: 10 }}>
+                              {data.qty === 0 ? "Habis" : data.qty <= 3 ? "Hampir" : "OK"}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </>
+                )}
               </div>
             )}
           </div>
@@ -560,9 +667,14 @@ export function CatalogManagePage() {
               {[
                 { label: "Harga", value: form.basePrice ? formatCurrency(Number(form.basePrice)) : "—" },
                 { label: "Total Stok", value: `${totalStock} unit` },
-                { label: attr1Label || "Ukuran", value: option1Values.length > 0 ? option1Values.join(", ") : "—" },
-                ...(attr2Label && option2Values.length > 0 ? [{ label: attr2Label, value: option2Values.join(", ") }] : []),
-                { label: "Varian", value: Object.keys(variantData).length > 0 ? `${Object.keys(variantData).length} kombinasi` : "—" },
+                ...(hasVariants ? [
+                  { label: option1Label || "Tipe 1", value: option1Values.length > 0 ? option1Values.join(", ") : "—" },
+                  ...(showOption2 && option2Values.length > 0 ? [{ label: option2Label || "Tipe 2", value: option2Values.join(", ") }] : []),
+                  { label: "Varian", value: Object.keys(variantData).length > 0 ? `${Object.keys(variantData).length} kombinasi` : "—" },
+                ] : [
+                  { label: "SKU", value: singleSku || "—" },
+                  { label: "Mode", value: "1 SKU · " + totalStock + " unit" },
+                ]),
                 { label: "Kategori", value: form.category || "—" },
               ].map((r, i) => (
                 <div key={i} style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
