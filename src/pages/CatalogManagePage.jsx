@@ -325,7 +325,7 @@ export function CatalogManagePage() {
   }
 
   return (
-    <div className="content" style={{ maxWidth: 860 }}>
+    <div className="content" style={{ maxWidth: 600, margin: "0 auto" }}>
       {/* Header */}
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 24, flexWrap: "wrap" }}>
         <button className="btn btn-ghost btn-sm" onClick={() => navigate("/catalog")}>← Kembali</button>
@@ -333,12 +333,6 @@ export function CatalogManagePage() {
           <div style={{ fontSize: 18, fontWeight: 800 }}>{isNew ? "Tambah Produk Baru" : `Edit: ${product?.name || ""}`}</div>
           {!isNew && product ? <div style={{ fontSize: 12.5, color: "var(--text-soft)", marginTop: 2 }}>SKU {(product.variants || [])[0]?.sku || "-"}</div> : null}
         </div>
-        {!isNew ? (
-          <button className="btn btn-ghost btn-sm" style={{ color: "var(--danger)" }} onClick={() => setDeleteConfirm(true)}>
-            <svg width={13} height={13} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14H6L5 6" /><path d="M10 11v6M14 11v6" /></svg>
-            {" "}Hapus Produk
-          </button>
-        ) : null}
         <button className="btn btn-primary" style={{ minWidth: 140, height: 40 }} onClick={handleSave} disabled={submitting}>
           {saved ? "✓ Tersimpan!" : submitting ? "Menyimpan..." : "Simpan Perubahan"}
         </button>
@@ -350,342 +344,325 @@ export function CatalogManagePage() {
         </div>
       ) : null}
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 320px", gap: 16, alignItems: "start" }}>
-        {/* Left column */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          {/* Info Produk */}
-          <div className="card">
-            <div style={{ fontSize: 11, fontWeight: 800, color: "var(--text-soft)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 16 }}>INFORMASI PRODUK</div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-              <div>
-                <label style={{ fontSize: 12, fontWeight: 700, color: "var(--text-soft)", display: "block", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.5px" }}>Nama Produk *</label>
-                <input className="input" placeholder="mis: T-Shirt Basic White" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} style={{ fontSize: 14, fontWeight: 600 }} />
+      {/* Image Upload — compact */}
+      <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 20 }}>
+        {/* Thumbnail preview */}
+        <div style={{
+          width: 80, height: 80, borderRadius: 12, flexShrink: 0,
+          background: "var(--surface)", border: "1px dashed var(--line)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          overflow: "hidden",
+        }}>
+          {imagePreview ? (
+            <img src={imagePreview} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+          ) : (
+            <svg width={24} height={24} fill="none" stroke="var(--text-muted)" strokeWidth="1.5" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+          )}
+        </div>
+        {/* Upload controls */}
+        <div>
+          <label className="btn btn-secondary btn-sm" style={{ cursor: "pointer" }}>
+            {uploading ? "Mengupload..." : imagePreview ? "Ganti Foto" : "Upload Foto"}
+            <input type="file" accept="image/*" onChange={handleImageSelect} style={{ display: "none" }} disabled={uploading} />
+          </label>
+          {imagePreview && (
+            <button className="btn btn-ghost btn-sm" style={{ marginLeft: 8, color: "var(--danger)" }}
+              onClick={() => { setImageFile(null); setImagePreview(null); }}>Hapus</button>
+          )}
+          <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 4 }}>JPG, PNG · Maks 5 MB</div>
+        </div>
+      </div>
+
+      {/* Product Info Card */}
+      <div className="card" style={{ marginBottom: 16 }}>
+        <div style={{ fontSize: 11, fontWeight: 800, color: "var(--text-soft)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 16 }}>INFORMASI PRODUK</div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          {/* Nama */}
+          <div>
+            <label style={labelStyle}>Nama Produk *</label>
+            <input className="input" placeholder="mis: T-Shirt Basic White" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} style={{ fontSize: 14, fontWeight: 600 }} />
+          </div>
+
+          {/* Harga + Kategori side by side */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <div>
+              <label style={labelStyle}>Harga Jual (Rp) *</label>
+              <div style={{ position: "relative" }}>
+                <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", fontSize: 13.5, fontWeight: 600, color: "var(--text-soft)" }}>Rp</span>
+                <input className="input" placeholder="85.000" value={form.basePrice ? Number(form.basePrice).toLocaleString("id-ID") : ""} onChange={(e) => setForm({ ...form, basePrice: e.target.value.replace(/\D/g, "") })} style={{ paddingLeft: 36, fontSize: 14, fontWeight: 700 }} />
               </div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                <div style={{ position: "relative" }} ref={catRef}>
-                  <label style={{ fontSize: 12, fontWeight: 700, color: "var(--text-soft)", display: "block", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.5px" }}>Kategori</label>
-                  <input
-                    className="input"
-                    placeholder="Ketik atau pilih kategori"
-                    value={form.category}
-                    onChange={(e) => { setForm({ ...form, category: e.target.value }); setCatOpen(true); }}
-                    onFocus={() => setCatOpen(true)}
-                  />
-                  {/* Custom dropdown */}
-                  {catOpen && (
-                    <>
-                      {/* Invisible overlay to close on click outside */}
-                      <div style={{ position: "fixed", inset: 0, zIndex: 49 }} onClick={() => setCatOpen(false)} />
-                      <div style={{
-                        position: "absolute", top: "100%", left: 0, right: 0, zIndex: 50,
-                        marginTop: 4, background: "#fff", border: "1px solid var(--line)",
-                        borderRadius: "var(--radius-sm, 8px)", boxShadow: "var(--shadow-md, 0 4px 16px rgba(0,0,0,0.06))",
-                        maxHeight: 200, overflowY: "auto",
-                      }}>
-                        {catList
-                          .filter(c => !form.category || c.toLowerCase().includes(form.category.toLowerCase()))
-                          .map(c => (
-                            <div
-                              key={c}
-                              onClick={() => { setForm({ ...form, category: c }); setCatOpen(false); }}
-                              style={{
-                                padding: "8px 12px", fontSize: 13, cursor: "pointer",
-                                background: form.category === c ? "var(--accent-soft)" : "transparent",
-                                fontWeight: form.category === c ? 700 : 500,
-                                transition: "background-color 0.1s ease",
-                              }}
-                              onMouseEnter={(e) => e.currentTarget.style.background = "var(--surface)"}
-                              onMouseLeave={(e) => e.currentTarget.style.background = form.category === c ? "var(--accent-soft)" : "transparent"}
-                            >
-                              {c}
-                            </div>
-                          ))
-                        }
-                        {form.category && !catList.includes(form.category) && (
-                          <div
-                            onClick={() => setCatOpen(false)}
-                            style={{
-                              padding: "8px 12px", fontSize: 13, cursor: "pointer",
-                              borderTop: catList.length > 0 ? "1px solid var(--line)" : "none",
-                              color: "var(--accent)", fontWeight: 600,
-                            }}
-                          >
-                            + Buat kategori &ldquo;{form.category}&rdquo;
-                          </div>
-                        )}
-                        {!form.category && catList.length === 0 && (
-                          <div style={{ padding: "12px", fontSize: 12, color: "var(--text-muted)", textAlign: "center" }}>
-                            Belum ada kategori. Ketik untuk membuat baru.
-                          </div>
-                        )}
+            </div>
+            <div style={{ position: "relative" }} ref={catRef}>
+              <label style={labelStyle}>Kategori</label>
+              <input
+                className="input"
+                placeholder="Ketik atau pilih kategori"
+                value={form.category}
+                onChange={(e) => { setForm({ ...form, category: e.target.value }); setCatOpen(true); }}
+                onFocus={() => setCatOpen(true)}
+              />
+              {/* Custom dropdown */}
+              {catOpen && (
+                <>
+                  {/* Invisible overlay to close on click outside */}
+                  <div style={{ position: "fixed", inset: 0, zIndex: 49 }} onClick={() => setCatOpen(false)} />
+                  <div style={{
+                    position: "absolute", top: "100%", left: 0, right: 0, zIndex: 50,
+                    marginTop: 4, background: "#fff", border: "1px solid var(--line)",
+                    borderRadius: "var(--radius-sm, 8px)", boxShadow: "var(--shadow-md, 0 4px 16px rgba(0,0,0,0.06))",
+                    maxHeight: 200, overflowY: "auto",
+                  }}>
+                    {catList
+                      .filter(c => !form.category || c.toLowerCase().includes(form.category.toLowerCase()))
+                      .map(c => (
+                        <div
+                          key={c}
+                          onClick={() => { setForm({ ...form, category: c }); setCatOpen(false); }}
+                          style={{
+                            padding: "8px 12px", fontSize: 13, cursor: "pointer",
+                            background: form.category === c ? "var(--accent-soft)" : "transparent",
+                            fontWeight: form.category === c ? 700 : 500,
+                            transition: "background-color 0.1s ease",
+                          }}
+                          onMouseEnter={(e) => e.currentTarget.style.background = "var(--surface)"}
+                          onMouseLeave={(e) => e.currentTarget.style.background = form.category === c ? "var(--accent-soft)" : "transparent"}
+                        >
+                          {c}
+                        </div>
+                      ))
+                    }
+                    {form.category && !catList.includes(form.category) && (
+                      <div
+                        onClick={() => setCatOpen(false)}
+                        style={{
+                          padding: "8px 12px", fontSize: 13, cursor: "pointer",
+                          borderTop: catList.length > 0 ? "1px solid var(--line)" : "none",
+                          color: "var(--accent)", fontWeight: 600,
+                        }}
+                      >
+                        + Buat kategori &ldquo;{form.category}&rdquo;
                       </div>
-                    </>
-                  )}
-                </div>
-                <div>
-                  <label style={{ fontSize: 12, fontWeight: 700, color: "var(--text-soft)", display: "block", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.5px" }}>Harga Jual (Rp) *</label>
-                  <div style={{ position: "relative" }}>
-                    <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", fontSize: 13.5, fontWeight: 600, color: "var(--text-soft)" }}>Rp</span>
-                    <input className="input" placeholder="85.000" value={form.basePrice ? Number(form.basePrice).toLocaleString("id-ID") : ""} onChange={(e) => setForm({ ...form, basePrice: e.target.value.replace(/\D/g, "") })} style={{ paddingLeft: 36, fontSize: 14, fontWeight: 700 }} />
+                    )}
+                    {!form.category && catList.length === 0 && (
+                      <div style={{ padding: "12px", fontSize: 12, color: "var(--text-muted)", textAlign: "center" }}>
+                        Belum ada kategori. Ketik untuk membuat baru.
+                      </div>
+                    )}
                   </div>
-                </div>
-              </div>
-              <div>
-                <label style={{ fontSize: 12, fontWeight: 700, color: "var(--text-soft)", display: "block", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.5px" }}>Deskripsi</label>
-                <textarea className="input" rows={3} placeholder="Deskripsi singkat produk..." value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} style={{ resize: "vertical", lineHeight: 1.5 }} />
-              </div>
+                </>
+              )}
             </div>
           </div>
 
-          {/* Varian Produk — Toggle-based */}
-          <div className="card">
-            {/* Toggle header */}
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: hasVariants ? 20 : 0 }}>
-              <div>
-                <div style={{ fontSize: 13, fontWeight: 700 }}>Varian Produk</div>
-                <div style={{ fontSize: 12, color: "var(--text-soft)" }}>
-                  {hasVariants ? "Produk ini memiliki beberapa varian" : "Produk tanpa varian (1 SKU)"}
+          {/* Deskripsi — smaller */}
+          <div>
+            <label style={labelStyle}>Deskripsi <span style={{ fontWeight: 400, textTransform: "none" }}>(opsional)</span></label>
+            <textarea className="input" rows={2} placeholder="Deskripsi singkat produk..." value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} style={{ resize: "vertical", lineHeight: 1.5 }} />
+          </div>
+        </div>
+      </div>
+
+      {/* Varian Produk Card */}
+      <div className="card" style={{ marginBottom: 16 }}>
+        {/* Toggle header */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: hasVariants ? 20 : 0 }}>
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 700 }}>Varian Produk</div>
+            <div style={{ fontSize: 12, color: "var(--text-soft)" }}>
+              {hasVariants ? "Produk ini memiliki beberapa varian" : "Produk tanpa varian (1 SKU)"}
+            </div>
+          </div>
+          <button
+            onClick={handleToggleVariants}
+            style={{
+              width: 44, height: 24, borderRadius: 12, border: "none",
+              background: hasVariants ? "var(--accent)" : "var(--surface-2)",
+              position: "relative", cursor: "pointer", transition: "background 0.2s",
+            }}
+          >
+            <span style={{
+              position: "absolute", top: 3, left: hasVariants ? 23 : 3,
+              width: 18, height: 18, borderRadius: "50%", background: "#fff",
+              boxShadow: "0 1px 3px rgba(0,0,0,0.2)", transition: "left 0.2s",
+            }} />
+          </button>
+        </div>
+
+        {/* Simple mode — no variants */}
+        {!hasVariants && (
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 16 }}>
+            <div>
+              <label style={labelStyle}>SKU</label>
+              <input className="input" placeholder="TSH-001" value={singleSku}
+                onChange={e => setSingleSku(e.target.value)} style={{ fontFamily: "monospace", fontSize: 13 }} />
+            </div>
+            <div>
+              <label style={labelStyle}>Stok</label>
+              <input className="input" type="number" min={0} value={singleQty}
+                onChange={e => setSingleQty(Math.max(0, parseInt(e.target.value) || 0))}
+                style={{ fontWeight: 700, fontSize: 14 }} />
+            </div>
+          </div>
+        )}
+
+        {/* Variant mode */}
+        {hasVariants && (
+          <div>
+            {/* Option 1 */}
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+                <div style={{ flex: 1 }}>
+                  <label style={labelStyle}>Tipe Varian 1</label>
+                  <input className="input" placeholder="mis: Size, Berat, Rasa" value={option1Label}
+                    onChange={e => setOption1Label(e.target.value)} style={{ fontSize: 13 }} />
                 </div>
               </div>
-              <button
-                onClick={handleToggleVariants}
-                style={{
-                  width: 44, height: 24, borderRadius: 12, border: "none",
-                  background: hasVariants ? "var(--accent)" : "var(--surface-2)",
-                  position: "relative", cursor: "pointer", transition: "background 0.2s",
-                }}
-              >
-                <span style={{
-                  position: "absolute", top: 3, left: hasVariants ? 23 : 3,
-                  width: 18, height: 18, borderRadius: "50%", background: "#fff",
-                  boxShadow: "0 1px 3px rgba(0,0,0,0.2)", transition: "left 0.2s",
-                }} />
-              </button>
+              {option1Label && (
+                <>
+                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
+                    {option1Values.map(v => (
+                      <span key={v} style={{
+                        display: "inline-flex", alignItems: "center", gap: 4,
+                        padding: "5px 12px", background: "var(--accent-soft)", color: "var(--accent)",
+                        borderRadius: 20, fontSize: 12.5, fontWeight: 700,
+                      }}>
+                        {v}
+                        <button onClick={() => setOption1Values(prev => prev.filter(x => x !== v))}
+                          style={{ background: "none", border: "none", cursor: "pointer", color: "var(--accent)", fontSize: 15, lineHeight: 1, padding: 0, marginLeft: 2 }}>×</button>
+                      </span>
+                    ))}
+                  </div>
+                  <div style={{ display: "flex", gap: 6 }}>
+                    <input className="input" placeholder={`Tambah nilai ${option1Label}...`} value={newOpt1}
+                      onChange={e => setNewOpt1(e.target.value)}
+                      onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); addOption1(); } }}
+                      style={{ flex: 1, fontSize: 13 }} />
+                    <button className="btn btn-secondary btn-sm" onClick={addOption1}>Tambah</button>
+                  </div>
+                </>
+              )}
             </div>
 
-            {/* Simple mode — no variants */}
-            {!hasVariants && (
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 16 }}>
-                <div>
-                  <label style={labelStyle}>SKU</label>
-                  <input className="input" placeholder="TSH-001" value={singleSku}
-                    onChange={e => setSingleSku(e.target.value)} style={{ fontFamily: "monospace", fontSize: 13 }} />
-                </div>
-                <div>
-                  <label style={labelStyle}>Stok</label>
-                  <input className="input" type="number" min={0} value={singleQty}
-                    onChange={e => setSingleQty(Math.max(0, parseInt(e.target.value) || 0))}
-                    style={{ fontWeight: 700, fontSize: 14 }} />
-                </div>
-              </div>
+            {/* Add Option 2 button / Option 2 */}
+            {!showOption2 && option1Values.length > 0 && (
+              <button className="btn btn-ghost btn-sm" style={{ marginBottom: 16 }}
+                onClick={() => setShowOption2(true)}>
+                + Tambah Tipe Varian 2 (opsional)
+              </button>
             )}
 
-            {/* Variant mode */}
-            {hasVariants && (
-              <div>
-                {/* Option 1 */}
-                <div style={{ marginBottom: 16 }}>
-                  <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
-                    <div style={{ flex: 1 }}>
-                      <label style={labelStyle}>Tipe Varian 1</label>
-                      <input className="input" placeholder="mis: Size, Berat, Rasa" value={option1Label}
-                        onChange={e => setOption1Label(e.target.value)} style={{ fontSize: 13 }} />
-                    </div>
+            {showOption2 && (
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ display: "flex", gap: 8, marginBottom: 8, alignItems: "flex-end" }}>
+                  <div style={{ flex: 1 }}>
+                    <label style={labelStyle}>Tipe Varian 2 (opsional)</label>
+                    <input className="input" placeholder="mis: Warna, Ukuran Cup" value={option2Label}
+                      onChange={e => setOption2Label(e.target.value)} style={{ fontSize: 13 }} />
                   </div>
-                  {option1Label && (
-                    <>
-                      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
-                        {option1Values.map(v => (
-                          <span key={v} style={{
-                            display: "inline-flex", alignItems: "center", gap: 4,
-                            padding: "5px 12px", background: "var(--accent-soft)", color: "var(--accent)",
-                            borderRadius: 20, fontSize: 12.5, fontWeight: 700,
-                          }}>
-                            {v}
-                            <button onClick={() => setOption1Values(prev => prev.filter(x => x !== v))}
-                              style={{ background: "none", border: "none", cursor: "pointer", color: "var(--accent)", fontSize: 15, lineHeight: 1, padding: 0, marginLeft: 2 }}>×</button>
-                          </span>
-                        ))}
-                      </div>
-                      <div style={{ display: "flex", gap: 6 }}>
-                        <input className="input" placeholder={`Tambah nilai ${option1Label}...`} value={newOpt1}
-                          onChange={e => setNewOpt1(e.target.value)}
-                          onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); addOption1(); } }}
-                          style={{ flex: 1, fontSize: 13 }} />
-                        <button className="btn btn-secondary btn-sm" onClick={addOption1}>Tambah</button>
-                      </div>
-                    </>
-                  )}
-                </div>
-
-                {/* Add Option 2 button / Option 2 */}
-                {!showOption2 && option1Values.length > 0 && (
-                  <button className="btn btn-ghost btn-sm" style={{ marginBottom: 16 }}
-                    onClick={() => setShowOption2(true)}>
-                    + Tambah Tipe Varian 2 (opsional)
+                  <button className="btn btn-ghost btn-sm" style={{ color: "var(--danger)", marginBottom: 1 }}
+                    onClick={() => { setShowOption2(false); setOption2Label(""); setOption2Values([]); setNewOpt2(""); }}>
+                    Hapus
                   </button>
-                )}
-
-                {showOption2 && (
-                  <div style={{ marginBottom: 16 }}>
-                    <div style={{ display: "flex", gap: 8, marginBottom: 8, alignItems: "flex-end" }}>
-                      <div style={{ flex: 1 }}>
-                        <label style={labelStyle}>Tipe Varian 2 (opsional)</label>
-                        <input className="input" placeholder="mis: Warna, Ukuran Cup" value={option2Label}
-                          onChange={e => setOption2Label(e.target.value)} style={{ fontSize: 13 }} />
-                      </div>
-                      <button className="btn btn-ghost btn-sm" style={{ color: "var(--danger)", marginBottom: 1 }}
-                        onClick={() => { setShowOption2(false); setOption2Label(""); setOption2Values([]); setNewOpt2(""); }}>
-                        Hapus
-                      </button>
-                    </div>
-                    {option2Label && (
-                      <>
-                        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
-                          {option2Values.map(v => (
-                            <span key={v} style={{
-                              display: "inline-flex", alignItems: "center", gap: 4,
-                              padding: "5px 12px", background: "#e8f0f8", color: "var(--blue)",
-                              borderRadius: 20, fontSize: 12.5, fontWeight: 700,
-                            }}>
-                              {v}
-                              <button onClick={() => setOption2Values(prev => prev.filter(x => x !== v))}
-                                style={{ background: "none", border: "none", cursor: "pointer", color: "var(--blue)", fontSize: 15, lineHeight: 1, padding: 0, marginLeft: 2 }}>×</button>
-                            </span>
-                          ))}
-                        </div>
-                        <div style={{ display: "flex", gap: 6 }}>
-                          <input className="input" placeholder={`Tambah nilai ${option2Label}...`} value={newOpt2}
-                            onChange={e => setNewOpt2(e.target.value)}
-                            onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); addOption2(); } }}
-                            style={{ flex: 1, fontSize: 13 }} />
-                          <button className="btn btn-secondary btn-sm" onClick={addOption2}>Tambah</button>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                )}
-
-                {/* Generated Variants Table */}
-                {Object.keys(variantData).length > 0 && (
+                </div>
+                {option2Label && (
                   <>
-                    <div className="divider" />
-                    <div style={{ fontSize: 12, fontWeight: 700, color: "var(--text-soft)", marginBottom: 10 }}>
-                      DAFTAR VARIAN ({Object.keys(variantData).length} kombinasi · {totalStock} unit)
+                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
+                      {option2Values.map(v => (
+                        <span key={v} style={{
+                          display: "inline-flex", alignItems: "center", gap: 4,
+                          padding: "5px 12px", background: "#e8f0f8", color: "var(--blue)",
+                          borderRadius: 20, fontSize: 12.5, fontWeight: 700,
+                        }}>
+                          {v}
+                          <button onClick={() => setOption2Values(prev => prev.filter(x => x !== v))}
+                            style={{ background: "none", border: "none", cursor: "pointer", color: "var(--blue)", fontSize: 15, lineHeight: 1, padding: 0, marginLeft: 2 }}>×</button>
+                        </span>
+                      ))}
                     </div>
-                    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                      {Object.entries(variantData).map(([key, data]) => {
-                        const [a1, a2] = key.split("|");
-                        return (
-                          <div key={key} style={{
-                            display: "flex", alignItems: "center", gap: 8,
-                            padding: "8px 12px", background: "var(--surface)", borderRadius: 8, fontSize: 13,
-                          }}>
-                            {a1 && <span style={{ padding: "2px 8px", background: "var(--accent-soft)", color: "var(--accent)", borderRadius: 4, fontSize: 11, fontWeight: 700, flexShrink: 0 }}>{a1}</span>}
-                            {a2 && <span style={{ padding: "2px 8px", background: "#e8f0f8", color: "var(--blue)", borderRadius: 4, fontSize: 11, fontWeight: 700, flexShrink: 0 }}>{a2}</span>}
-                            <input className="input" value={data.sku} placeholder="SKU"
-                              onChange={e => setVariantData(prev => ({ ...prev, [key]: { ...prev[key], sku: e.target.value } }))}
-                              style={{ width: 100, fontSize: 11, padding: "4px 8px", fontFamily: "monospace" }} />
-                            <div style={{ display: "flex", alignItems: "center", gap: 4, marginLeft: "auto" }}>
-                              <div className="qty-btn" style={{ width: 22, height: 22, fontSize: 12 }}
-                                onClick={() => setVariantData(prev => ({ ...prev, [key]: { ...prev[key], qty: Math.max(0, (prev[key]?.qty || 0) - 1) } }))}>−</div>
-                              <input type="number" min={0} value={data.qty}
-                                onChange={e => setVariantData(prev => ({ ...prev, [key]: { ...prev[key], qty: Math.max(0, parseInt(e.target.value) || 0) } }))}
-                                style={{ width: 50, textAlign: "center", padding: "2px 4px", border: "1px solid var(--line)", borderRadius: 4, fontWeight: 700, fontSize: 12, fontFamily: "inherit" }} />
-                              <div className="qty-btn" style={{ width: 22, height: 22, fontSize: 12 }}
-                                onClick={() => setVariantData(prev => ({ ...prev, [key]: { ...prev[key], qty: (prev[key]?.qty || 0) + 1 } }))}>+</div>
-                            </div>
-                            <span className={`badge ${data.qty === 0 ? "badge-red" : data.qty <= 3 ? "badge-amber" : "badge-green"}`} style={{ fontSize: 10 }}>
-                              {data.qty === 0 ? "Habis" : data.qty <= 3 ? "Hampir" : "OK"}
-                            </span>
-                          </div>
-                        );
-                      })}
+                    <div style={{ display: "flex", gap: 6 }}>
+                      <input className="input" placeholder={`Tambah nilai ${option2Label}...`} value={newOpt2}
+                        onChange={e => setNewOpt2(e.target.value)}
+                        onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); addOption2(); } }}
+                        style={{ flex: 1, fontSize: 13 }} />
+                      <button className="btn btn-secondary btn-sm" onClick={addOption2}>Tambah</button>
                     </div>
                   </>
                 )}
               </div>
             )}
-          </div>
-        </div>
 
-        {/* Right column */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          {/* Image upload */}
-          <div className="card" style={{ padding: 16 }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: "var(--text-soft)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 10 }}>
-              Foto Produk
-            </div>
-
-            <div style={{
-              aspectRatio: "1",
-              background: "var(--surface)",
-              borderRadius: 10,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              overflow: "hidden",
-              marginBottom: 10,
-              border: "1px dashed var(--line)",
-            }}>
-              {imagePreview ? (
-                <img src={imagePreview} alt="Preview" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-              ) : (
-                <div style={{ textAlign: "center", color: "var(--text-muted)", padding: 16 }}>
-                  <svg width={32} height={32} fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
-                  <div style={{ fontSize: 12, marginTop: 8 }}>JPG, PNG — maks 5 MB</div>
+            {/* Generated Variants Table */}
+            {Object.keys(variantData).length > 0 && (
+              <>
+                <div className="divider" />
+                <div style={{ fontSize: 12, fontWeight: 700, color: "var(--text-soft)", marginBottom: 10 }}>
+                  DAFTAR VARIAN ({Object.keys(variantData).length} kombinasi · {totalStock} unit)
                 </div>
-              )}
-            </div>
-
-            <label className="btn btn-secondary btn-sm w-full" style={{ cursor: "pointer", textAlign: "center" }}>
-              {uploading ? "Mengupload..." : imagePreview ? "Ganti Foto" : "Pilih Foto"}
-              <input type="file" accept="image/*" onChange={handleImageSelect} style={{ display: "none" }} disabled={uploading} />
-            </label>
-
-            {imagePreview && (
-              <button className="btn btn-ghost btn-sm w-full" style={{ marginTop: 6, color: "var(--danger)" }}
-                onClick={() => { setImageFile(null); setImagePreview(null); }}>
-                Hapus Foto
-              </button>
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  {Object.entries(variantData).map(([key, data]) => {
+                    const [a1, a2] = key.split("|");
+                    return (
+                      <div key={key} style={{
+                        display: "flex", alignItems: "center", gap: 8,
+                        padding: "8px 12px", background: "var(--surface)", borderRadius: 8, fontSize: 13,
+                      }}>
+                        {a1 && <span style={{ padding: "2px 8px", background: "var(--accent-soft)", color: "var(--accent)", borderRadius: 4, fontSize: 11, fontWeight: 700, flexShrink: 0 }}>{a1}</span>}
+                        {a2 && <span style={{ padding: "2px 8px", background: "#e8f0f8", color: "var(--blue)", borderRadius: 4, fontSize: 11, fontWeight: 700, flexShrink: 0 }}>{a2}</span>}
+                        <input className="input" value={data.sku} placeholder="SKU"
+                          onChange={e => setVariantData(prev => ({ ...prev, [key]: { ...prev[key], sku: e.target.value } }))}
+                          style={{ width: 100, fontSize: 11, padding: "4px 8px", fontFamily: "monospace" }} />
+                        <div style={{ display: "flex", alignItems: "center", gap: 4, marginLeft: "auto" }}>
+                          <div className="qty-btn" style={{ width: 22, height: 22, fontSize: 12 }}
+                            onClick={() => setVariantData(prev => ({ ...prev, [key]: { ...prev[key], qty: Math.max(0, (prev[key]?.qty || 0) - 1) } }))}>−</div>
+                          <input type="number" min={0} value={data.qty}
+                            onChange={e => setVariantData(prev => ({ ...prev, [key]: { ...prev[key], qty: Math.max(0, parseInt(e.target.value) || 0) } }))}
+                            style={{ width: 50, textAlign: "center", padding: "2px 4px", border: "1px solid var(--line)", borderRadius: 4, fontWeight: 700, fontSize: 12, fontFamily: "inherit" }} />
+                          <div className="qty-btn" style={{ width: 22, height: 22, fontSize: 12 }}
+                            onClick={() => setVariantData(prev => ({ ...prev, [key]: { ...prev[key], qty: (prev[key]?.qty || 0) + 1 } }))}>+</div>
+                        </div>
+                        <span className={`badge ${data.qty === 0 ? "badge-red" : data.qty <= 3 ? "badge-amber" : "badge-green"}`} style={{ fontSize: 10 }}>
+                          {data.qty === 0 ? "Habis" : data.qty <= 3 ? "Hampir" : "OK"}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
             )}
           </div>
+        )}
+      </div>
 
-          {/* Status */}
-          <div className="card">
-            <div style={{ fontSize: 11, fontWeight: 800, color: "var(--text-soft)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 14 }}>STATUS PRODUK</div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              <StatusToggle label="Tampilkan di Katalog" desc="Produk bisa dilihat & dijual" defaultOn />
-              <StatusToggle label="Tersedia di Bazar" desc="Bisa dialokasikan ke event" defaultOn />
+      {/* Status Card */}
+      <div className="card" style={{ marginBottom: 16 }}>
+        <div style={{ fontSize: 11, fontWeight: 800, color: "var(--text-soft)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 14 }}>STATUS PRODUK</div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 600 }}>Tampilkan di Katalog</div>
+              <div style={{ fontSize: 11, color: "var(--text-soft)" }}>Produk terlihat di halaman kasir</div>
             </div>
+            <StatusToggle defaultOn />
           </div>
-
-          {/* Summary */}
-          <div className="card" style={{ background: "var(--accent-light)", border: "1px solid var(--accent-soft)" }}>
-            <div style={{ fontSize: 11, fontWeight: 800, color: "var(--accent)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 12 }}>RINGKASAN</div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {[
-                { label: "Harga", value: form.basePrice ? formatCurrency(Number(form.basePrice)) : "—" },
-                { label: "Total Stok", value: `${totalStock} unit` },
-                ...(hasVariants ? [
-                  { label: option1Label || "Tipe 1", value: option1Values.length > 0 ? option1Values.join(", ") : "—" },
-                  ...(showOption2 && option2Values.length > 0 ? [{ label: option2Label || "Tipe 2", value: option2Values.join(", ") }] : []),
-                  { label: "Varian", value: Object.keys(variantData).length > 0 ? `${Object.keys(variantData).length} kombinasi` : "—" },
-                ] : [
-                  { label: "SKU", value: singleSku || "—" },
-                  { label: "Mode", value: "1 SKU · " + totalStock + " unit" },
-                ]),
-                { label: "Kategori", value: form.category || "—" },
-              ].map((r, i) => (
-                <div key={i} style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
-                  <span style={{ color: "var(--text-soft)", fontWeight: 500 }}>{r.label}</span>
-                  <span style={{ fontWeight: 700 }}>{r.value}</span>
-                </div>
-              ))}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 600 }}>Tersedia di Bazar</div>
+              <div style={{ fontSize: 11, color: "var(--text-soft)" }}>Bisa dialokasikan ke event</div>
             </div>
+            <StatusToggle defaultOn />
           </div>
         </div>
       </div>
+
+      {/* Danger Zone — Delete (edit mode only) */}
+      {!isNew && (
+        <div style={{ borderTop: "1px solid var(--line)", paddingTop: 20, marginTop: 8 }}>
+          <button className="btn btn-ghost" style={{ color: "var(--danger)", width: "100%", justifyContent: "center", gap: 8 }} onClick={() => setDeleteConfirm(true)}>
+            <svg width={14} height={14} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14H6L5 6" /><path d="M10 11v6M14 11v6" /></svg>
+            Hapus Produk
+          </button>
+        </div>
+      )}
 
       {/* Delete confirm modal */}
       {deleteConfirm ? (
@@ -710,17 +687,11 @@ export function CatalogManagePage() {
 }
 
 // Toggle component
-function StatusToggle({ label, desc, defaultOn = false }) {
+function StatusToggle({ defaultOn = false }) {
   const [on, setOn] = useState(defaultOn);
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-      <div style={{ flex: 1 }}>
-        <div style={{ fontSize: 13, fontWeight: 700 }}>{label}</div>
-        <div style={{ fontSize: 11.5, color: "var(--text-soft)" }}>{desc}</div>
-      </div>
-      <div onClick={() => setOn(!on)} style={{ width: 40, height: 22, borderRadius: 11, background: on ? "var(--accent)" : "var(--surface-2)", cursor: "pointer", position: "relative", transition: "background 0.2s", flexShrink: 0 }}>
-        <div style={{ position: "absolute", top: 2, left: on ? 20 : 2, width: 18, height: 18, borderRadius: "50%", background: "#fff", boxShadow: "0 1px 4px rgba(0,0,0,0.2)", transition: "left 0.2s" }} />
-      </div>
+    <div onClick={() => setOn(!on)} style={{ width: 40, height: 22, borderRadius: 11, background: on ? "var(--accent)" : "var(--surface-2)", cursor: "pointer", position: "relative", transition: "background 0.2s", flexShrink: 0 }}>
+      <div style={{ position: "absolute", top: 2, left: on ? 20 : 2, width: 18, height: 18, borderRadius: "50%", background: "#fff", boxShadow: "0 1px 4px rgba(0,0,0,0.2)", transition: "left 0.2s" }} />
     </div>
   );
 }
