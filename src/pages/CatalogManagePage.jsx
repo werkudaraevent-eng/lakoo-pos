@@ -394,58 +394,92 @@ export function CatalogManagePage() {
             </div>
             <div style={{ position: "relative" }} ref={catRef}>
               <label style={labelStyle}>Kategori</label>
-              <input
+              <div
                 className="input"
-                placeholder="Ketik atau pilih kategori"
-                value={form.category}
-                onChange={(e) => { setForm({ ...form, category: e.target.value }); setCatOpen(true); }}
-                onFocus={() => setCatOpen(true)}
-              />
+                onClick={() => setCatOpen(!catOpen)}
+                style={{ cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", minHeight: 38 }}
+              >
+                <span style={{ color: form.category ? "var(--text)" : "var(--text-muted)", fontWeight: form.category ? 600 : 400 }}>
+                  {form.category || "Pilih atau buat kategori"}
+                </span>
+                <svg width={14} height={14} fill="none" stroke="var(--text-muted)" strokeWidth="2" strokeLinecap="round" viewBox="0 0 24 24" style={{ flexShrink: 0, transform: catOpen ? "rotate(180deg)" : "none", transition: "transform 0.15s" }}>
+                  <polyline points="6 9 12 15 18 9" />
+                </svg>
+              </div>
               {/* Custom dropdown */}
               {catOpen && (
                 <>
-                  {/* Invisible overlay to close on click outside */}
                   <div style={{ position: "fixed", inset: 0, zIndex: 49 }} onClick={() => setCatOpen(false)} />
                   <div style={{
                     position: "absolute", top: "100%", left: 0, right: 0, zIndex: 50,
                     marginTop: 4, background: "#fff", border: "1px solid var(--line)",
                     borderRadius: "var(--radius-sm, 8px)", boxShadow: "var(--shadow-md, 0 4px 16px rgba(0,0,0,0.06))",
-                    maxHeight: 200, overflowY: "auto",
+                    maxHeight: 240, overflowY: "auto",
                   }}>
+                    {/* Search input inside dropdown */}
+                    <div style={{ padding: "8px 10px", borderBottom: "1px solid var(--line)", position: "sticky", top: 0, background: "#fff", zIndex: 1 }}>
+                      <input
+                        className="input"
+                        placeholder="Cari atau ketik kategori baru..."
+                        value={catSearch}
+                        onChange={(e) => setCatSearch(e.target.value)}
+                        onClick={(e) => e.stopPropagation()}
+                        autoFocus
+                        style={{ fontSize: 13, padding: "6px 10px" }}
+                      />
+                    </div>
+
+                    {/* Existing categories */}
                     {catList
-                      .filter(c => !form.category || c.toLowerCase().includes(form.category.toLowerCase()))
+                      .filter(c => !catSearch || c.toLowerCase().includes(catSearch.toLowerCase()))
                       .map(c => (
                         <div
                           key={c}
-                          onClick={() => { setForm({ ...form, category: c }); setCatOpen(false); }}
+                          onClick={() => { setForm({ ...form, category: c }); setCatOpen(false); setCatSearch(""); }}
                           style={{
-                            padding: "8px 12px", fontSize: 13, cursor: "pointer",
+                            padding: "9px 12px", fontSize: 13, cursor: "pointer",
+                            display: "flex", alignItems: "center", gap: 8,
                             background: form.category === c ? "var(--accent-soft)" : "transparent",
                             fontWeight: form.category === c ? 700 : 500,
-                            transition: "background-color 0.1s ease",
                           }}
                           onMouseEnter={(e) => e.currentTarget.style.background = "var(--surface)"}
                           onMouseLeave={(e) => e.currentTarget.style.background = form.category === c ? "var(--accent-soft)" : "transparent"}
                         >
+                          <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--accent)", flexShrink: 0 }} />
                           {c}
                         </div>
                       ))
                     }
-                    {form.category && !catList.includes(form.category) && (
+
+                    {/* Create new category option — always visible when typing */}
+                    {catSearch && !catList.some(c => c.toLowerCase() === catSearch.toLowerCase()) && (
                       <div
-                        onClick={() => setCatOpen(false)}
+                        onClick={() => { setForm({ ...form, category: catSearch }); setCatOpen(false); setCatSearch(""); }}
                         style={{
-                          padding: "8px 12px", fontSize: 13, cursor: "pointer",
-                          borderTop: catList.length > 0 ? "1px solid var(--line)" : "none",
+                          padding: "9px 12px", fontSize: 13, cursor: "pointer",
+                          borderTop: "1px solid var(--line)",
                           color: "var(--accent)", fontWeight: 600,
+                          display: "flex", alignItems: "center", gap: 8,
                         }}
+                        onMouseEnter={(e) => e.currentTarget.style.background = "var(--accent-light)"}
+                        onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
                       >
-                        + Buat kategori &ldquo;{form.category}&rdquo;
+                        <span style={{ width: 18, height: 18, borderRadius: "50%", background: "var(--accent-soft)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, lineHeight: 1, flexShrink: 0 }}>+</span>
+                        Buat kategori "<strong>{catSearch}</strong>"
                       </div>
                     )}
-                    {!form.category && catList.length === 0 && (
-                      <div style={{ padding: "12px", fontSize: 12, color: "var(--text-muted)", textAlign: "center" }}>
-                        Belum ada kategori. Ketik untuk membuat baru.
+
+                    {/* Empty state */}
+                    {catList.length === 0 && !catSearch && (
+                      <div style={{ padding: "14px 12px", fontSize: 12.5, color: "var(--text-muted)", textAlign: "center", lineHeight: 1.5 }}>
+                        Belum ada kategori.<br />Ketik di kolom pencarian untuk membuat baru.
+                      </div>
+                    )}
+
+                    {/* No match */}
+                    {catSearch && catList.filter(c => c.toLowerCase().includes(catSearch.toLowerCase())).length === 0 && catList.length > 0 && (
+                      <div style={{ padding: "8px 12px", fontSize: 12, color: "var(--text-muted)" }}>
+                        Tidak ditemukan kategori "{catSearch}"
                       </div>
                     )}
                   </div>
