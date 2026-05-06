@@ -358,37 +358,37 @@ export function PosDataProvider({ children }) {
     return response.products || [];
   }
 
+  const contextValue = useMemo(() => ({
+    ...state,
+    variants,
+    loading,
+    hasLoaded,
+    loadError,
+    reload,
+    createEvent,
+    updateEvent,
+    deleteEvent,
+    updateEventStatus,
+    closeEvent,
+    createPromotion,
+    adjustInventory,
+    finalizeSale,
+    updateSettings,
+    createUser,
+    updateUser,
+    createProduct,
+    updateProduct,
+    createVariant,
+    updateVariant,
+    updateWorkspaceAssignments,
+    allocateStockToEvent,
+    bulkImportProducts,
+    getStoreProducts,
+    uploadImage,
+  }), [state, variants, loading, hasLoaded, loadError]);
+
   return (
-    <PosDataContext.Provider
-      value={{
-        ...state,
-        variants,
-        loading,
-        hasLoaded,
-        loadError,
-        reload,
-        createEvent,
-        updateEvent,
-        deleteEvent,
-        updateEventStatus,
-        closeEvent,
-        createPromotion,
-        adjustInventory,
-        finalizeSale,
-        updateSettings,
-        createUser,
-        updateUser,
-        createProduct,
-        updateProduct,
-        createVariant,
-        updateVariant,
-        updateWorkspaceAssignments,
-        allocateStockToEvent,
-        bulkImportProducts,
-        getStoreProducts,
-        uploadImage,
-      }}
-    >
+    <PosDataContext.Provider value={contextValue}>
       {children}
     </PosDataContext.Provider>
   );

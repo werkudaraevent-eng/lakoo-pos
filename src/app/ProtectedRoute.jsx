@@ -46,18 +46,34 @@ export function ProtectedRoute({ allow, renderShell = true, requireWorkspace = t
 
   if (requireWorkspace) {
     if (!hasLoaded || loading) {
+      // Show shell with inline loading — NOT full-page blank
+      if (renderShell) {
+        return (
+          <AppShell>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "60px 24px" }}>
+              <div style={{ textAlign: "center" }}>
+                <div style={{ width: 32, height: 32, border: "3px solid var(--surface)", borderTopColor: "var(--accent)", borderRadius: "50%", animation: "spin 0.8s linear infinite", margin: "0 auto 12px" }} />
+                <div style={{ fontSize: 13.5, color: "var(--text-soft)" }}>Memuat data...</div>
+                <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+              </div>
+            </div>
+          </AppShell>
+        );
+      }
       return <LoadingScreen message="Menyiapkan workspace..." />;
     }
 
     if (loadError) {
-      return (
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100vh", background: "var(--bg)" }}>
-          <div style={{ textAlign: "center", padding: 24 }}>
+      const errorContent = (
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "60px 24px" }}>
+          <div style={{ textAlign: "center" }}>
             <div style={{ fontSize: 17, fontWeight: 700, color: "var(--danger)", marginBottom: 8 }}>Gagal Memuat</div>
             <div style={{ fontSize: 13.5, color: "var(--text-soft)" }}>{loadError}</div>
           </div>
         </div>
       );
+      if (renderShell) return <AppShell>{errorContent}</AppShell>;
+      return errorContent;
     }
 
     if (!hasResolvedWorkspace) {

@@ -31,13 +31,14 @@ import { PlatformTenantsPage } from "../pages/platform/PlatformTenantsPage";
 import { PlatformTenantDetailPage } from "../pages/platform/PlatformTenantDetailPage";
 
 export function App() {
-  const { authLoading } = useAuth();
+  const { authLoading, user } = useAuth();
   const location = useLocation();
 
-  // Show branded loading screen while restoring session (skip for platform routes & public pages)
+  // Only show loading screen if there's NO cached user at all (true cold start)
+  // If user exists in localStorage, render immediately — auth/me refreshes in background
   const isPlatformRoute = location.pathname.startsWith("/platform");
   const isPublicRoute = ["/login", "/register", "/account-blocked"].includes(location.pathname);
-  if (authLoading && !isPlatformRoute && !isPublicRoute) {
+  if (authLoading && !user && !isPlatformRoute && !isPublicRoute) {
     return <LoadingScreen message="Memulihkan sesi..." />;
   }
 
