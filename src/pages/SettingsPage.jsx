@@ -183,7 +183,7 @@ export function SettingsPage() {
   const taxCalc = Math.round(100000 * (Number(form.taxRate) || 0) / 100);
 
   return (
-    <div className="page-stack" style={{ maxWidth: 720, margin: "0 auto" }}>
+    <div className="page-stack" style={{ maxWidth: 900 }}>
 
       {/* ── Subscription Info Panel ── */}
       {tenantInfo?.tenant ? (
