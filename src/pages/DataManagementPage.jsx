@@ -46,6 +46,7 @@ export function DataManagementPage() {
   const [logs, setLogs] = useState([]);
   const [loadingBin, setLoadingBin] = useState(false);
   const [loadingLogs, setLoadingLogs] = useState(false);
+  const [auditFilter, setAuditFilter] = useState("");
   const [toast, setToast] = useState(null);
   const [confirmAction, setConfirmAction] = useState(null); // "products" | "sales" | "stock"
   const [deleteConfirm, setDeleteConfirm] = useState(null); // { entityType, ids }
@@ -62,12 +63,12 @@ export function DataManagementPage() {
         .finally(() => setLoadingBin(false));
     } else if (tab === "audit") {
       setLoadingLogs(true);
-      getAuditLogs({ limit: 100 })
+      getAuditLogs({ limit: 200, entityType: auditFilter || undefined })
         .then(setLogs)
         .catch(() => {})
         .finally(() => setLoadingLogs(false));
     }
-  }, [tab]);
+  }, [tab, auditFilter]);
 
   function showToast(type, message) {
     setToast({ type, message });
@@ -405,6 +406,26 @@ export function DataManagementPage() {
       {/* Tab: Riwayat Aktivitas */}
       {tab === "audit" && (
         <div>
+          {/* Filter */}
+          <div style={{ display: "flex", gap: 6, marginBottom: 12, flexWrap: "wrap" }}>
+            {[
+              { key: "", label: "Semua" },
+              { key: "product", label: "Produk" },
+              { key: "sale", label: "Transaksi" },
+              { key: "inventory", label: "Stok" },
+              { key: "user", label: "Pengguna" },
+              { key: "event", label: "Event" },
+              { key: "settings", label: "Pengaturan" },
+              { key: "promotion", label: "Promosi" },
+            ].map(f => (
+              <div key={f.key} className={`cat-chip${auditFilter === f.key ? " active" : ""}`}
+                style={{ fontSize: 12, padding: "4px 12px" }}
+                onClick={() => setAuditFilter(f.key)}>
+                {f.label}
+              </div>
+            ))}
+          </div>
+
           {loadingLogs ? (
             <div style={{ padding: 24, color: "var(--text-soft)", fontSize: 13 }}>Memuat...</div>
           ) : (
