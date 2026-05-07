@@ -360,6 +360,13 @@ export function PosDataProvider({ children }) {
     return response.products || [];
   }
 
+  async function createNewCategory(name) {
+    const requestWorkspaceId = activeWorkspaceIdRef.current || "";
+    const response = await apiPost("/api/categories", { name });
+    applyMutationState(response.data, requestWorkspaceId);
+    return { ok: true };
+  }
+
   async function deleteCategory(categoryName) {
     const requestWorkspaceId = activeWorkspaceIdRef.current || "";
     const response = await apiDelete(`/api/categories/${encodeURIComponent(categoryName)}`);
@@ -459,6 +466,7 @@ export function PosDataProvider({ children }) {
     allocateStockToEvent,
     bulkImportProducts,
     getStoreProducts,
+    createNewCategory,
     deleteCategory,
     renameCategory,
     uploadImage,

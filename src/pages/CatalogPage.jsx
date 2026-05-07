@@ -34,7 +34,7 @@ function CategoryRow({ category, onRename, onDelete }) {
 }
 
 export function CatalogPage() {
-  const { products, workspaces, categories, settings, loading, loadError, updateProduct, getStoreProducts, allocateStockToEvent, bulkImportProducts, renameCategory, deleteCategory } = usePosData();
+  const { products, workspaces, categories, settings, loading, loadError, updateProduct, getStoreProducts, allocateStockToEvent, bulkImportProducts, createNewCategory, renameCategory, deleteCategory } = usePosData();
   const { activeWorkspaceId } = useWorkspace();
   const activeWorkspace = workspaces.find((w) => w.id === activeWorkspaceId);
   const isEventWorkspace = activeWorkspace?.type === "event";
@@ -52,6 +52,7 @@ export function CatalogPage() {
   const [csvPreview, setCsvPreview] = useState([]);
   const [importingCsv, setImportingCsv] = useState(false);
   const [catManageModal, setCatManageModal] = useState(false);
+  const [newCatName, setNewCatName] = useState("");
   const csvFileRef = useRef(null);
   const isAllocateMode = activeWorkspace?.stockMode === "allocate";
 
@@ -236,6 +237,18 @@ export function CatalogPage() {
     try {
       await deleteCategory(name);
       showToast("success", `Kategori "${name}" berhasil dihapus.`);
+    } catch (err) {
+      showToast("error", err.message);
+    }
+  }
+
+  async function handleAddCategory() {
+    const name = newCatName.trim();
+    if (!name) return;
+    try {
+      await createNewCategory(name);
+      setNewCatName("");
+      showToast("success", `Kategori "${name}" berhasil ditambahkan.`);
     } catch (err) {
       showToast("error", err.message);
     }
@@ -624,7 +637,20 @@ export function CatalogPage() {
               )}
             </div>
 
-            <div style={{ marginTop: 16 }}>
+            {/* Add new category */}
+            <div style={{ display: "flex", gap: 8, marginTop: 16, paddingTop: 16, borderTop: "1px solid var(--line)" }}>
+              <input
+                className="input"
+                placeholder="Tambah kategori baru..."
+                value={newCatName}
+                onChange={e => setNewCatName(e.target.value)}
+                onKeyDown={e => { if (e.key === "Enter") handleAddCategory(); }}
+                style={{ flex: 1, fontSize: 13 }}
+              />
+              <button className="btn btn-primary btn-sm" onClick={handleAddCategory} disabled={!newCatName.trim()}>Tambah</button>
+            </div>
+
+            <div style={{ marginTop: 12 }}>
               <button className="btn btn-secondary" style={{ width: "100%" }} onClick={() => setCatManageModal(false)}>Tutup</button>
             </div>
           </div>

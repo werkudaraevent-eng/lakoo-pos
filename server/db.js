@@ -127,6 +127,11 @@ async function ensureCategory(executor, name, tenantId) {
   return category;
 }
 
+export async function createCategory(name, tenantId) {
+  const executor = ensureSql();
+  return ensureCategory(executor, name, tenantId);
+}
+
 export async function deleteCategory(categoryName, tenantId) {
   const executor = ensureSql();
   const slug = slugify(categoryName);

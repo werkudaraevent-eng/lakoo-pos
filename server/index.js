@@ -64,6 +64,7 @@ import {
   bulkDeleteAllProducts,
   bulkDeleteAllSales,
   checkTenantStatus,
+  createCategory,
   deleteCategory,
   renameCategory,
   closeEventRecord,
@@ -157,7 +158,9 @@ export function createApp({
   authenticateUserFn = authenticateUser,
   bulkCreateProductsFn = bulkCreateProducts,
   bulkDeleteAllProductsFn = bulkDeleteAllProducts,
+  createCategoryFn = createCategory,
   deleteCategoryFn = deleteCategory,
+  ensureCategoryFn = createCategory,
   renameCategoryFn = renameCategory,
   bulkDeleteAllSalesFn = bulkDeleteAllSales,
   closeEventRecordFn = closeEventRecord,
@@ -742,6 +745,20 @@ export function createApp({
         ok: true,
         data: await getBootstrapFn({ workspaceId: getRequestWorkspaceId(req), tenantId }),
       });
+    })
+  );
+
+  app.post(
+    "/api/categories",
+    auth,
+    requireRoleMiddleware(["admin", "manager"]),
+    asyncHandler(async (req, res) => {
+      const tenantId = req.auth.user.tenantId;
+      const { name } = req.body;
+      if (!name || !name.trim()) { res.status(400).json({ ok: false, message: "Nama kategori wajib diisi." }); return; }
+      await ensureCategoryFn(name.trim(), tenantId);
+      const data = await getBootstrapFn({ workspaceId: getRequestWorkspaceId(req), tenantId });
+      res.json({ ok: true, data });
     })
   );
 
