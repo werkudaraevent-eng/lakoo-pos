@@ -461,14 +461,14 @@ export async function authenticateUser(username, password, tenantSlug) {
                u.password_hash AS "passwordHash", u.tenant_id AS "tenantId"
         FROM users u
         JOIN tenants t ON t.id = u.tenant_id
-        WHERE lower(u.username) = lower(${username}) AND t.slug = ${tenantSlug}
+        WHERE (lower(u.username) = lower(${username}) OR lower(u.email) = lower(${username})) AND t.slug = ${tenantSlug}
         LIMIT 1
       `
     : await executor`
         SELECT u.id, u.name, u.username, u.role, u.is_active AS "isActive",
                u.password_hash AS "passwordHash", u.tenant_id AS "tenantId"
         FROM users u
-        WHERE lower(u.username) = lower(${username})
+        WHERE lower(u.username) = lower(${username}) OR lower(u.email) = lower(${username})
         LIMIT 1
       `;
   const user = rows[0];

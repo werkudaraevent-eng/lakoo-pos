@@ -79,10 +79,10 @@ export function LoginPage() {
 
           <form className="form-stack" onSubmit={handleSubmit}>
             <div className="field">
-              <label>Username</label>
+              <label>Username atau Email</label>
               <input
                 autoFocus
-                placeholder="Masukkan username"
+                placeholder="username atau email@contoh.com"
                 value={form.username}
                 onChange={(e) => { setForm((c) => ({ ...c, username: e.target.value })); setError(""); }}
               />
