@@ -214,7 +214,7 @@ export function EventDetailPage() {
   // --- Main Render ---
 
   return (
-    <div style={{ display: "grid", gap: 20, maxWidth: 860, width: "100%" }}>
+    <div style={{ display: "grid", gap: 20, width: "100%" }}>
       {/* Header */}
       <div>
         <Link

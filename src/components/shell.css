@@ -282,9 +282,19 @@
   padding: 24px;
 }
 
+/* Consistent content width for all pages */
+.shell-content > * {
+  max-width: 900px;
+}
+
 .shell-content-flush {
   padding: 0;
   overflow: hidden;
+}
+
+/* Checkout/flush pages need full width */
+.shell-content-flush > * {
+  max-width: none;
 }
 
 /* ── Page actions bar ── */
@@ -301,7 +311,6 @@
   display: flex;
   flex-direction: column;
   gap: 24px;
-  max-width: 1200px;
 }
 
 .page-header-card {
