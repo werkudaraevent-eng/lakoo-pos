@@ -292,30 +292,37 @@ export function CheckoutPage() {
       {/* ── Payment Modal ── */}
       {payModal && !paid ? (
         <div className="modal-overlay">
-          <div className="modal" style={{ width: 440 }}>
-            <div className="modal-title">Pembayaran</div>
-            <div style={{ fontSize: 13, color: "var(--text-soft)", marginBottom: 4 }}>Total yang harus dibayar</div>
-            <div style={{ fontSize: 32, fontWeight: 800, color: "var(--accent)", marginBottom: 20 }}>{formatCurrency(total)}</div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text-soft)", marginBottom: 10 }}>METODE PEMBAYARAN</div>
-            {enabledMethods.map((m) => (
-              <div
-                key={m.id}
-                onClick={() => setPayMethod(m.id)}
-                style={{
-                  padding: "12px 14px",
-                  border: `1.5px solid ${payMethod === m.id ? "var(--accent)" : "var(--line)"}`,
-                  borderRadius: 8,
-                  marginBottom: 8,
-                  cursor: "pointer",
-                  background: payMethod === m.id ? "var(--accent-light)" : "#fff",
-                  transition: "background-color 0.15s ease, border-color 0.15s ease",
-                }}
-              >
-                <div style={{ fontWeight: 700, fontSize: 13 }}>{m.label}</div>
-                <div style={{ fontSize: 12, color: "var(--text-soft)" }}>{m.desc}</div>
-              </div>
-            ))}
-            <div style={{ display: "flex", gap: 8, marginTop: 20 }}>
+          <div className="modal" style={{ width: 440, overflow: "hidden", display: "flex", flexDirection: "column" }}>
+            {/* Fixed header */}
+            <div style={{ flexShrink: 0 }}>
+              <div className="modal-title">Pembayaran</div>
+              <div style={{ fontSize: 13, color: "var(--text-soft)", marginBottom: 4 }}>Total yang harus dibayar</div>
+              <div style={{ fontSize: 32, fontWeight: 800, color: "var(--accent)", marginBottom: 20 }}>{formatCurrency(total)}</div>
+            </div>
+            {/* Scrollable body */}
+            <div style={{ flex: 1, overflowY: "auto", minHeight: 0 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text-soft)", marginBottom: 10 }}>METODE PEMBAYARAN</div>
+              {enabledMethods.map((m) => (
+                <div
+                  key={m.id}
+                  onClick={() => setPayMethod(m.id)}
+                  style={{
+                    padding: "12px 14px",
+                    border: `1.5px solid ${payMethod === m.id ? "var(--accent)" : "var(--line)"}`,
+                    borderRadius: 8,
+                    marginBottom: 8,
+                    cursor: "pointer",
+                    background: payMethod === m.id ? "var(--accent-light)" : "#fff",
+                    transition: "background-color 0.15s ease, border-color 0.15s ease",
+                  }}
+                >
+                  <div style={{ fontWeight: 700, fontSize: 13 }}>{m.label}</div>
+                  <div style={{ fontSize: 12, color: "var(--text-soft)" }}>{m.desc}</div>
+                </div>
+              ))}
+            </div>
+            {/* Fixed footer */}
+            <div style={{ flexShrink: 0, display: "flex", gap: 8, marginTop: 20 }}>
               <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setPayModal(false)}>Batal</button>
               <button className="btn btn-primary" style={{ flex: 2, height: 44 }} onClick={handlePay} disabled={submitting}>
                 {submitting ? "Memproses..." : "Konfirmasi Bayar"}
