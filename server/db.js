@@ -131,18 +131,30 @@ export async function deleteCategory(categoryName, tenantId) {
   const executor = ensureSql();
   const slug = slugify(categoryName);
   
-  // Check if any active products use this category
-  const usage = await executor`
-    SELECT COUNT(*)::int AS count FROM products p
-    JOIN categories c ON c.id = p.category_id
-    WHERE c.slug = ${slug} AND p.tenant_id = ${tenantId} AND p.deleted_at IS NULL
+  // Get category ID
+  const catRows = await executor`SELECT id FROM categories WHERE slug = ${slug} AND tenant_id = ${tenantId} LIMIT 1`;
+  if (!catRows[0]) return { ok: false, message: "Kategori tidak ditemukan." };
+  const categoryId = catRows[0].id;
+  
+  // Check if any ACTIVE products use this category
+  const activeUsage = await executor`
+    SELECT COUNT(*)::int AS count FROM products
+    WHERE category_id = ${categoryId} AND tenant_id = ${tenantId} AND deleted_at IS NULL
   `;
   
-  if (usage[0]?.count > 0) {
-    return { ok: false, message: `Kategori "${categoryName}" masih digunakan oleh ${usage[0].count} produk.` };
+  if (activeUsage[0]?.count > 0) {
+    return { ok: false, message: `Kategori "${categoryName}" masih digunakan oleh ${activeUsage[0].count} produk aktif. Pindahkan produk ke kategori lain terlebih dahulu.` };
   }
   
-  await executor`DELETE FROM categories WHERE slug = ${slug} AND tenant_id = ${tenantId}`;
+  // Move deleted products to a fallback "Uncategorized" category
+  const fallback = await ensureCategory(executor, "Uncategorized", tenantId);
+  await executor`
+    UPDATE products SET category_id = ${fallback.id}
+    WHERE category_id = ${categoryId} AND tenant_id = ${tenantId}
+  `;
+  
+  // Now safe to delete
+  await executor`DELETE FROM categories WHERE id = ${categoryId} AND tenant_id = ${tenantId}`;
   return { ok: true };
 }
 
