@@ -1,15 +1,20 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
+import { useAuth } from "../context/AuthContext";
 import { usePosData } from "../context/PosDataContext";
+import { ConfirmModal } from "../components/ConfirmModal";
 import { formatCurrency, formatDate } from "../utils/formatters";
 import "../features/dashboard/dashboard.css";
 
 export function SalesPage() {
-  const { sales, settings, loading, loadError } = usePosData();
+  const { user } = useAuth();
+  const { sales, settings, loading, loadError, deleteSale } = usePosData();
   const [search, setSearch] = useState("");
   const [method, setMethod] = useState("Semua");
   const [detail, setDetail] = useState(null);
+  const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [toast, setToast] = useState(null);
 
   const payMethodLabels = useMemo(() => {
     const methods = settings?.paymentMethods;
@@ -68,6 +73,22 @@ export function SalesPage() {
     return "badge badge-gray";
   }
 
+  function showToast(type, message) {
+    setToast({ type, message });
+    setTimeout(() => setToast(null), 3000);
+  }
+
+  async function handleDeleteSale() {
+    if (!deleteConfirm) return;
+    try {
+      await deleteSale(deleteConfirm.id);
+      showToast("success", `Transaksi ${deleteConfirm.receiptNumber} dipindahkan ke tempat sampah.`);
+      setDeleteConfirm(null);
+    } catch (err) {
+      showToast("error", err.message || "Gagal menghapus transaksi.");
+    }
+  }
+
   return (
     <div className="content">
       {loading ? <p className="text-sm text-muted" style={{ padding: 16 }}>Memuat data...</p> : null}
@@ -120,6 +141,7 @@ export function SalesPage() {
                 <th>Metode</th>
                 <th>Status</th>
                 <th></th>
+                {user?.role === "admin" && <th></th>}
               </tr>
             </thead>
             <tbody>
@@ -151,10 +173,22 @@ export function SalesPage() {
                       Detail →
                     </button>
                   </td>
+                  {user?.role === "admin" && (
+                    <td>
+                      <button
+                        className="btn btn-ghost btn-sm btn-icon"
+                        style={{ color: "var(--danger)" }}
+                        onClick={(e) => { e.stopPropagation(); setDeleteConfirm(sale); }}
+                        title="Hapus transaksi"
+                      >
+                        <svg width={13} height={13} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+                      </button>
+                    </td>
+                  )}
                 </tr>
               )) : (
                 <tr>
-                  <td colSpan={8} className="text-muted text-sm" style={{ textAlign: "center", padding: 32 }}>
+                  <td colSpan={user?.role === "admin" ? 9 : 8} className="text-muted text-sm" style={{ textAlign: "center", padding: 32 }}>
                     Belum ada transaksi
                   </td>
                 </tr>
@@ -163,6 +197,30 @@ export function SalesPage() {
           </table>
         </div>
       </div>
+
+      {/* Delete Confirmation */}
+      <ConfirmModal
+        open={!!deleteConfirm}
+        icon="warning"
+        title="Hapus Transaksi?"
+        message={`Yakin ingin menghapus transaksi "${deleteConfirm?.receiptNumber}"? Data akan dipindahkan ke tempat sampah.`}
+        confirmLabel="Ya, Hapus"
+        confirmVariant="danger"
+        onConfirm={handleDeleteSale}
+        onCancel={() => setDeleteConfirm(null)}
+      />
+
+      {/* Toast */}
+      {toast && (
+        <div style={{
+          position: "fixed", bottom: 24, right: 24, zIndex: 9999,
+          padding: "12px 20px", borderRadius: 8,
+          background: toast.type === "success" ? "var(--accent)" : "var(--danger)",
+          color: "#fff", fontSize: 13, fontWeight: 600, boxShadow: "0 4px 12px rgba(0,0,0,0.15)"
+        }}>
+          {toast.message}
+        </div>
+      )}
 
       {/* Receipt-style Detail Modal */}
       {detail && (

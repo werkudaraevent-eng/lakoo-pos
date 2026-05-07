@@ -46,13 +46,14 @@ function toLocalDatetimeValue(isoString) {
 
 export function PromotionsPage() {
   const { user } = useAuth();
-  const { promotions, sales, loading, loadError, createPromotion } = usePosData();
+  const { promotions, sales, loading, loadError, createPromotion, deletePromotion } = usePosData();
   const [filter, setFilter] = useState("Semua");
   const [showModal, setShowModal] = useState(false);
   const [editPromo, setEditPromo] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
   const [deactivateTarget, setDeactivateTarget] = useState(null);
+  const [toast, setToast] = useState(null);
 
   // Count promo usage from sales
   const promoUsage = useMemo(() => {
@@ -126,13 +127,23 @@ export function PromotionsPage() {
     }
   }
 
+  function showToast(type, message) {
+    setToast({ type, message });
+    setTimeout(() => setToast(null), 3000);
+  }
+
   function handleDelete(promo) {
     setDeactivateTarget(promo);
   }
 
-  function doDeactivate() {
+  async function doDeactivate() {
     if (!deactivateTarget) return;
-    createPromotion({ ...deactivateTarget, isActive: false }, user).catch(console.error);
+    try {
+      await deletePromotion(deactivateTarget.id);
+      showToast("success", `Promo "${deactivateTarget.code}" dipindahkan ke tempat sampah.`);
+    } catch (err) {
+      showToast("error", err.message || "Gagal menghapus promo.");
+    }
     setDeactivateTarget(null);
   }
 
@@ -257,7 +268,7 @@ export function PromotionsPage() {
                     className="btn btn-ghost btn-sm btn-icon"
                     style={{ color: "var(--danger)" }}
                     onClick={() => handleDelete(promo)}
-                    title="Nonaktifkan"
+                    title="Hapus"
                   >
                     <svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
                       <polyline points="3 6 5 6 21 6" />
@@ -374,13 +385,25 @@ export function PromotionsPage() {
       <ConfirmModal
         open={!!deactivateTarget}
         icon="warning"
-        title="Nonaktifkan Promo?"
-        message={`Yakin ingin menonaktifkan promo "${deactivateTarget?.code}"?`}
-        confirmLabel="Ya, Nonaktifkan"
+        title="Hapus Promo?"
+        message={`Yakin ingin menghapus promo "${deactivateTarget?.code}"? Data akan dipindahkan ke tempat sampah.`}
+        confirmLabel="Ya, Hapus"
         confirmVariant="danger"
         onConfirm={doDeactivate}
         onCancel={() => setDeactivateTarget(null)}
       />
+
+      {/* Toast */}
+      {toast && (
+        <div style={{
+          position: "fixed", bottom: 24, right: 24, zIndex: 9999,
+          padding: "12px 20px", borderRadius: 8,
+          background: toast.type === "success" ? "var(--accent)" : "var(--danger)",
+          color: "#fff", fontSize: 13, fontWeight: 600, boxShadow: "0 4px 12px rgba(0,0,0,0.15)"
+        }}>
+          {toast.message}
+        </div>
+      )}
     </div>
   );
 }

@@ -93,6 +93,7 @@ import {
   restoreFromRecycleBin,
   setWorkspaceAssignments,
   softDeleteProducts,
+  softDeletePromotion,
   softDeleteSales,
   updateEventRecord,
   updateEventStatusRecord,
@@ -183,6 +184,7 @@ export function createApp({
   setWorkspaceAssignmentsFn = setWorkspaceAssignments,
   signJwtFn = signJwt,
   softDeleteProductsFn = softDeleteProducts,
+  softDeletePromotionFn = softDeletePromotion,
   softDeleteSalesFn = softDeleteSales,
   updateEventRecordFn = updateEventRecord,
   updateEventStatusRecordFn = updateEventStatusRecord,
@@ -605,6 +607,32 @@ export function createApp({
       const sale = data.sales.find((item) => item.id === result.saleId) ?? null;
       try { await createAuditLogFn({ tenantId, userId: req.auth.user.id, userName: req.auth.user.name || "User", action: "sale.create", entityType: "sale", entityId: result.saleId, ipAddress: req.ip }); } catch (_) {}
       res.json({ ok: true, sale, data });
+    })
+  );
+
+  app.delete(
+    "/api/sales/:id",
+    auth,
+    requireRoleMiddleware(["admin"]),
+    asyncHandler(async (req, res) => {
+      const tenantId = req.auth.user.tenantId;
+      await softDeleteSalesFn([req.params.id], tenantId);
+      try { await createAuditLogFn({ tenantId, userId: req.auth.user.id, userName: req.auth.user.name || "Admin", action: "sale.delete", entityType: "sale", entityId: req.params.id, ipAddress: req.ip }); } catch (_) {}
+      const data = await getBootstrapFn({ workspaceId: getRequestWorkspaceId(req), tenantId });
+      res.json({ ok: true, data });
+    })
+  );
+
+  app.delete(
+    "/api/promotions/:id",
+    auth,
+    requireRoleMiddleware(["admin", "manager"]),
+    asyncHandler(async (req, res) => {
+      const tenantId = req.auth.user.tenantId;
+      await softDeletePromotionFn(req.params.id, tenantId);
+      try { await createAuditLogFn({ tenantId, userId: req.auth.user.id, userName: req.auth.user.name || "User", action: "promotion.delete", entityType: "promotion", entityId: req.params.id, ipAddress: req.ip }); } catch (_) {}
+      const data = await getBootstrapFn({ workspaceId: getRequestWorkspaceId(req), tenantId });
+      res.json({ ok: true, data });
     })
   );
 

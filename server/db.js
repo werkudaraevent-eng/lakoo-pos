@@ -1938,6 +1938,14 @@ export async function softDeleteSales(saleIds, tenantId) {
   `;
 }
 
+export async function softDeletePromotion(promoId, tenantId) {
+  const executor = ensureSql();
+  await executor`
+    UPDATE promotions SET deleted_at = ${nowIso()}, is_active = false
+    WHERE id = ${promoId} AND tenant_id = ${tenantId}
+  `;
+}
+
 export async function restoreFromRecycleBin(entityType, entityIds, tenantId) {
   const executor = ensureSql();
   if (entityType === "product") {

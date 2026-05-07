@@ -383,6 +383,20 @@ export function PosDataProvider({ children }) {
     await apiPost("/api/recycle-bin/delete", { entityType, entityIds });
   }
 
+  async function deleteSale(saleId) {
+    const requestWorkspaceId = activeWorkspaceIdRef.current || "";
+    const response = await apiDelete(`/api/sales/${saleId}`);
+    applyMutationState(response.data, requestWorkspaceId);
+    return { ok: true };
+  }
+
+  async function deletePromotion(promoId) {
+    const requestWorkspaceId = activeWorkspaceIdRef.current || "";
+    const response = await apiDelete(`/api/promotions/${promoId}`);
+    applyMutationState(response.data, requestWorkspaceId);
+    return { ok: true };
+  }
+
   async function bulkDeleteProducts() {
     const requestWorkspaceId = activeWorkspaceIdRef.current || "";
     const response = await apiPost("/api/bulk/delete-products");
@@ -416,6 +430,8 @@ export function PosDataProvider({ children }) {
     updateEventStatus,
     closeEvent,
     createPromotion,
+    deletePromotion,
+    deleteSale,
     adjustInventory,
     finalizeSale,
     updateSettings,
