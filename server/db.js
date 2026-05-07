@@ -131,36 +131,40 @@ export async function deleteCategory(categoryName, tenantId) {
   const executor = ensureSql();
   const slug = slugify(categoryName);
   
-  // Get category ID
   const catRows = await executor`SELECT id FROM categories WHERE slug = ${slug} AND tenant_id = ${tenantId} LIMIT 1`;
   if (!catRows[0]) return { ok: false, message: "Kategori tidak ditemukan." };
   const categoryId = catRows[0].id;
   
-  // Check if ANY products (active or deleted) use this category
-  const totalUsage = await executor`
-    SELECT COUNT(*)::int AS count FROM products
+  // Set products using this category to null (tanpa kategori)
+  await executor`
+    UPDATE products SET category_id = NULL
     WHERE category_id = ${categoryId} AND tenant_id = ${tenantId}
   `;
   
-  if (totalUsage[0]?.count > 0) {
-    // Move ALL products (including deleted) to "Uncategorized" fallback
-    const fallback = await ensureCategory(executor, "Uncategorized", tenantId);
-    if (fallback.id === categoryId) {
-      return { ok: false, message: "Tidak bisa menghapus kategori 'Uncategorized'." };
-    }
-    await executor`
-      UPDATE products SET category_id = ${fallback.id}
-      WHERE category_id = ${categoryId} AND tenant_id = ${tenantId}
-    `;
+  // Delete the category
+  await executor`DELETE FROM categories WHERE id = ${categoryId} AND tenant_id = ${tenantId}`;
+  return { ok: true };
+}
+
+export async function renameCategory(oldName, newName, tenantId) {
+  const executor = ensureSql();
+  const oldSlug = slugify(oldName);
+  const newSlug = slugify(newName);
+  
+  const catRows = await executor`SELECT id FROM categories WHERE slug = ${oldSlug} AND tenant_id = ${tenantId} LIMIT 1`;
+  if (!catRows[0]) return { ok: false, message: "Kategori tidak ditemukan." };
+  
+  // Check if new name already exists
+  const existing = await executor`SELECT id FROM categories WHERE slug = ${newSlug} AND tenant_id = ${tenantId} LIMIT 1`;
+  if (existing[0] && existing[0].id !== catRows[0].id) {
+    return { ok: false, message: `Kategori "${newName}" sudah ada.` };
   }
   
-  // Now safe to delete
-  try {
-    await executor`DELETE FROM categories WHERE id = ${categoryId} AND tenant_id = ${tenantId}`;
-    return { ok: true };
-  } catch (err) {
-    return { ok: false, message: "Gagal menghapus kategori: " + err.message };
-  }
+  await executor`
+    UPDATE categories SET name = ${newName}, slug = ${newSlug}
+    WHERE id = ${catRows[0].id} AND tenant_id = ${tenantId}
+  `;
+  return { ok: true };
 }
 
 async function fetchSettings(executor, tenantId) {

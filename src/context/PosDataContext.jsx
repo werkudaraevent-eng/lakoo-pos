@@ -367,6 +367,13 @@ export function PosDataProvider({ children }) {
     return { ok: true };
   }
 
+  async function renameCategory(oldName, newName) {
+    const requestWorkspaceId = activeWorkspaceIdRef.current || "";
+    const response = await apiPatch(`/api/categories/${encodeURIComponent(oldName)}`, { newName });
+    applyMutationState(response.data, requestWorkspaceId);
+    return { ok: true };
+  }
+
   async function getAuditLogs(params = {}) {
     const query = new URLSearchParams();
     if (params.limit) query.set("limit", params.limit);
@@ -453,6 +460,7 @@ export function PosDataProvider({ children }) {
     bulkImportProducts,
     getStoreProducts,
     deleteCategory,
+    renameCategory,
     uploadImage,
     getAuditLogs,
     getRecycleBin,

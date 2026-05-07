@@ -7,8 +7,34 @@ import { useWorkspace } from "../context/WorkspaceContext";
 import { formatCurrency } from "../utils/formatters";
 import "../features/dashboard/dashboard.css";
 
+function CategoryRow({ category, onRename, onDelete }) {
+  const [editing, setEditing] = useState(false);
+  const [name, setName] = useState(category.name);
+
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", background: "var(--surface)", borderRadius: 8 }}>
+      {editing ? (
+        <>
+          <input className="input" value={name} onChange={e => setName(e.target.value)}
+            style={{ flex: 1, fontSize: 13, padding: "4px 8px" }} autoFocus
+            onKeyDown={e => { if (e.key === "Enter") { onRename(category.name, name); setEditing(false); } if (e.key === "Escape") { setName(category.name); setEditing(false); } }}
+          />
+          <button className="btn btn-primary btn-sm" onClick={() => { onRename(category.name, name); setEditing(false); }}>Simpan</button>
+          <button className="btn btn-ghost btn-sm" onClick={() => { setName(category.name); setEditing(false); }}>Batal</button>
+        </>
+      ) : (
+        <>
+          <span style={{ flex: 1, fontSize: 13, fontWeight: 600 }}>{category.name}</span>
+          <button className="btn btn-ghost btn-sm" onClick={() => setEditing(true)} style={{ fontSize: 12 }}>Rename</button>
+          <button className="btn btn-ghost btn-sm" onClick={() => onDelete(category.name)} style={{ fontSize: 12, color: "var(--danger)" }}>Hapus</button>
+        </>
+      )}
+    </div>
+  );
+}
+
 export function CatalogPage() {
-  const { products, workspaces, categories, settings, loading, loadError, updateProduct, getStoreProducts, allocateStockToEvent, bulkImportProducts } = usePosData();
+  const { products, workspaces, categories, settings, loading, loadError, updateProduct, getStoreProducts, allocateStockToEvent, bulkImportProducts, renameCategory, deleteCategory } = usePosData();
   const { activeWorkspaceId } = useWorkspace();
   const activeWorkspace = workspaces.find((w) => w.id === activeWorkspaceId);
   const isEventWorkspace = activeWorkspace?.type === "event";
@@ -25,6 +51,7 @@ export function CatalogPage() {
   const [importCsvModal, setImportCsvModal] = useState(false);
   const [csvPreview, setCsvPreview] = useState([]);
   const [importingCsv, setImportingCsv] = useState(false);
+  const [catManageModal, setCatManageModal] = useState(false);
   const csvFileRef = useRef(null);
   const isAllocateMode = activeWorkspace?.stockMode === "allocate";
 
@@ -195,6 +222,25 @@ export function CatalogPage() {
     setDeleteConfirm(null);
   }
 
+  async function handleRenameCategory(oldName, newName) {
+    if (!newName.trim() || newName === oldName) return;
+    try {
+      await renameCategory(oldName, newName.trim());
+      showToast("success", `Kategori "${oldName}" diubah menjadi "${newName}".`);
+    } catch (err) {
+      showToast("error", err.message);
+    }
+  }
+
+  async function handleDeleteCategory(name) {
+    try {
+      await deleteCategory(name);
+      showToast("success", `Kategori "${name}" berhasil dihapus.`);
+    } catch (err) {
+      showToast("error", err.message);
+    }
+  }
+
   const catList = useMemo(() => {
     const unique = [...new Set((categories || []).map((c) => c.name))].sort();
     return ["Semua", ...unique];
@@ -264,10 +310,13 @@ export function CatalogPage() {
       </div>
 
       {/* Category filter */}
-      <div className="cat-filter">
+      <div className="cat-filter" style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
         {catList.map((c) => (
           <div key={c} className={`cat-chip${cat === c ? " active" : ""}`} onClick={() => setCat(c)}>{c}</div>
         ))}
+        <button className="btn btn-ghost btn-sm" onClick={() => setCatManageModal(true)} style={{ fontSize: 12 }}>
+          ⚙️ Kelola
+        </button>
       </div>
 
       {/* Product grid */}
@@ -550,6 +599,33 @@ export function CatalogPage() {
               >
                 {importingCsv ? "Mengimport..." : `Import ${xlsxRowsToProducts(csvPreview).length} Produk`}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Kelola Kategori Modal */}
+      {catManageModal && (
+        <div className="modal-overlay" onClick={() => setCatManageModal(false)}>
+          <div className="modal" style={{ width: 440 }} onClick={e => e.stopPropagation()}>
+            <div className="modal-title">Kelola Kategori</div>
+            <div style={{ fontSize: 13, color: "var(--text-soft)", marginBottom: 16 }}>
+              Rename atau hapus kategori. Produk tanpa kategori akan tampil di "Semua".
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 8, maxHeight: 300, overflowY: "auto" }}>
+              {(categories || []).map(cat => (
+                <CategoryRow key={cat.id} category={cat} onRename={handleRenameCategory} onDelete={handleDeleteCategory} />
+              ))}
+              {(!categories || categories.length === 0) && (
+                <div style={{ padding: 16, textAlign: "center", color: "var(--text-muted)", fontSize: 13 }}>
+                  Belum ada kategori.
+                </div>
+              )}
+            </div>
+
+            <div style={{ marginTop: 16 }}>
+              <button className="btn btn-secondary" style={{ width: "100%" }} onClick={() => setCatManageModal(false)}>Tutup</button>
             </div>
           </div>
         </div>

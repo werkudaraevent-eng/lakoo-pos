@@ -65,6 +65,7 @@ import {
   bulkDeleteAllSales,
   checkTenantStatus,
   deleteCategory,
+  renameCategory,
   closeEventRecord,
   createAuditLog,
   createEventRecord,
@@ -157,6 +158,7 @@ export function createApp({
   bulkCreateProductsFn = bulkCreateProducts,
   bulkDeleteAllProductsFn = bulkDeleteAllProducts,
   deleteCategoryFn = deleteCategory,
+  renameCategoryFn = renameCategory,
   bulkDeleteAllSalesFn = bulkDeleteAllSales,
   closeEventRecordFn = closeEventRecord,
   createAuditLogFn = createAuditLog,
@@ -750,6 +752,21 @@ export function createApp({
     asyncHandler(async (req, res) => {
       const tenantId = req.auth.user.tenantId;
       const result = await deleteCategoryFn(decodeURIComponent(req.params.name), tenantId);
+      if (!result.ok) { res.status(400).json(result); return; }
+      const data = await getBootstrapFn({ workspaceId: getRequestWorkspaceId(req), tenantId });
+      res.json({ ok: true, data });
+    })
+  );
+
+  app.patch(
+    "/api/categories/:name",
+    auth,
+    requireRoleMiddleware(["admin", "manager"]),
+    asyncHandler(async (req, res) => {
+      const tenantId = req.auth.user.tenantId;
+      const { newName } = req.body;
+      if (!newName) { res.status(400).json({ ok: false, message: "Nama baru wajib diisi." }); return; }
+      const result = await renameCategoryFn(decodeURIComponent(req.params.name), newName, tenantId);
       if (!result.ok) { res.status(400).json(result); return; }
       const data = await getBootstrapFn({ workspaceId: getRequestWorkspaceId(req), tenantId });
       res.json({ ok: true, data });
