@@ -423,7 +423,7 @@ export function createApp({
         return;
       }
 
-      try { await createAuditLogFn({ tenantId, userId: req.auth.user.id, userName: req.auth.user.name || "User", action: "event.create", entityType: "event", entityId: result.eventId, ipAddress: req.ip }); } catch (_) {}
+      try { await createAuditLogFn({ tenantId, userId: req.auth.user.id, userName: req.auth.user.name || "User", action: "event.create", entityType: "event", entityId: result.eventId, details: { name: req.body.name, location: req.body.locationLabel, stockMode: req.body.stockMode }, ipAddress: req.ip }); } catch (_) {}
       res.json({
         ok: true,
         eventId: result.eventId,
@@ -445,7 +445,7 @@ export function createApp({
         return;
       }
 
-      try { await createAuditLogFn({ tenantId, userId: req.auth.user.id, userName: req.auth.user.name || "User", action: "event.status_change", entityType: "event", entityId: result.eventId, details: { nextStatus: result.nextStatus }, ipAddress: req.ip }); } catch (_) {}
+      try { await createAuditLogFn({ tenantId, userId: req.auth.user.id, userName: req.auth.user.name || "User", action: "event.status_change", entityType: "event", entityId: result.eventId, details: { status: req.body.status }, ipAddress: req.ip }); } catch (_) {}
       res.json({
         ok: true,
         eventId: result.eventId,
@@ -468,7 +468,7 @@ export function createApp({
         return;
       }
 
-      try { await createAuditLogFn({ tenantId, userId: req.auth.user.id, userName: req.auth.user.name || "User", action: "event.close", entityType: "event", entityId: result.eventId, ipAddress: req.ip }); } catch (_) {}
+      try { await createAuditLogFn({ tenantId, userId: req.auth.user.id, userName: req.auth.user.name || "User", action: "event.close", entityType: "event", entityId: result.eventId, details: { eventId: req.params.id }, ipAddress: req.ip }); } catch (_) {}
       res.json({
         ok: true,
         eventId: result.eventId,
@@ -557,7 +557,7 @@ export function createApp({
     asyncHandler(async (req, res) => {
       const tenantId = req.auth.user.tenantId;
       await createPromotionRecordFn(req.body, req.auth.user.id, tenantId);
-      try { await createAuditLogFn({ tenantId, userId: req.auth.user.id, userName: req.auth.user.name || "User", action: "promotion.create", entityType: "promotion", details: { code: req.body.code }, ipAddress: req.ip }); } catch (_) {}
+      try { await createAuditLogFn({ tenantId, userId: req.auth.user.id, userName: req.auth.user.name || "User", action: "promotion.create", entityType: "promotion", details: { code: req.body.code, type: req.body.type, value: req.body.value }, ipAddress: req.ip }); } catch (_) {}
       res.json({
         ok: true,
         data: await getBootstrapFn({ workspaceId: getRequestWorkspaceId(req), tenantId }),
@@ -612,7 +612,7 @@ export function createApp({
         tenantId,
       });
       const sale = data.sales.find((item) => item.id === result.saleId) ?? null;
-      try { await createAuditLogFn({ tenantId, userId: req.auth.user.id, userName: req.auth.user.name || "User", action: "sale.create", entityType: "sale", entityId: result.saleId, ipAddress: req.ip }); } catch (_) {}
+      try { await createAuditLogFn({ tenantId, userId: req.auth.user.id, userName: req.auth.user.name || "User", action: "sale.create", entityType: "sale", entityId: result.saleId, details: { receiptNumber: sale?.receiptNumber, total: sale?.grandTotal, paymentMethod: req.body.paymentMethod, items: req.body.cart?.length }, ipAddress: req.ip }); } catch (_) {}
       res.json({ ok: true, sale, data });
     })
   );
@@ -624,7 +624,7 @@ export function createApp({
     asyncHandler(async (req, res) => {
       const tenantId = req.auth.user.tenantId;
       await softDeleteSalesFn([req.params.id], tenantId);
-      try { await createAuditLogFn({ tenantId, userId: req.auth.user.id, userName: req.auth.user.name || "Admin", action: "sale.delete", entityType: "sale", entityId: req.params.id, ipAddress: req.ip }); } catch (_) {}
+      try { await createAuditLogFn({ tenantId, userId: req.auth.user.id, userName: req.auth.user.name || "Admin", action: "sale.delete", entityType: "sale", entityId: req.params.id, details: { saleId: req.params.id }, ipAddress: req.ip }); } catch (_) {}
       const data = await getBootstrapFn({ workspaceId: getRequestWorkspaceId(req), tenantId });
       res.json({ ok: true, data });
     })
@@ -637,7 +637,7 @@ export function createApp({
     asyncHandler(async (req, res) => {
       const tenantId = req.auth.user.tenantId;
       await softDeletePromotionFn(req.params.id, tenantId);
-      try { await createAuditLogFn({ tenantId, userId: req.auth.user.id, userName: req.auth.user.name || "User", action: "promotion.delete", entityType: "promotion", entityId: req.params.id, ipAddress: req.ip }); } catch (_) {}
+      try { await createAuditLogFn({ tenantId, userId: req.auth.user.id, userName: req.auth.user.name || "User", action: "promotion.delete", entityType: "promotion", entityId: req.params.id, details: { promoId: req.params.id }, ipAddress: req.ip }); } catch (_) {}
       const data = await getBootstrapFn({ workspaceId: getRequestWorkspaceId(req), tenantId });
       res.json({ ok: true, data });
     })
@@ -650,7 +650,7 @@ export function createApp({
     asyncHandler(async (req, res) => {
       const tenantId = req.auth.user.tenantId;
       await updateSettingsRecordFn(req.body, tenantId);
-      try { await createAuditLogFn({ tenantId, userId: req.auth.user.id, userName: req.auth.user.name || "User", action: "settings.update", entityType: "settings", ipAddress: req.ip }); } catch (_) {}
+      try { await createAuditLogFn({ tenantId, userId: req.auth.user.id, userName: req.auth.user.name || "User", action: "settings.update", entityType: "settings", details: { fields: Object.keys(req.body).filter(k => req.body[k] !== undefined).join(", ") }, ipAddress: req.ip }); } catch (_) {}
       res.json({
         ok: true,
         data: await getBootstrapFn({ workspaceId: getRequestWorkspaceId(req), tenantId }),
@@ -680,7 +680,7 @@ export function createApp({
       }
 
       const result = await createUserRecordFn(req.body, tenantId);
-      try { await createAuditLogFn({ tenantId, userId: req.auth.user.id, userName: req.auth.user.name || "User", action: "user.create", entityType: "user", entityId: result.userId, ipAddress: req.ip }); } catch (_) {}
+      try { await createAuditLogFn({ tenantId, userId: req.auth.user.id, userName: req.auth.user.name || "User", action: "user.create", entityType: "user", entityId: result.userId, details: { name: req.body.name, username: req.body.username, role: req.body.role }, ipAddress: req.ip }); } catch (_) {}
       res.json({
         ok: true,
         userId: result.userId,
@@ -719,7 +719,7 @@ export function createApp({
         return;
       }
 
-      try { await createAuditLogFn({ tenantId, userId: req.auth.user.id, userName: req.auth.user.name || "User", action: "user.update", entityType: "user", entityId: req.params.id, ipAddress: req.ip }); } catch (_) {}
+      try { await createAuditLogFn({ tenantId, userId: req.auth.user.id, userName: req.auth.user.name || "User", action: "user.update", entityType: "user", entityId: req.params.id, details: { name: req.body.name, role: req.body.role }, ipAddress: req.ip }); } catch (_) {}
       res.json({
         ok: true,
         data: await getBootstrapFn({ workspaceId: getRequestWorkspaceId(req), tenantId }),
@@ -740,7 +740,7 @@ export function createApp({
         return;
       }
 
-      try { await createAuditLogFn({ tenantId, userId: req.auth.user.id, userName: req.auth.user.name || "User", action: "product.create", entityType: "product", details: { name: req.body.name }, ipAddress: req.ip }); } catch (_) {}
+      try { await createAuditLogFn({ tenantId, userId: req.auth.user.id, userName: req.auth.user.name || "User", action: "product.create", entityType: "product", details: { name: req.body.name, category: req.body.category, price: req.body.basePrice }, ipAddress: req.ip }); } catch (_) {}
       res.json({
         ok: true,
         data: await getBootstrapFn({ workspaceId: getRequestWorkspaceId(req), tenantId }),
@@ -824,7 +824,7 @@ export function createApp({
         return;
       }
 
-      try { await createAuditLogFn({ tenantId, userId: req.auth.user.id, userName: req.auth.user.name || "User", action: "product.update", entityType: "product", entityId: req.params.id, ipAddress: req.ip }); } catch (_) {}
+      try { await createAuditLogFn({ tenantId, userId: req.auth.user.id, userName: req.auth.user.name || "User", action: "product.update", entityType: "product", entityId: req.params.id, details: { name: req.body.name, category: req.body.category, price: req.body.basePrice }, ipAddress: req.ip }); } catch (_) {}
       res.json({
         ok: true,
         data: await getBootstrapFn({ workspaceId: getRequestWorkspaceId(req), tenantId }),

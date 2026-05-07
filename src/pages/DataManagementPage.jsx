@@ -30,6 +30,34 @@ function getActionLabel(action) {
   return ACTION_LABELS[action] || action;
 }
 
+function formatAuditDetail(log) {
+  const d = log.details || log.detail;
+  if (!d || (typeof d === "object" && Object.keys(d).length === 0)) return "-";
+
+  const details = typeof d === "string" ? (() => { try { return JSON.parse(d); } catch { return null; } })() : d;
+  if (!details) return String(d);
+
+  const parts = [];
+  if (details.name) parts.push(`"${details.name}"`);
+  if (details.receiptNumber) parts.push(`#${details.receiptNumber}`);
+  if (details.code) parts.push(`Kode: ${details.code}`);
+  if (details.username) parts.push(`@${details.username}`);
+  if (details.role) parts.push(`Role: ${details.role}`);
+  if (details.category) parts.push(`Kategori: ${details.category}`);
+  if (details.price || details.total) parts.push(`Rp ${(details.price || details.total || 0).toLocaleString("id-ID")}`);
+  if (details.paymentMethod) parts.push(`via ${details.paymentMethod}`);
+  if (details.items) parts.push(`${details.items} item`);
+  if (details.quantity) parts.push(`${details.mode === "restock" ? "+" : ""}${details.quantity} unit`);
+  if (details.mode) parts.push(details.mode === "restock" ? "Restock" : "Adjustment");
+  if (details.status) parts.push(`→ ${details.status}`);
+  if (details.count) parts.push(`${details.count} item`);
+  if (details.fields) parts.push(details.fields);
+  if (details.location) parts.push(details.location);
+  if (details.stockMode) parts.push(`Mode: ${details.stockMode}`);
+
+  return parts.length > 0 ? parts.join(" · ") : "-";
+}
+
 export function DataManagementPage() {
   const {
     getAuditLogs,
@@ -472,15 +500,11 @@ export function DataManagementPage() {
                         <th>Pengguna</th>
                         <th>Aktivitas</th>
                         <th>Tipe</th>
-                        <th>ID Entitas</th>
-                        <th>Detail</th>
+                        <th>Keterangan</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {filteredLogs.map((log, i) => {
-                        const details = log.details || log.detail;
-                        const detailStr = details ? (typeof details === "string" ? details : JSON.stringify(details)) : "-";
-                        return (
+                      {filteredLogs.map((log, i) => (
                           <tr key={log.id || i}>
                             <td style={{ whiteSpace: "nowrap", fontSize: 12 }}>
                               {new Date(log.created_at || log.createdAt).toLocaleString("id-ID", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
@@ -488,11 +512,11 @@ export function DataManagementPage() {
                             <td style={{ fontWeight: 600 }}>{log.user_name || log.userName || "System"}</td>
                             <td>{getActionLabel(log.action)}</td>
                             <td><span className="badge badge-gray" style={{ fontSize: 10 }}>{log.entity_type || log.entityType || "-"}</span></td>
-                            <td style={{ fontFamily: "monospace", fontSize: 11, wordBreak: "break-all" }}>{log.entity_id || log.entityId || "-"}</td>
-                            <td style={{ fontSize: 11, color: "var(--text-soft)", maxWidth: 200, wordBreak: "break-word" }}>{detailStr !== "{}" ? detailStr : "-"}</td>
+                            <td style={{ fontSize: 12, color: "var(--text-soft)", maxWidth: 280 }}>
+                              {formatAuditDetail(log)}
+                            </td>
                           </tr>
-                        );
-                      })}
+                      ))}
                     </tbody>
                   </table>
                 </div>
