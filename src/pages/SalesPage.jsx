@@ -225,15 +225,15 @@ export function SalesPage() {
       {/* Receipt-style Detail Modal */}
       {detail && (
         <div className="modal-overlay" onClick={() => setDetail(null)}>
-          <div className="modal" style={{ width: 400, padding: 0 }} onClick={(e) => e.stopPropagation()}>
-            {/* Dark header */}
-            <div style={{ background: "var(--text)", padding: "24px 24px 20px" }}>
+          <div className="modal" style={{ width: 400, padding: 0, overflow: "hidden", display: "flex", flexDirection: "column" }} onClick={(e) => e.stopPropagation()}>
+            {/* Dark header — fixed */}
+            <div style={{ background: "var(--text)", padding: "24px 24px 20px", flexShrink: 0 }}>
               <div style={{ fontSize: 22, fontWeight: 800, color: "#fff", letterSpacing: "-0.5px" }}>{settings?.storeName || "Lakoo."}</div>
               <div style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", letterSpacing: "0.5px", textTransform: "uppercase", marginTop: 2 }}>Point of Sale</div>
             </div>
 
-            {/* Receipt body */}
-            <div style={{ padding: 24 }}>
+            {/* Receipt body — scrollable */}
+            <div style={{ padding: 24, flex: 1, overflowY: "auto", minHeight: 0 }}>
               {/* Date */}
               <div style={{ fontSize: 12.5, color: "var(--text-2)" }}>
                 {formatDate(detail.createdAt)}
