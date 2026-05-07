@@ -458,76 +458,43 @@ export function DataManagementPage() {
               return true;
             });
             return (
-            <div className="card" style={{ padding: 0 }}>
+            <div className="card" style={{ padding: 0, overflow: "hidden" }}>
               {filteredLogs.length === 0 ? (
-                <div
-                  style={{
-                    padding: "40px 24px",
-                    textAlign: "center",
-                    color: "var(--text-soft)",
-                    fontSize: 13,
-                  }}
-                >
+                <div style={{ padding: "40px 24px", textAlign: "center", color: "var(--text-soft)", fontSize: 13 }}>
                   Belum ada aktivitas tercatat.
                 </div>
               ) : (
-                <div style={{ maxHeight: 500, overflowY: "auto" }}>
-                  {filteredLogs.map((log, i) => (
-                    <div
-                      key={log.id || i}
-                      style={{
-                        display: "flex",
-                        gap: 12,
-                        padding: "12px 16px",
-                        borderBottom: "1px solid var(--line)",
-                        fontSize: 13,
-                      }}
-                    >
-                      <div
-                        style={{
-                          width: 32,
-                          height: 32,
-                          borderRadius: "50%",
-                          background: "var(--surface)",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          fontSize: 11,
-                          fontWeight: 800,
-                          flexShrink: 0,
-                          color: "var(--text-soft)",
-                        }}
-                      >
-                        {(log.user_name || log.userName || "S").charAt(0).toUpperCase()}
-                      </div>
-                      <div style={{ flex: 1 }}>
-                        <div>
-                          <strong>{log.user_name || log.userName || "System"}</strong>
-                          <span style={{ color: "var(--text-soft)", marginLeft: 6 }}>
-                            {getActionLabel(log.action)}
-                          </span>
-                        </div>
-                        {(log.entity_type || log.entityType) && (
-                          <div
-                            style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}
-                          >
-                            {log.entity_type || log.entityType}
-                            {(log.entity_id || log.entityId)
-                              ? ` · ${(log.entity_id || log.entityId).substring(0, 12)}...`
-                              : ""}
-                          </div>
-                        )}
-                      </div>
-                      <div style={{ fontSize: 11, color: "var(--text-muted)", flexShrink: 0 }}>
-                        {new Date(log.created_at || log.createdAt).toLocaleString("id-ID", {
-                          day: "numeric",
-                          month: "short",
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
-                      </div>
-                    </div>
-                  ))}
+                <div className="table-wrap" style={{ maxHeight: 500, overflowY: "auto" }}>
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Waktu</th>
+                        <th>Pengguna</th>
+                        <th>Aktivitas</th>
+                        <th>Tipe</th>
+                        <th>ID Entitas</th>
+                        <th>Detail</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredLogs.map((log, i) => {
+                        const details = log.details || log.detail;
+                        const detailStr = details ? (typeof details === "string" ? details : JSON.stringify(details)) : "-";
+                        return (
+                          <tr key={log.id || i}>
+                            <td style={{ whiteSpace: "nowrap", fontSize: 12 }}>
+                              {new Date(log.created_at || log.createdAt).toLocaleString("id-ID", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                            </td>
+                            <td style={{ fontWeight: 600 }}>{log.user_name || log.userName || "System"}</td>
+                            <td>{getActionLabel(log.action)}</td>
+                            <td><span className="badge badge-gray" style={{ fontSize: 10 }}>{log.entity_type || log.entityType || "-"}</span></td>
+                            <td style={{ fontFamily: "monospace", fontSize: 11, wordBreak: "break-all" }}>{log.entity_id || log.entityId || "-"}</td>
+                            <td style={{ fontSize: 11, color: "var(--text-soft)", maxWidth: 200, wordBreak: "break-word" }}>{detailStr !== "{}" ? detailStr : "-"}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
                 </div>
               )}
             </div>
