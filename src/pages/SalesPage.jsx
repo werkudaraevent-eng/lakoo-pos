@@ -12,6 +12,9 @@ export function SalesPage() {
   const { sales, settings, loading, loadError, deleteSale } = usePosData();
   const [search, setSearch] = useState("");
   const [method, setMethod] = useState("Semua");
+  const [dateRange, setDateRange] = useState("all"); // "today" | "7d" | "30d" | "all" | "custom"
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [detail, setDetail] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [toast, setToast] = useState(null);
@@ -39,6 +42,21 @@ export function SalesPage() {
   const methodLabels = payMethodLabels;
 
   const filtered = useMemo(() => {
+    const now = new Date();
+    let startDate = null;
+
+    if (dateRange === "today") {
+      startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    } else if (dateRange === "7d") {
+      startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    } else if (dateRange === "30d") {
+      startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    } else if (dateRange === "custom" && dateFrom) {
+      startDate = new Date(dateFrom);
+    }
+
+    const endDate = dateRange === "custom" && dateTo ? new Date(dateTo + "T23:59:59") : null;
+
     return (sales || []).filter((s) => {
       const matchMethod = method === "Semua" || s.paymentMethod === method;
       const q = search.toLowerCase();
@@ -48,9 +66,17 @@ export function SalesPage() {
         (s.items || []).some((item) =>
           (item.productNameSnapshot || "").toLowerCase().includes(q)
         );
-      return matchMethod && matchSearch;
+
+      let matchDate = true;
+      if (startDate) {
+        const saleDate = new Date(s.createdAt);
+        if (saleDate < startDate) matchDate = false;
+        if (endDate && saleDate > endDate) matchDate = false;
+      }
+
+      return matchMethod && matchSearch && matchDate;
     });
-  }, [sales, search, method]);
+  }, [sales, search, method, dateRange, dateFrom, dateTo]);
 
   const totalRev = filtered.reduce((s, t) => s + (t.grandTotal || 0), 0);
   const totalItems = filtered.reduce(
@@ -94,8 +120,8 @@ export function SalesPage() {
       {loading ? <p className="text-sm text-muted" style={{ padding: 16 }}>Memuat data...</p> : null}
       {loadError ? <p style={{ padding: 16, color: "var(--danger)" }}>{loadError}</p> : null}
 
-      {/* Search + filter */}
-      <div style={{ display: "flex", gap: 10, marginBottom: 16, flexWrap: "wrap" }}>
+      {/* Search + payment method filter */}
+      <div style={{ display: "flex", gap: 10, marginBottom: 10, flexWrap: "wrap" }}>
         <div className="input-wrap" style={{ flex: "1 1 200px" }}>
           <span className="input-icon">
             <svg width={14} height={14} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
@@ -109,6 +135,32 @@ export function SalesPage() {
             </div>
           ))}
         </div>
+      </div>
+
+      {/* Date range filter */}
+      <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap", alignItems: "center" }}>
+        {[
+          { key: "today", label: "Hari Ini" },
+          { key: "7d", label: "7 Hari" },
+          { key: "30d", label: "30 Hari" },
+          { key: "all", label: "Semua Waktu" },
+          { key: "custom", label: "Custom" },
+        ].map(d => (
+          <div key={d.key} className={`cat-chip${dateRange === d.key ? " active" : ""}`}
+            style={{ fontSize: 12, padding: "4px 12px" }}
+            onClick={() => setDateRange(d.key)}>
+            {d.label}
+          </div>
+        ))}
+        {dateRange === "custom" && (
+          <>
+            <input type="date" className="input" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
+              style={{ width: 140, fontSize: 12, padding: "4px 8px" }} />
+            <span style={{ fontSize: 12, color: "var(--text-soft)" }}>—</span>
+            <input type="date" className="input" value={dateTo} onChange={e => setDateTo(e.target.value)}
+              style={{ width: 140, fontSize: 12, padding: "4px 8px" }} />
+          </>
+        )}
       </div>
 
       {/* KPI summary */}
