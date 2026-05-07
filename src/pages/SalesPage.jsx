@@ -120,47 +120,58 @@ export function SalesPage() {
       {loading ? <p className="text-sm text-muted" style={{ padding: 16 }}>Memuat data...</p> : null}
       {loadError ? <p style={{ padding: 16, color: "var(--danger)" }}>{loadError}</p> : null}
 
-      {/* Search + payment method filter */}
-      <div style={{ display: "flex", gap: 10, marginBottom: 10, flexWrap: "wrap" }}>
-        <div className="input-wrap" style={{ flex: "1 1 200px" }}>
+      {/* Search */}
+      <div style={{ marginBottom: 14 }}>
+        <div className="input-wrap" style={{ maxWidth: 360 }}>
           <span className="input-icon">
             <svg width={14} height={14} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
           </span>
           <input className="input has-icon" placeholder="Cari ID atau produk..." value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
-        <div className="cat-filter" style={{ margin: 0 }}>
-          {methods.map((m) => (
-            <div key={m} className={`cat-chip${method === m ? " active" : ""}`} onClick={() => setMethod(m)}>
-              {m === "Semua" ? "Semua" : methodLabels[m] || m}
-            </div>
-          ))}
-        </div>
       </div>
 
-      {/* Date range filter */}
-      <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap", alignItems: "center" }}>
-        {[
-          { key: "today", label: "Hari Ini" },
-          { key: "7d", label: "7 Hari" },
-          { key: "30d", label: "30 Hari" },
-          { key: "all", label: "Semua Waktu" },
-          { key: "custom", label: "Custom" },
-        ].map(d => (
-          <div key={d.key} className={`cat-chip${dateRange === d.key ? " active" : ""}`}
-            style={{ fontSize: 12, padding: "4px 12px" }}
-            onClick={() => setDateRange(d.key)}>
-            {d.label}
+      {/* Filters row */}
+      <div style={{ display: "flex", gap: 20, marginBottom: 16, flexWrap: "wrap" }}>
+        {/* Payment method */}
+        <div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-soft)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 6 }}>Metode Bayar</div>
+          <div className="cat-filter" style={{ margin: 0 }}>
+            {methods.map((m) => (
+              <div key={m} className={`cat-chip${method === m ? " active" : ""}`} onClick={() => setMethod(m)}>
+                {m === "Semua" ? "Semua" : methodLabels[m] || m}
+              </div>
+            ))}
           </div>
-        ))}
-        {dateRange === "custom" && (
-          <>
-            <input type="date" className="input" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
-              style={{ width: 140, fontSize: 12, padding: "4px 8px" }} />
-            <span style={{ fontSize: 12, color: "var(--text-soft)" }}>—</span>
-            <input type="date" className="input" value={dateTo} onChange={e => setDateTo(e.target.value)}
-              style={{ width: 140, fontSize: 12, padding: "4px 8px" }} />
-          </>
-        )}
+        </div>
+
+        {/* Date range */}
+        <div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-soft)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 6 }}>Periode</div>
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+            {[
+              { key: "today", label: "Hari Ini" },
+              { key: "7d", label: "7 Hari" },
+              { key: "30d", label: "30 Hari" },
+              { key: "all", label: "Semua" },
+              { key: "custom", label: "Custom" },
+            ].map(d => (
+              <div key={d.key} className={`cat-chip${dateRange === d.key ? " active" : ""}`}
+                style={{ fontSize: 12, padding: "4px 12px" }}
+                onClick={() => setDateRange(d.key)}>
+                {d.label}
+              </div>
+            ))}
+            {dateRange === "custom" && (
+              <>
+                <input type="date" className="input" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
+                  style={{ width: 130, fontSize: 12, padding: "4px 8px" }} />
+                <span style={{ fontSize: 12, color: "var(--text-soft)" }}>—</span>
+                <input type="date" className="input" value={dateTo} onChange={e => setDateTo(e.target.value)}
+                  style={{ width: 130, fontSize: 12, padding: "4px 8px" }} />
+              </>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* KPI summary */}
