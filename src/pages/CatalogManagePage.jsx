@@ -264,8 +264,10 @@ export function CatalogManagePage() {
       if (hasVariants) {
         variantsPayload = getVariantsForSave();
       } else {
-        // Single variant (no options)
+        // Single variant (no options) — include existing variant ID if editing
+        const existingVariantId = !isNew && product?.variants?.[0]?.id;
         variantsPayload = [{
+          id: existingVariantId || undefined,
           sku: singleSku || `${(form.name || "PRD").substring(0, 3).toUpperCase()}-001`,
           attribute1Value: "",
           attribute2Value: "",
