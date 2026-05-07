@@ -15,7 +15,7 @@ import {
 export function ProtectedRoute({ allow, renderShell = true, requireWorkspace = true }) {
   const { user } = useAuth();
   const { workspaces, loading, hasLoaded, loadError } = usePosData();
-  const { activeWorkspaceId, clearWorkspace } = useWorkspace();
+  const { activeWorkspaceId, clearWorkspace, selectWorkspace } = useWorkspace();
   const location = useLocation();
   const accessibleWorkspaces = filterAccessibleWorkspaces(workspaces, user);
   const hasResolvedWorkspace = accessibleWorkspaces.some(
@@ -77,6 +77,11 @@ export function ProtectedRoute({ allow, renderShell = true, requireWorkspace = t
     }
 
     if (!hasResolvedWorkspace) {
+      // Auto-select if only 1 workspace — skip the picker page entirely
+      if (accessibleWorkspaces.length === 1 && accessibleWorkspaces[0]?.id) {
+        selectWorkspace(accessibleWorkspaces[0]);
+        return null; // Will re-render with workspace selected
+      }
       return (
         <Navigate
           to={pickWorkspaceRedirect(accessibleWorkspaces)}

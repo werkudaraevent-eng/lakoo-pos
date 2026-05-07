@@ -130,43 +130,45 @@ export function PosDataProvider({ children }) {
   }
 
   useEffect(() => {
-    if (user) {
-      let cancelled = false;
-
-      async function bootstrap() {
-        setHasLoaded(false);
-        setLoading(true);
-        setLoadError("");
-
-        try {
-          const nextState = await loadBootstrapData();
-
-          if (!cancelled) {
-            setState(nextState);
-          }
-        } catch (error) {
-          if (!cancelled) {
-            setLoadError(error.message);
-          }
-        } finally {
-          if (!cancelled) {
-            setLoading(false);
-            setHasLoaded(true);
-          }
-        }
-      }
-
-      bootstrap();
-
-      return () => {
-        cancelled = true;
-      };
-    } else {
+    if (!user) {
       setState(createEmptyState());
       setLoading(false);
       setHasLoaded(false);
       setLoadError("");
+      return;
     }
+
+    // Only bootstrap when we have a workspace selected (or on first load to get workspace list)
+    let cancelled = false;
+
+    async function bootstrap() {
+      setHasLoaded(false);
+      setLoading(true);
+      setLoadError("");
+
+      try {
+        const nextState = await loadBootstrapData();
+
+        if (!cancelled) {
+          setState(nextState);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setLoadError(error.message);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+          setHasLoaded(true);
+        }
+      }
+    }
+
+    bootstrap();
+
+    return () => {
+      cancelled = true;
+    };
   }, [activeWorkspaceId, user]);
 
   async function createPromotion(payload, actor) {
