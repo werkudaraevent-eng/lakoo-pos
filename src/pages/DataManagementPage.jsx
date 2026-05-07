@@ -3,6 +3,33 @@ import { usePosData } from "../context/PosDataContext";
 import { ConfirmModal } from "../components/ConfirmModal";
 import "../features/dashboard/dashboard.css";
 
+const ACTION_LABELS = {
+  "sale.create": "Membuat transaksi baru",
+  "sale.bulk_delete": "Menghapus semua riwayat transaksi",
+  "sale.restore": "Memulihkan transaksi dari tempat sampah",
+  "sale.permanent_delete": "Menghapus transaksi secara permanen",
+  "product.create": "Menambah produk baru",
+  "product.update": "Mengubah data produk",
+  "product.bulk_delete": "Menghapus semua produk",
+  "product.restore": "Memulihkan produk dari tempat sampah",
+  "product.permanent_delete": "Menghapus produk secara permanen",
+  "user.create": "Menambah pengguna baru",
+  "user.update": "Mengubah data pengguna",
+  "settings.update": "Mengubah pengaturan toko",
+  "event.create": "Membuat event baru",
+  "event.status_change": "Mengubah status event",
+  "event.close": "Menutup event",
+  "inventory.adjust": "Menyesuaikan stok",
+  "inventory.reset_all": "Mereset semua stok ke 0",
+  "promotion.create": "Membuat promosi baru",
+  "promotion.restore": "Memulihkan promosi dari tempat sampah",
+  "promotion.permanent_delete": "Menghapus promosi secara permanen",
+};
+
+function getActionLabel(action) {
+  return ACTION_LABELS[action] || action;
+}
+
 export function DataManagementPage() {
   const {
     getAuditLogs,
@@ -427,7 +454,7 @@ export function DataManagementPage() {
                         <div>
                           <strong>{log.user_name || log.userName || "System"}</strong>
                           <span style={{ color: "var(--text-soft)", marginLeft: 6 }}>
-                            {log.action}
+                            {getActionLabel(log.action)}
                           </span>
                         </div>
                         {(log.entity_type || log.entityType) && (
