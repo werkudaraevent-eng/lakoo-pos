@@ -1226,6 +1226,7 @@ export async function updateProductRecord(productId, payload, tenantId) {
   try {
     const category = await ensureCategory(executor, payload.category, tenantId);
 
+    const isActive = payload.isActive !== undefined ? Boolean(payload.isActive) : true;
     await executor`
       UPDATE products
       SET
@@ -1234,7 +1235,8 @@ export async function updateProductRecord(productId, payload, tenantId) {
         description = ${payload.description},
         base_price = ${Number(payload.basePrice)},
         image_url = COALESCE(${payload.imageUrl || null}, image_url),
-        is_active = ${Boolean(payload.isActive)}
+        is_active = ${isActive},
+        deleted_at = ${isActive ? null : nowIso()}
       WHERE id = ${productId} AND tenant_id = ${tenantId}
     `;
 

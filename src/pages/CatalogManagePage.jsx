@@ -374,7 +374,7 @@ export function CatalogManagePage() {
       </div>
 
       {/* Product Info Card */}
-      <div className="card" style={{ marginBottom: 16 }}>
+      <div className="card" style={{ marginBottom: 16, overflow: "visible" }}>
         <div style={{ fontSize: 11, fontWeight: 800, color: "var(--text-soft)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 16 }}>INFORMASI PRODUK</div>
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           {/* Nama */}
