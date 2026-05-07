@@ -325,7 +325,7 @@ export function CatalogManagePage() {
   }
 
   return (
-    <div className="content" style={{ maxWidth: 600, margin: "0 auto" }}>
+    <div className="content">
       {/* Header */}
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 24, flexWrap: "wrap" }}>
         <button className="btn btn-ghost btn-sm" onClick={() => navigate("/catalog")}>← Kembali</button>
