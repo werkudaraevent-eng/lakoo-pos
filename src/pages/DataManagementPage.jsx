@@ -47,6 +47,8 @@ export function DataManagementPage() {
   const [loadingBin, setLoadingBin] = useState(false);
   const [loadingLogs, setLoadingLogs] = useState(false);
   const [auditFilter, setAuditFilter] = useState("");
+  const [auditDateFrom, setAuditDateFrom] = useState("");
+  const [auditDateTo, setAuditDateTo] = useState("");
   const [toast, setToast] = useState(null);
   const [confirmAction, setConfirmAction] = useState(null); // "products" | "sales" | "stock"
   const [deleteConfirm, setDeleteConfirm] = useState(null); // { entityType, ids }
@@ -406,31 +408,58 @@ export function DataManagementPage() {
       {/* Tab: Riwayat Aktivitas */}
       {tab === "audit" && (
         <div>
-          {/* Filter */}
-          <div style={{ display: "flex", gap: 6, marginBottom: 12, flexWrap: "wrap" }}>
-            {[
-              { key: "", label: "Semua" },
-              { key: "product", label: "Produk" },
-              { key: "sale", label: "Transaksi" },
-              { key: "inventory", label: "Stok" },
-              { key: "user", label: "Pengguna" },
-              { key: "event", label: "Event" },
-              { key: "settings", label: "Pengaturan" },
-              { key: "promotion", label: "Promosi" },
-            ].map(f => (
-              <div key={f.key} className={`cat-chip${auditFilter === f.key ? " active" : ""}`}
-                style={{ fontSize: 12, padding: "4px 12px" }}
-                onClick={() => setAuditFilter(f.key)}>
-                {f.label}
+          {/* Filters */}
+          <div style={{ display: "flex", gap: 20, marginBottom: 14, flexWrap: "wrap" }}>
+            {/* By type */}
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-soft)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 6 }}>Tipe</div>
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                {[
+                  { key: "", label: "Semua" },
+                  { key: "product", label: "Produk" },
+                  { key: "sale", label: "Transaksi" },
+                  { key: "inventory", label: "Stok" },
+                  { key: "user", label: "Pengguna" },
+                  { key: "event", label: "Event" },
+                  { key: "settings", label: "Pengaturan" },
+                  { key: "promotion", label: "Promosi" },
+                ].map(f => (
+                  <div key={f.key} className={`cat-chip${auditFilter === f.key ? " active" : ""}`}
+                    style={{ fontSize: 12, padding: "4px 12px" }}
+                    onClick={() => setAuditFilter(f.key)}>
+                    {f.label}
+                  </div>
+                ))}
               </div>
-            ))}
+            </div>
+            {/* By date */}
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-soft)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 6 }}>Periode</div>
+              <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                <input type="date" className="input" value={auditDateFrom} onChange={e => setAuditDateFrom(e.target.value)}
+                  style={{ width: 130, fontSize: 12, padding: "4px 8px" }} />
+                <span style={{ fontSize: 12, color: "var(--text-soft)" }}>—</span>
+                <input type="date" className="input" value={auditDateTo} onChange={e => setAuditDateTo(e.target.value)}
+                  style={{ width: 130, fontSize: 12, padding: "4px 8px" }} />
+                {(auditDateFrom || auditDateTo) && (
+                  <button className="btn btn-ghost btn-sm" style={{ fontSize: 11 }} onClick={() => { setAuditDateFrom(""); setAuditDateTo(""); }}>Reset</button>
+                )}
+              </div>
+            </div>
           </div>
 
           {loadingLogs ? (
             <div style={{ padding: 24, color: "var(--text-soft)", fontSize: 13 }}>Memuat...</div>
-          ) : (
+          ) : (() => {
+            const filteredLogs = logs.filter(log => {
+              const logDate = new Date(log.created_at || log.createdAt);
+              if (auditDateFrom && logDate < new Date(auditDateFrom)) return false;
+              if (auditDateTo && logDate > new Date(auditDateTo + "T23:59:59")) return false;
+              return true;
+            });
+            return (
             <div className="card" style={{ padding: 0 }}>
-              {logs.length === 0 ? (
+              {filteredLogs.length === 0 ? (
                 <div
                   style={{
                     padding: "40px 24px",
@@ -443,7 +472,7 @@ export function DataManagementPage() {
                 </div>
               ) : (
                 <div style={{ maxHeight: 500, overflowY: "auto" }}>
-                  {logs.map((log, i) => (
+                  {filteredLogs.map((log, i) => (
                     <div
                       key={log.id || i}
                       style={{
@@ -502,7 +531,8 @@ export function DataManagementPage() {
                 </div>
               )}
             </div>
-          )}
+            );
+          })()}
         </div>
       )}
 
