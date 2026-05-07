@@ -360,6 +360,49 @@ export function PosDataProvider({ children }) {
     return response.products || [];
   }
 
+  async function getAuditLogs(params = {}) {
+    const query = new URLSearchParams();
+    if (params.limit) query.set("limit", params.limit);
+    if (params.offset) query.set("offset", params.offset);
+    if (params.action) query.set("action", params.action);
+    if (params.entityType) query.set("entityType", params.entityType);
+    const response = await apiGet(`/api/audit-logs?${query.toString()}`);
+    return response.logs || [];
+  }
+
+  async function getRecycleBin() {
+    const response = await apiGet("/api/recycle-bin");
+    return { products: response.products || [], sales: response.sales || [], promotions: response.promotions || [] };
+  }
+
+  async function restoreFromBin(entityType, entityIds) {
+    await apiPost("/api/recycle-bin/restore", { entityType, entityIds });
+  }
+
+  async function permanentDeleteFromBin(entityType, entityIds) {
+    await apiPost("/api/recycle-bin/delete", { entityType, entityIds });
+  }
+
+  async function bulkDeleteProducts() {
+    const requestWorkspaceId = activeWorkspaceIdRef.current || "";
+    const response = await apiPost("/api/bulk/delete-products");
+    applyMutationState(response.data, requestWorkspaceId);
+    return response.count;
+  }
+
+  async function bulkDeleteSales() {
+    const requestWorkspaceId = activeWorkspaceIdRef.current || "";
+    const response = await apiPost("/api/bulk/delete-sales");
+    applyMutationState(response.data, requestWorkspaceId);
+    return response.count;
+  }
+
+  async function bulkResetStock() {
+    const requestWorkspaceId = activeWorkspaceIdRef.current || "";
+    const response = await apiPost("/api/bulk/reset-stock");
+    applyMutationState(response.data, requestWorkspaceId);
+  }
+
   const contextValue = useMemo(() => ({
     ...state,
     variants,
@@ -387,6 +430,13 @@ export function PosDataProvider({ children }) {
     bulkImportProducts,
     getStoreProducts,
     uploadImage,
+    getAuditLogs,
+    getRecycleBin,
+    restoreFromBin,
+    permanentDeleteFromBin,
+    bulkDeleteProducts,
+    bulkDeleteSales,
+    bulkResetStock,
   }), [state, variants, loading, hasLoaded, loadError]);
 
   return (

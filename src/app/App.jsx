@@ -22,6 +22,7 @@ import { ReceiptPage } from "../pages/ReceiptPage";
 import { SalesPage } from "../pages/SalesPage";
 import { SettingsPage } from "../pages/SettingsPage";
 import { UsersPage } from "../pages/UsersPage";
+import { DataManagementPage } from "../pages/DataManagementPage";
 import { WorkspacePickerPage } from "../pages/WorkspacePickerPage";
 import { AccountBlockedPage } from "../pages/AccountBlockedPage";
 
@@ -83,6 +84,7 @@ export function App() {
       <Route element={<ProtectedRoute allow={["admin"]} />}>
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="/users" element={<UsersPage />} />
+        <Route path="/data" element={<DataManagementPage />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />

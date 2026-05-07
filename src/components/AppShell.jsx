@@ -22,6 +22,7 @@ const NAV_ITEMS = [
   { section: "Sistem" },
   { id: "pengguna", label: "Pengguna", to: "/users", icon: "Users", roles: ["admin"] },
   { id: "pengaturan", label: "Pengaturan", to: "/settings", icon: "Settings", roles: ["admin"] },
+  { id: "data", label: "Kelola Data", to: "/data", icon: "Database", roles: ["admin"] },
 ];
 
 const PAGE_TITLES = {
@@ -35,6 +36,7 @@ const PAGE_TITLES = {
   "/reports": "Laporan & Analitik",
   "/settings": "Pengaturan",
   "/users": "Pengguna",
+  "/data": "Kelola Data",
 };
 
 function getUserInitial(user) {

@@ -61,8 +61,11 @@ import {
   authenticateUser,
   authenticatePlatformAdmin,
   bulkCreateProducts,
+  bulkDeleteAllProducts,
+  bulkDeleteAllSales,
   checkTenantStatus,
   closeEventRecord,
+  createAuditLog,
   createEventRecord,
   deactivateEventRecord,
   createProductRecord,
@@ -71,10 +74,12 @@ import {
   createUserRecord,
   createVariantRecord,
   finalizeSaleRecord,
+  getAuditLogs,
   getBootstrap,
   getPlanLimits,
   getPlatformAdminById,
   getPlatformStats,
+  getRecycleBin,
   getStoreProducts,
   getTenantAdminUser,
   getTenantById,
@@ -83,7 +88,12 @@ import {
   getUserById,
   initializeDatabase,
   listTenants,
+  permanentDelete,
+  resetAllStock,
+  restoreFromRecycleBin,
   setWorkspaceAssignments,
+  softDeleteProducts,
+  softDeleteSales,
   updateEventRecord,
   updateEventStatusRecord,
   updateProductRecord,
@@ -143,7 +153,10 @@ export function createApp({
   allocateStockToEventFn = allocateStockToEvent,
   authenticateUserFn = authenticateUser,
   bulkCreateProductsFn = bulkCreateProducts,
+  bulkDeleteAllProductsFn = bulkDeleteAllProducts,
+  bulkDeleteAllSalesFn = bulkDeleteAllSales,
   closeEventRecordFn = closeEventRecord,
+  createAuditLogFn = createAuditLog,
   createEventRecordFn = createEventRecord,
   deactivateEventRecordFn = deactivateEventRecord,
   createProductRecordFn = createProductRecord,
@@ -151,8 +164,10 @@ export function createApp({
   createUserRecordFn = createUserRecord,
   createVariantRecordFn = createVariantRecord,
   finalizeSaleRecordFn = finalizeSaleRecord,
+  getAuditLogsFn = getAuditLogs,
   getBootstrapFn = getBootstrap,
   getPlatformAdminByIdFn = getPlatformAdminById,
+  getRecycleBinFn = getRecycleBin,
   getStoreProductsFn = getStoreProducts,
   getPlatformStatsFn = getPlatformStats,
   getTenantAdminUserFn = getTenantAdminUser,
@@ -160,10 +175,15 @@ export function createApp({
   getTenantDetailFn = getTenantDetail,
   checkTenantStatusFn = checkTenantStatus,
   getUserByIdFn = getUserById,
+  permanentDeleteFn = permanentDelete,
   requireAuthFn = requireAuth,
   requireRoleMiddleware = requireRole,
+  resetAllStockFn = resetAllStock,
+  restoreFromRecycleBinFn = restoreFromRecycleBin,
   setWorkspaceAssignmentsFn = setWorkspaceAssignments,
   signJwtFn = signJwt,
+  softDeleteProductsFn = softDeleteProducts,
+  softDeleteSalesFn = softDeleteSales,
   updateEventRecordFn = updateEventRecord,
   updateEventStatusRecordFn = updateEventStatusRecord,
   updateProductRecordFn = updateProductRecord,
@@ -394,6 +414,7 @@ export function createApp({
         return;
       }
 
+      try { await createAuditLogFn({ tenantId, userId: req.auth.user.id, userName: req.auth.user.name || "User", action: "event.create", entityType: "event", entityId: result.eventId, ipAddress: req.ip }); } catch (_) {}
       res.json({
         ok: true,
         eventId: result.eventId,
@@ -415,6 +436,7 @@ export function createApp({
         return;
       }
 
+      try { await createAuditLogFn({ tenantId, userId: req.auth.user.id, userName: req.auth.user.name || "User", action: "event.status_change", entityType: "event", entityId: result.eventId, details: { nextStatus: result.nextStatus }, ipAddress: req.ip }); } catch (_) {}
       res.json({
         ok: true,
         eventId: result.eventId,
@@ -437,6 +459,7 @@ export function createApp({
         return;
       }
 
+      try { await createAuditLogFn({ tenantId, userId: req.auth.user.id, userName: req.auth.user.name || "User", action: "event.close", entityType: "event", entityId: result.eventId, ipAddress: req.ip }); } catch (_) {}
       res.json({
         ok: true,
         eventId: result.eventId,
@@ -525,6 +548,7 @@ export function createApp({
     asyncHandler(async (req, res) => {
       const tenantId = req.auth.user.tenantId;
       await createPromotionRecordFn(req.body, req.auth.user.id, tenantId);
+      try { await createAuditLogFn({ tenantId, userId: req.auth.user.id, userName: req.auth.user.name || "User", action: "promotion.create", entityType: "promotion", details: { code: req.body.code }, ipAddress: req.ip }); } catch (_) {}
       res.json({
         ok: true,
         data: await getBootstrapFn({ workspaceId: getRequestWorkspaceId(req), tenantId }),
@@ -550,6 +574,7 @@ export function createApp({
         return;
       }
 
+      try { await createAuditLogFn({ tenantId, userId: req.auth.user.id, userName: req.auth.user.name || "User", action: "inventory.adjust", entityType: "inventory", details: { variantId: req.body.variantId, mode: req.body.mode, quantity: req.body.quantity }, ipAddress: req.ip }); } catch (_) {}
       res.json({
         ok: true,
         data: await getBootstrapFn({
@@ -578,6 +603,7 @@ export function createApp({
         tenantId,
       });
       const sale = data.sales.find((item) => item.id === result.saleId) ?? null;
+      try { await createAuditLogFn({ tenantId, userId: req.auth.user.id, userName: req.auth.user.name || "User", action: "sale.create", entityType: "sale", entityId: result.saleId, ipAddress: req.ip }); } catch (_) {}
       res.json({ ok: true, sale, data });
     })
   );
@@ -589,6 +615,7 @@ export function createApp({
     asyncHandler(async (req, res) => {
       const tenantId = req.auth.user.tenantId;
       await updateSettingsRecordFn(req.body, tenantId);
+      try { await createAuditLogFn({ tenantId, userId: req.auth.user.id, userName: req.auth.user.name || "User", action: "settings.update", entityType: "settings", ipAddress: req.ip }); } catch (_) {}
       res.json({
         ok: true,
         data: await getBootstrapFn({ workspaceId: getRequestWorkspaceId(req), tenantId }),
@@ -618,6 +645,7 @@ export function createApp({
       }
 
       const result = await createUserRecordFn(req.body, tenantId);
+      try { await createAuditLogFn({ tenantId, userId: req.auth.user.id, userName: req.auth.user.name || "User", action: "user.create", entityType: "user", entityId: result.userId, ipAddress: req.ip }); } catch (_) {}
       res.json({
         ok: true,
         userId: result.userId,
@@ -656,6 +684,7 @@ export function createApp({
         return;
       }
 
+      try { await createAuditLogFn({ tenantId, userId: req.auth.user.id, userName: req.auth.user.name || "User", action: "user.update", entityType: "user", entityId: req.params.id, ipAddress: req.ip }); } catch (_) {}
       res.json({
         ok: true,
         data: await getBootstrapFn({ workspaceId: getRequestWorkspaceId(req), tenantId }),
@@ -676,6 +705,7 @@ export function createApp({
         return;
       }
 
+      try { await createAuditLogFn({ tenantId, userId: req.auth.user.id, userName: req.auth.user.name || "User", action: "product.create", entityType: "product", details: { name: req.body.name }, ipAddress: req.ip }); } catch (_) {}
       res.json({
         ok: true,
         data: await getBootstrapFn({ workspaceId: getRequestWorkspaceId(req), tenantId }),
@@ -717,6 +747,7 @@ export function createApp({
         return;
       }
 
+      try { await createAuditLogFn({ tenantId, userId: req.auth.user.id, userName: req.auth.user.name || "User", action: "product.update", entityType: "product", entityId: req.params.id, ipAddress: req.ip }); } catch (_) {}
       res.json({
         ok: true,
         data: await getBootstrapFn({ workspaceId: getRequestWorkspaceId(req), tenantId }),
@@ -761,6 +792,97 @@ export function createApp({
         ok: true,
         data: await getBootstrapFn({ workspaceId: getRequestWorkspaceId(req), tenantId }),
       });
+    })
+  );
+
+  // ── Audit Logs ─────────────────────────────────────────────────
+  app.get(
+    "/api/audit-logs",
+    auth,
+    requireRoleMiddleware(["admin"]),
+    asyncHandler(async (req, res) => {
+      const tenantId = req.auth.user.tenantId;
+      const { limit, offset, action, entityType } = req.query;
+      const logs = await getAuditLogsFn(tenantId, { limit: Number(limit) || 50, offset: Number(offset) || 0, action, entityType });
+      res.json({ ok: true, logs });
+    })
+  );
+
+  // ── Recycle Bin ───────────────────────────────────────────────────
+  app.get(
+    "/api/recycle-bin",
+    auth,
+    requireRoleMiddleware(["admin"]),
+    asyncHandler(async (req, res) => {
+      const tenantId = req.auth.user.tenantId;
+      const bin = await getRecycleBinFn(tenantId);
+      res.json({ ok: true, ...bin });
+    })
+  );
+
+  app.post(
+    "/api/recycle-bin/restore",
+    auth,
+    requireRoleMiddleware(["admin"]),
+    asyncHandler(async (req, res) => {
+      const tenantId = req.auth.user.tenantId;
+      const { entityType, entityIds } = req.body;
+      await restoreFromRecycleBinFn(entityType, entityIds, tenantId);
+      try { await createAuditLogFn({ tenantId, userId: req.auth.user.id, userName: req.auth.user.name, action: `${entityType}.restore`, entityType, details: { count: entityIds.length } }); } catch (_) {}
+      res.json({ ok: true });
+    })
+  );
+
+  app.post(
+    "/api/recycle-bin/delete",
+    auth,
+    requireRoleMiddleware(["admin"]),
+    asyncHandler(async (req, res) => {
+      const tenantId = req.auth.user.tenantId;
+      const { entityType, entityIds } = req.body;
+      await permanentDeleteFn(entityType, entityIds, tenantId);
+      try { await createAuditLogFn({ tenantId, userId: req.auth.user.id, userName: req.auth.user.name, action: `${entityType}.permanent_delete`, entityType, details: { count: entityIds.length } }); } catch (_) {}
+      res.json({ ok: true });
+    })
+  );
+
+  // ── Bulk Actions ──────────────────────────────────────────────────
+  app.post(
+    "/api/bulk/delete-products",
+    auth,
+    requireRoleMiddleware(["admin"]),
+    asyncHandler(async (req, res) => {
+      const tenantId = req.auth.user.tenantId;
+      const count = await bulkDeleteAllProductsFn(tenantId);
+      try { await createAuditLogFn({ tenantId, userId: req.auth.user.id, userName: req.auth.user.name, action: "product.bulk_delete", entityType: "product", details: { count } }); } catch (_) {}
+      const data = await getBootstrapFn({ workspaceId: getRequestWorkspaceId(req), tenantId });
+      res.json({ ok: true, count, data });
+    })
+  );
+
+  app.post(
+    "/api/bulk/delete-sales",
+    auth,
+    requireRoleMiddleware(["admin"]),
+    asyncHandler(async (req, res) => {
+      const tenantId = req.auth.user.tenantId;
+      const count = await bulkDeleteAllSalesFn(tenantId);
+      try { await createAuditLogFn({ tenantId, userId: req.auth.user.id, userName: req.auth.user.name, action: "sale.bulk_delete", entityType: "sale", details: { count } }); } catch (_) {}
+      const data = await getBootstrapFn({ workspaceId: getRequestWorkspaceId(req), tenantId });
+      res.json({ ok: true, count, data });
+    })
+  );
+
+  app.post(
+    "/api/bulk/reset-stock",
+    auth,
+    requireRoleMiddleware(["admin"]),
+    asyncHandler(async (req, res) => {
+      const tenantId = req.auth.user.tenantId;
+      await resetAllStockFn(tenantId);
+      try { await createAuditLogFn({ tenantId, userId: req.auth.user.id, userName: req.auth.user.name, action: "inventory.reset_all", entityType: "inventory", details: {} }); } catch (_) {}
+      const data = await getBootstrapFn({ workspaceId: getRequestWorkspaceId(req), tenantId });
+      res.json({ ok: true, data });
     })
   );
 

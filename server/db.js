@@ -181,7 +181,7 @@ async function fetchProducts(executor, tenantId) {
     FROM products p
     JOIN categories c ON c.id = p.category_id
     LEFT JOIN product_variants pv ON pv.product_id = p.id
-    WHERE p.tenant_id = ${tenantId}
+    WHERE p.tenant_id = ${tenantId} AND p.deleted_at IS NULL
     ORDER BY p.created_at DESC, p.name ASC, pv.created_at ASC, pv.sku ASC
   `;
 
@@ -228,7 +228,7 @@ async function fetchPromotions(executor, tenantId) {
       p.created_at AS "createdAt"
     FROM promotions p
     JOIN users u ON u.id = p.created_by
-    WHERE p.tenant_id = ${tenantId}
+    WHERE p.tenant_id = ${tenantId} AND p.deleted_at IS NULL
     ORDER BY p.created_at DESC
   `;
 
@@ -274,7 +274,7 @@ async function fetchSales(executor, { workspaceId, fallbackWorkspaceId, tenantId
       s.created_at AS "createdAt"
     FROM sales s
     JOIN users u ON u.id = s.cashier_user_id
-    WHERE s.tenant_id = ${tenantId}
+    WHERE s.tenant_id = ${tenantId} AND s.deleted_at IS NULL
     ORDER BY s.created_at DESC
   `;
   const filteredSales = filterRowsByWorkspace(salesRows, { workspaceId, fallbackWorkspaceId });
@@ -1777,7 +1777,7 @@ export async function getStoreProducts(tenantId) {
            c.name AS category
     FROM products p
     LEFT JOIN categories c ON c.id = p.category_id
-    WHERE p.tenant_id = ${tenantId} AND p.is_active = true
+    WHERE p.tenant_id = ${tenantId} AND p.is_active = true AND p.deleted_at IS NULL
     ORDER BY p.name ASC
   `;
 
@@ -1855,6 +1855,144 @@ export async function bulkCreateProducts(products, tenantId) {
   }
 
   return results;
+}
+
+// ── Audit Log ──────────────────────────────────────────────────────
+
+export async function createAuditLog({ tenantId, userId, userName, action, entityType, entityId, details, ipAddress }) {
+  const executor = ensureSql();
+  await executor`
+    INSERT INTO audit_logs (id, tenant_id, user_id, user_name, action, entity_type, entity_id, details, ip_address, created_at)
+    VALUES (${createId("log")}, ${tenantId}, ${userId || null}, ${userName || "System"}, ${action}, ${entityType || null}, ${entityId || null}, ${details ? JSON.stringify(details) : null}, ${ipAddress || null}, ${nowIso()})
+  `;
+}
+
+export async function getAuditLogs(tenantId, { limit = 50, offset = 0, action, entityType } = {}) {
+  const executor = ensureSql();
+
+  if (action && entityType) {
+    return executor`
+      SELECT * FROM audit_logs 
+      WHERE tenant_id = ${tenantId} AND action LIKE ${action + '%'} AND entity_type = ${entityType}
+      ORDER BY created_at DESC LIMIT ${limit} OFFSET ${offset}
+    `;
+  }
+  if (action) {
+    return executor`
+      SELECT * FROM audit_logs 
+      WHERE tenant_id = ${tenantId} AND action LIKE ${action + '%'}
+      ORDER BY created_at DESC LIMIT ${limit} OFFSET ${offset}
+    `;
+  }
+  if (entityType) {
+    return executor`
+      SELECT * FROM audit_logs 
+      WHERE tenant_id = ${tenantId} AND entity_type = ${entityType}
+      ORDER BY created_at DESC LIMIT ${limit} OFFSET ${offset}
+    `;
+  }
+  return executor`
+    SELECT * FROM audit_logs 
+    WHERE tenant_id = ${tenantId}
+    ORDER BY created_at DESC LIMIT ${limit} OFFSET ${offset}
+  `;
+}
+
+// ── Recycle Bin ────────────────────────────────────────────────────
+
+export async function getRecycleBin(tenantId) {
+  const executor = ensureSql();
+  const products = await executor`
+    SELECT id, name, category_id, base_price, deleted_at FROM products
+    WHERE tenant_id = ${tenantId} AND deleted_at IS NOT NULL
+    ORDER BY deleted_at DESC
+  `;
+  const sales = await executor`
+    SELECT id, receipt_number, grand_total, created_at, deleted_at FROM sales
+    WHERE tenant_id = ${tenantId} AND deleted_at IS NOT NULL
+    ORDER BY deleted_at DESC
+  `;
+  const promotions = await executor`
+    SELECT id, code, type, value, deleted_at FROM promotions
+    WHERE tenant_id = ${tenantId} AND deleted_at IS NOT NULL
+    ORDER BY deleted_at DESC
+  `;
+  return { products, sales, promotions };
+}
+
+export async function softDeleteProducts(productIds, tenantId) {
+  const executor = ensureSql();
+  await executor`
+    UPDATE products SET deleted_at = ${nowIso()}, is_active = false
+    WHERE id = ANY(${productIds}) AND tenant_id = ${tenantId}
+  `;
+}
+
+export async function softDeleteSales(saleIds, tenantId) {
+  const executor = ensureSql();
+  await executor`
+    UPDATE sales SET deleted_at = ${nowIso()}
+    WHERE id = ANY(${saleIds}) AND tenant_id = ${tenantId}
+  `;
+}
+
+export async function restoreFromRecycleBin(entityType, entityIds, tenantId) {
+  const executor = ensureSql();
+  if (entityType === "product") {
+    await executor`
+      UPDATE products SET deleted_at = NULL, is_active = true
+      WHERE id = ANY(${entityIds}) AND tenant_id = ${tenantId}
+    `;
+  } else if (entityType === "sale") {
+    await executor`
+      UPDATE sales SET deleted_at = NULL
+      WHERE id = ANY(${entityIds}) AND tenant_id = ${tenantId}
+    `;
+  } else if (entityType === "promotion") {
+    await executor`
+      UPDATE promotions SET deleted_at = NULL, is_active = true
+      WHERE id = ANY(${entityIds}) AND tenant_id = ${tenantId}
+    `;
+  }
+}
+
+export async function permanentDelete(entityType, entityIds, tenantId) {
+  const executor = ensureSql();
+  if (entityType === "product") {
+    await executor`DELETE FROM products WHERE id = ANY(${entityIds}) AND tenant_id = ${tenantId} AND deleted_at IS NOT NULL`;
+  } else if (entityType === "sale") {
+    await executor`DELETE FROM sales WHERE id = ANY(${entityIds}) AND tenant_id = ${tenantId} AND deleted_at IS NOT NULL`;
+  } else if (entityType === "promotion") {
+    await executor`DELETE FROM promotions WHERE id = ANY(${entityIds}) AND tenant_id = ${tenantId} AND deleted_at IS NOT NULL`;
+  }
+}
+
+// ── Bulk Actions ───────────────────────────────────────────────────
+
+export async function bulkDeleteAllProducts(tenantId) {
+  const executor = ensureSql();
+  const result = await executor`
+    UPDATE products SET deleted_at = ${nowIso()}, is_active = false
+    WHERE tenant_id = ${tenantId} AND deleted_at IS NULL
+  `;
+  return result.count;
+}
+
+export async function bulkDeleteAllSales(tenantId) {
+  const executor = ensureSql();
+  const result = await executor`
+    UPDATE sales SET deleted_at = ${nowIso()}
+    WHERE tenant_id = ${tenantId} AND deleted_at IS NULL
+  `;
+  return result.count;
+}
+
+export async function resetAllStock(tenantId) {
+  const executor = ensureSql();
+  await executor`
+    UPDATE product_variants SET quantity_on_hand = 0
+    WHERE tenant_id = ${tenantId}
+  `;
 }
 
 export function checkTenantStatus(tenant) {

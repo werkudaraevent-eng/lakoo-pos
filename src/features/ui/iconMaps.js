@@ -10,6 +10,7 @@ export function getNavigationIconName(label) {
     Reports: "BarChart3",
     Settings: "Settings",
     Users: "Users",
+    Database: "Database",
   };
 
   return map[label] || "Circle";
