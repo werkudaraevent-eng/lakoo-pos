@@ -64,6 +64,7 @@ import {
   bulkDeleteAllProducts,
   bulkDeleteAllSales,
   checkTenantStatus,
+  deleteCategory,
   closeEventRecord,
   createAuditLog,
   createEventRecord,
@@ -155,6 +156,7 @@ export function createApp({
   authenticateUserFn = authenticateUser,
   bulkCreateProductsFn = bulkCreateProducts,
   bulkDeleteAllProductsFn = bulkDeleteAllProducts,
+  deleteCategoryFn = deleteCategory,
   bulkDeleteAllSalesFn = bulkDeleteAllSales,
   closeEventRecordFn = closeEventRecord,
   createAuditLogFn = createAuditLog,
@@ -738,6 +740,19 @@ export function createApp({
         ok: true,
         data: await getBootstrapFn({ workspaceId: getRequestWorkspaceId(req), tenantId }),
       });
+    })
+  );
+
+  app.delete(
+    "/api/categories/:name",
+    auth,
+    requireRoleMiddleware(["admin", "manager"]),
+    asyncHandler(async (req, res) => {
+      const tenantId = req.auth.user.tenantId;
+      const result = await deleteCategoryFn(decodeURIComponent(req.params.name), tenantId);
+      if (!result.ok) { res.status(400).json(result); return; }
+      const data = await getBootstrapFn({ workspaceId: getRequestWorkspaceId(req), tenantId });
+      res.json({ ok: true, data });
     })
   );
 

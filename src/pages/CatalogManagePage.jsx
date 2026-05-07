@@ -12,6 +12,7 @@ export function CatalogManagePage() {
     categories,
     createProduct,
     createVariant,
+    deleteCategory,
     products,
     settings,
     updateProduct,
@@ -374,7 +375,7 @@ export function CatalogManagePage() {
       </div>
 
       {/* Product Info Card */}
-      <div className="card" style={{ marginBottom: 16, overflow: "visible" }}>
+      <div className="card" style={{ marginBottom: 16, overflow: "visible", position: "relative", zIndex: 10 }}>
         <div style={{ fontSize: 11, fontWeight: 800, color: "var(--text-soft)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 16 }}>INFORMASI PRODUK</div>
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           {/* Nama */}
@@ -392,7 +393,7 @@ export function CatalogManagePage() {
                 <input className="input" placeholder="85.000" value={form.basePrice ? Number(form.basePrice).toLocaleString("id-ID") : ""} onChange={(e) => setForm({ ...form, basePrice: e.target.value.replace(/\D/g, "") })} style={{ paddingLeft: 36, fontSize: 14, fontWeight: 700 }} />
               </div>
             </div>
-            <div style={{ position: "relative" }} ref={catRef}>
+            <div style={{ position: "relative", zIndex: 60 }} ref={catRef}>
               <label style={labelStyle}>Kategori</label>
               <div
                 className="input"
@@ -435,7 +436,6 @@ export function CatalogManagePage() {
                       .map(c => (
                         <div
                           key={c}
-                          onClick={() => { setForm({ ...form, category: c }); setCatOpen(false); setCatSearch(""); }}
                           style={{
                             padding: "9px 12px", fontSize: 13, cursor: "pointer",
                             display: "flex", alignItems: "center", gap: 8,
@@ -445,8 +445,28 @@ export function CatalogManagePage() {
                           onMouseEnter={(e) => e.currentTarget.style.background = "var(--surface)"}
                           onMouseLeave={(e) => e.currentTarget.style.background = form.category === c ? "var(--accent-soft)" : "transparent"}
                         >
-                          <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--accent)", flexShrink: 0 }} />
-                          {c}
+                          <span
+                            style={{ flex: 1, display: "flex", alignItems: "center", gap: 8 }}
+                            onClick={() => { setForm({ ...form, category: c }); setCatOpen(false); setCatSearch(""); }}
+                          >
+                            <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--accent)", flexShrink: 0 }} />
+                            {c}
+                          </span>
+                          <button
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              try {
+                                await deleteCategory(c);
+                                if (form.category === c) setForm(f => ({ ...f, category: "" }));
+                              } catch (err) {
+                                setSaveError(err.message || "Gagal hapus kategori.");
+                              }
+                            }}
+                            style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-muted)", fontSize: 14, lineHeight: 1, padding: "2px 4px", borderRadius: 4, opacity: 0.5 }}
+                            onMouseEnter={(e) => { e.currentTarget.style.opacity = "1"; e.currentTarget.style.color = "var(--danger)"; }}
+                            onMouseLeave={(e) => { e.currentTarget.style.opacity = "0.5"; e.currentTarget.style.color = "var(--text-muted)"; }}
+                            title="Hapus kategori"
+                          >×</button>
                         </div>
                       ))
                     }

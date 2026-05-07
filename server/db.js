@@ -127,6 +127,25 @@ async function ensureCategory(executor, name, tenantId) {
   return category;
 }
 
+export async function deleteCategory(categoryName, tenantId) {
+  const executor = ensureSql();
+  const slug = slugify(categoryName);
+  
+  // Check if any active products use this category
+  const usage = await executor`
+    SELECT COUNT(*)::int AS count FROM products p
+    JOIN categories c ON c.id = p.category_id
+    WHERE c.slug = ${slug} AND p.tenant_id = ${tenantId} AND p.deleted_at IS NULL
+  `;
+  
+  if (usage[0]?.count > 0) {
+    return { ok: false, message: `Kategori "${categoryName}" masih digunakan oleh ${usage[0].count} produk.` };
+  }
+  
+  await executor`DELETE FROM categories WHERE slug = ${slug} AND tenant_id = ${tenantId}`;
+  return { ok: true };
+}
+
 async function fetchSettings(executor, tenantId) {
   const rows = await executor`
     SELECT key, value
