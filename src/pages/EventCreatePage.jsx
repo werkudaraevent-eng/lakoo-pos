@@ -35,7 +35,13 @@ export function EventCreatePage() {
   const { createEvent, loadError, users } = usePosData();
   const [draft, setDraft] = useState(createEmptyEventDraft);
   const [message, setMessage] = useState("");
+  const [toast, setToast] = useState(null);
   const [submitting, setSubmitting] = useState(false);
+
+  function showToast(type, msg) {
+    setToast({ type, message: msg });
+    setTimeout(() => setToast(null), 5000);
+  }
 
   const eventUsers = useMemo(
     () => users.filter((user) => user.role === "admin" || user.role === "manager" || user.role === "cashier"),
@@ -64,6 +70,7 @@ export function EventCreatePage() {
 
     if (!result.ok) {
       setMessage(result.message);
+      showToast("error", result.message);
       setSubmitting(false);
       return;
     }
@@ -187,6 +194,20 @@ export function EventCreatePage() {
           </Button>
         </form>
       </section>
+
+      {toast && (
+        <div style={{
+          position: "fixed", bottom: 24, right: 24, zIndex: 9999,
+          padding: "14px 22px", borderRadius: 10,
+          background: toast.type === "success" ? "var(--success, #4a9066)" : "var(--danger, #b54343)",
+          color: "#fff", fontSize: 13.5, fontWeight: 600,
+          boxShadow: "0 8px 24px rgba(0,0,0,0.18)", maxWidth: 420,
+          animation: "fadeIn 0.2s ease",
+        }}>
+          {toast.type === "success" ? "\u2713 " : "\u2717 "}
+          {toast.message}
+        </div>
+      )}
     </div>
   );
 }

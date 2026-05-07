@@ -113,10 +113,28 @@
 /* Password input wrapper with toggle */
 .password-input-wrapper {
   position: relative;
+  display: flex;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: #fff;
+  transition: border-color 0.15s;
+}
+
+.password-input-wrapper:focus-within {
+  border-color: var(--accent);
 }
 
 .password-input-wrapper input {
   padding-right: 100px;
+  border: none;
+  background: transparent;
+}
+
+.password-input-wrapper input:focus {
+  border: none;
+  box-shadow: none;
+  outline: none;
 }
 
 .password-toggle-btn {

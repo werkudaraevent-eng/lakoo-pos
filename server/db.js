@@ -1258,15 +1258,18 @@ export async function updateProductRecord(productId, payload, tenantId) {
   const executor = ensureSql();
 
   const existing = await executor`
-    SELECT id
-    FROM products
-    WHERE id = ${productId} AND tenant_id = ${tenantId}
+    SELECT p.id, p.name, p.base_price, p.description, p.is_active, c.name as category_name
+    FROM products p
+    LEFT JOIN categories c ON c.id = p.category_id
+    WHERE p.id = ${productId} AND p.tenant_id = ${tenantId}
     LIMIT 1
   `;
 
   if (!existing[0]) {
     return { ok: false, message: "Product tidak ditemukan." };
   }
+
+  const before = existing[0];
 
   try {
     const category = await ensureCategory(executor, payload.category, tenantId);
@@ -1285,7 +1288,16 @@ export async function updateProductRecord(productId, payload, tenantId) {
       WHERE id = ${productId} AND tenant_id = ${tenantId}
     `;
 
-    return { ok: true };
+    // Detect which fields changed
+    const changes = [];
+    if (before.name !== payload.name) changes.push("nama");
+    if (before.category_name !== payload.category) changes.push("kategori");
+    if (Number(before.base_price) !== Number(payload.basePrice)) changes.push("harga");
+    if ((before.description || "") !== (payload.description || "")) changes.push("deskripsi");
+    if (Boolean(before.is_active) !== isActive) changes.push("status");
+    if (payload.imageUrl) changes.push("gambar");
+
+    return { ok: true, productName: before.name, changes };
   } catch (error) {
     return { ok: false, message: error.message };
   }

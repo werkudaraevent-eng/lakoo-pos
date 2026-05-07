@@ -4,6 +4,7 @@ import * as XLSX from "xlsx";
 
 import { usePosData } from "../context/PosDataContext";
 import { useWorkspace } from "../context/WorkspaceContext";
+import { useAuth } from "../context/AuthContext";
 import { formatCurrency } from "../utils/formatters";
 import "../features/dashboard/dashboard.css";
 
@@ -36,8 +37,12 @@ function CategoryRow({ category, onRename, onDelete }) {
 export function CatalogPage() {
   const { products, workspaces, categories, settings, loading, loadError, updateProduct, getStoreProducts, allocateStockToEvent, bulkImportProducts, createNewCategory, renameCategory, deleteCategory } = usePosData();
   const { activeWorkspaceId } = useWorkspace();
+  const { user } = useAuth();
   const activeWorkspace = workspaces.find((w) => w.id === activeWorkspaceId);
   const isEventWorkspace = activeWorkspace?.type === "event";
+  const productLimit = user?.planLimits?.products;
+  const productCount = (products || []).filter(p => p.isActive !== false).length;
+  const isProductFull = productLimit > 0 && productCount >= productLimit;
 
   const [search, setSearch] = useState("");
   const [cat, setCat] = useState("Semua");
@@ -297,6 +302,22 @@ export function CatalogPage() {
         </div>
       )}
 
+      {/* Usage indicator */}
+      {productLimit && productLimit > 0 && (
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, padding: "8px 14px", background: productCount >= productLimit ? "var(--danger-soft, #fef2f2)" : "var(--surface)", borderRadius: 8, border: productCount >= productLimit ? "1px solid var(--danger, #b54343)" : "1px solid var(--line)", fontSize: 12.5 }}>
+          <span style={{ fontWeight: 700, color: productCount >= productLimit ? "var(--danger, #b54343)" : "var(--text)" }}>
+            {productCount} / {productLimit}
+          </span>
+          <span style={{ color: "var(--text-soft)" }}>Produk</span>
+          {productCount >= productLimit && (
+            <span style={{ marginLeft: "auto", fontSize: 11.5, color: "var(--danger, #b54343)", fontWeight: 600 }}>Kuota penuh — upgrade paket untuk menambah</span>
+          )}
+          {productCount < productLimit && (
+            <span style={{ marginLeft: "auto", fontSize: 11, color: "var(--text-muted)" }}>Paket {user?.tenant?.plan || "trial"}</span>
+          )}
+        </div>
+      )}
+
       {/* Search + Add */}
       <div style={{ display: "flex", gap: 10, marginBottom: 16, flexWrap: "wrap" }}>
         <div className="input-wrap" style={{ flex: "1 1 200px" }}>
@@ -305,14 +326,21 @@ export function CatalogPage() {
           </span>
           <input className="input has-icon" placeholder="Cari produk..." value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
-        <Link to="/catalog/new" className="btn btn-primary" style={{ textDecoration: "none" }}>
-          <svg width={14} height={14} fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
-          {" "}Tambah Produk
-        </Link>
+        {isProductFull ? (
+          <button className="btn btn-primary" disabled style={{ opacity: 0.5, cursor: "not-allowed" }}>
+            <svg width={14} height={14} fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+            {" "}Tambah Produk
+          </button>
+        ) : (
+          <Link to="/catalog/new" className="btn btn-primary" style={{ textDecoration: "none" }}>
+            <svg width={14} height={14} fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+            {" "}Tambah Produk
+          </Link>
+        )}
         <button className="btn btn-secondary" onClick={handleExportXlsx} title="Export katalog ke Excel">
           📥 Export
         </button>
-        <button className="btn btn-secondary" onClick={() => { setImportCsvModal(true); setCsvPreview([]); }} title="Import produk dari CSV">
+        <button className="btn btn-secondary" disabled={isProductFull} style={isProductFull ? { opacity: 0.5, cursor: "not-allowed" } : {}} onClick={() => { if (!isProductFull) { setImportCsvModal(true); setCsvPreview([]); } }} title={isProductFull ? "Kuota produk penuh" : "Import produk dari CSV"}>
           📤 Import
         </button>
         {isEventWorkspace && (

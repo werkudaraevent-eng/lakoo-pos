@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { usePosData } from "../context/PosDataContext";
 import { ConfirmModal } from "../components/ConfirmModal";
 import "../features/dashboard/dashboard.css";
@@ -51,7 +52,7 @@ function formatAuditDetail(log) {
   if (details.mode) parts.push(details.mode === "restock" ? "Restock" : "Adjustment");
   if (details.status) parts.push(`→ ${details.status}`);
   if (details.count) parts.push(`${details.count} item`);
-  if (details.fields) parts.push(details.fields);
+  if (details.fields) parts.push(`Diubah: ${details.fields}`);
   if (details.location) parts.push(details.location);
   if (details.stockMode) parts.push(`Mode: ${details.stockMode}`);
 
@@ -69,7 +70,9 @@ export function DataManagementPage() {
     bulkResetStock,
   } = usePosData();
 
-  const [tab, setTab] = useState("bin"); // "bin" | "bulk" | "audit"
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tab = searchParams.get("tab") || "bin"; // "bin" | "bulk" | "audit"
+  const setTab = (t) => setSearchParams({ tab: t }, { replace: true });
   const [bin, setBin] = useState({ products: [], sales: [], promotions: [] });
   const [logs, setLogs] = useState([]);
   const [loadingBin, setLoadingBin] = useState(false);
@@ -77,6 +80,8 @@ export function DataManagementPage() {
   const [auditFilter, setAuditFilter] = useState("");
   const [auditDateFrom, setAuditDateFrom] = useState("");
   const [auditDateTo, setAuditDateTo] = useState("");
+  const [auditSort, setAuditSort] = useState({ key: "time", dir: "desc" });
+  const [auditPageSize, setAuditPageSize] = useState(25);
   const [toast, setToast] = useState(null);
   const [confirmAction, setConfirmAction] = useState(null); // "products" | "sales" | "stock"
   const [deleteConfirm, setDeleteConfirm] = useState(null); // { entityType, ids }
@@ -485,6 +490,31 @@ export function DataManagementPage() {
               if (auditDateTo && logDate > new Date(auditDateTo + "T23:59:59")) return false;
               return true;
             });
+
+            // Sort
+            const sortedLogs = [...filteredLogs].sort((a, b) => {
+              const dir = auditSort.dir === "asc" ? 1 : -1;
+              switch (auditSort.key) {
+                case "time": return dir * (new Date(a.created_at || a.createdAt) - new Date(b.created_at || b.createdAt));
+                case "user": return dir * ((a.user_name || a.userName || "").localeCompare(b.user_name || b.userName || ""));
+                case "activity": return dir * ((a.action || "").localeCompare(b.action || ""));
+                case "type": return dir * ((a.entity_type || a.entityType || "").localeCompare(b.entity_type || b.entityType || ""));
+                default: return 0;
+              }
+            });
+
+            // Pagination
+            const visibleLogs = sortedLogs.slice(0, auditPageSize);
+            const hasMore = sortedLogs.length > auditPageSize;
+
+            const toggleSort = (key) => {
+              setAuditSort(prev => prev.key === key ? { key, dir: prev.dir === "asc" ? "desc" : "asc" } : { key, dir: "desc" });
+            };
+            const sortIcon = (key) => {
+              if (auditSort.key !== key) return " ↕";
+              return auditSort.dir === "asc" ? " ↑" : " ↓";
+            };
+
             return (
             <div className="card" style={{ padding: 0, overflow: "hidden" }}>
               {filteredLogs.length === 0 ? (
@@ -492,19 +522,20 @@ export function DataManagementPage() {
                   Belum ada aktivitas tercatat.
                 </div>
               ) : (
-                <div className="table-wrap" style={{ maxHeight: 500, overflowY: "auto" }}>
+                <>
+                <div className="table-wrap" style={{ maxHeight: "calc(100vh - 380px)", minHeight: 300, overflowY: "auto" }}>
                   <table>
-                    <thead>
+                    <thead style={{ position: "sticky", top: 0, zIndex: 2, background: "var(--card-bg, #fff)" }}>
                       <tr>
-                        <th>Waktu</th>
-                        <th>Pengguna</th>
-                        <th>Aktivitas</th>
-                        <th>Tipe</th>
+                        <th style={{ cursor: "pointer", userSelect: "none", whiteSpace: "nowrap" }} onClick={() => toggleSort("time")}>Waktu{sortIcon("time")}</th>
+                        <th style={{ cursor: "pointer", userSelect: "none", whiteSpace: "nowrap" }} onClick={() => toggleSort("user")}>Pengguna{sortIcon("user")}</th>
+                        <th style={{ cursor: "pointer", userSelect: "none", whiteSpace: "nowrap" }} onClick={() => toggleSort("activity")}>Aktivitas{sortIcon("activity")}</th>
+                        <th style={{ cursor: "pointer", userSelect: "none", whiteSpace: "nowrap" }} onClick={() => toggleSort("type")}>Tipe{sortIcon("type")}</th>
                         <th>Keterangan</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {filteredLogs.map((log, i) => (
+                      {visibleLogs.map((log, i) => (
                           <tr key={log.id || i}>
                             <td style={{ whiteSpace: "nowrap", fontSize: 12 }}>
                               {new Date(log.created_at || log.createdAt).toLocaleString("id-ID", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
@@ -520,6 +551,26 @@ export function DataManagementPage() {
                     </tbody>
                   </table>
                 </div>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 16px", borderTop: "1px solid var(--border, #eee)", fontSize: 12, color: "var(--text-soft)" }}>
+                  <span>Menampilkan {visibleLogs.length} dari {sortedLogs.length} aktivitas</span>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <span>Tampilkan:</span>
+                    {[25, 50, 100].map(size => (
+                      <button key={size} className={`btn btn-sm${auditPageSize === size ? "" : " btn-ghost"}`}
+                        style={{ fontSize: 11, padding: "2px 8px", minWidth: 32, background: auditPageSize === size ? "var(--accent, #b8860b)" : undefined, color: auditPageSize === size ? "#fff" : undefined, border: auditPageSize === size ? "none" : undefined }}
+                        onClick={() => setAuditPageSize(size)}>
+                        {size}
+                      </button>
+                    ))}
+                    {hasMore && (
+                      <button className="btn btn-ghost btn-sm" style={{ fontSize: 11, padding: "2px 10px" }}
+                        onClick={() => setAuditPageSize(prev => prev + 50)}>
+                        Muat lebih banyak
+                      </button>
+                    )}
+                  </div>
+                </div>
+                </>
               )}
             </div>
             );

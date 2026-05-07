@@ -11,6 +11,7 @@ export function getNavigationIconName(label) {
     Settings: "Settings",
     Users: "Users",
     Database: "Database",
+    Changelog: "ScrollText",
   };
 
   return map[label] || "Circle";

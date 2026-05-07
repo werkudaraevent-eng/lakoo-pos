@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
+import * as XLSX from "xlsx";
 
 import { usePosData } from "../context/PosDataContext";
 import { formatCurrency } from "../utils/formatters";
@@ -7,6 +8,8 @@ import "../features/dashboard/dashboard.css";
 export function ReportsPage() {
   const { sales, settings, loading, loadError } = usePosData();
   const [period, setPeriod] = useState("30d");
+  const [exporting, setExporting] = useState(false);
+  const reportRef = useRef(null);
 
   const periodDays = period === "7d" ? 7 : period === "30d" ? 30 : 90;
 
@@ -78,13 +81,73 @@ export function ReportsPage() {
 
   const totalProductRev = topProducts.reduce((s, p) => s + p.rev, 0) || 1;
 
+  async function handleExportPdf() {
+    if (!reportRef.current) return;
+    setExporting(true);
+    try {
+      const html2canvas = (await import("html2canvas")).default;
+      const { jsPDF } = await import("jspdf");
+      const canvas = await html2canvas(reportRef.current, { scale: 2, useCORS: true, backgroundColor: "#ffffff" });
+      const imgData = canvas.toDataURL("image/png");
+      const pdf = new jsPDF("p", "mm", "a4");
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+      pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, pdfHeight);
+      pdf.save(`Laporan-${period}-${new Date().toISOString().slice(0, 10)}.pdf`);
+    } catch (err) {
+      console.error("PDF export failed:", err);
+    } finally {
+      setExporting(false);
+    }
+  }
+
+  function handleExportExcel() {
+    const rows = filteredSales.map((s) => ({
+      Tanggal: new Date(s.createdAt).toLocaleString("id-ID", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }),
+      "No. Struk": s.receiptNumber || "-",
+      "Metode Bayar": s.paymentMethod || "cash",
+      "Total Item": s.items?.length || 0,
+      "Grand Total": s.grandTotal || 0,
+      Produk: (s.items || []).map(i => `${i.productNameSnapshot} x${i.qty}`).join(", "),
+    }));
+
+    const summaryRows = [
+      { Metrik: "Pendapatan", Nilai: totalRev },
+      { Metrik: "Total Transaksi", Nilai: filteredSales.length },
+      { Metrik: "Produk Terjual", Nilai: totalItems },
+    ];
+
+    const wb = XLSX.utils.book_new();
+    const wsTransaksi = XLSX.utils.json_to_sheet(rows);
+    const wsRingkasan = XLSX.utils.json_to_sheet(summaryRows);
+    const wsTopProduk = XLSX.utils.json_to_sheet(topProducts.map((p, i) => ({
+      "#": i + 1,
+      Produk: p.name,
+      Terjual: p.sold,
+      Pendapatan: p.rev,
+    })));
+
+    XLSX.utils.book_append_sheet(wb, wsRingkasan, "Ringkasan");
+    XLSX.utils.book_append_sheet(wb, wsTransaksi, "Transaksi");
+    XLSX.utils.book_append_sheet(wb, wsTopProduk, "Produk Terlaris");
+    XLSX.writeFile(wb, `Laporan-${period}-${new Date().toISOString().slice(0, 10)}.xlsx`);
+  }
+
   return (
     <div className="content">
       {loading ? <p className="text-sm text-muted" style={{ padding: 16 }}>Memuat data...</p> : null}
       {loadError ? <p style={{ padding: 16, color: "var(--danger)" }}>{loadError}</p> : null}
 
-      {/* Period selector */}
-      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 16 }}>
+      {/* Period selector + Export buttons */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 10 }}>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button className="btn btn-secondary" onClick={handleExportPdf} disabled={exporting} style={{ fontSize: 12.5 }}>
+            {exporting ? "Exporting..." : "📄 Export PDF"}
+          </button>
+          <button className="btn btn-secondary" onClick={handleExportExcel} style={{ fontSize: 12.5 }}>
+            📊 Export Excel
+          </button>
+        </div>
         <div className="cat-filter" style={{ margin: 0 }}>
           {[{ key: "7d", label: "7 Hari" }, { key: "30d", label: "30 Hari" }, { key: "90d", label: "90 Hari" }].map((p) => (
             <div key={p.key} className={`cat-chip${period === p.key ? " active" : ""}`} onClick={() => setPeriod(p.key)}>{p.label}</div>
@@ -92,6 +155,8 @@ export function ReportsPage() {
         </div>
       </div>
 
+      {/* Report content (captured for PDF) */}
+      <div ref={reportRef}>
       {/* KPIs */}
       <div className="grid-3 mb-16">
         <div className="card">
@@ -194,6 +259,7 @@ export function ReportsPage() {
           </table>
         </div>
       </div>
+      </div>{/* end reportRef */}
     </div>
   );
 }

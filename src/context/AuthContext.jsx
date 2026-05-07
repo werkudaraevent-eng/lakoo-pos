@@ -84,7 +84,7 @@ export function AuthProvider({ children }) {
       try {
         const payload = await apiGet("/api/auth/me");
         if (!cancelled) {
-          setUser({ ...payload.user, tenant: payload.tenant, planLimits: payload.limits });
+          setUser({ ...payload.user, tenant: payload.tenant, planLimits: payload.limits, usage: payload.usage });
         }
       } catch {
         if (!cancelled) {
@@ -114,7 +114,7 @@ export function AuthProvider({ children }) {
       setAuthToken(payload.token);
       setToken(payload.token);
       localStorage.removeItem("pos-impersonating"); // Clear impersonation flag on normal login
-      const enrichedUser = { ...payload.user, planLimits: payload.limits };
+      const enrichedUser = { ...payload.user, planLimits: payload.limits, usage: payload.usage };
       setUser(enrichedUser);
       return { ok: true, user: enrichedUser };
     } catch (error) {

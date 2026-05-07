@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 
 import { apiGet } from "../api/client";
 import { usePosData } from "../context/PosDataContext";
+import { resetOnboardingTour } from "../components/OnboardingTour";
 
 function formatDate(iso) {
   if (!iso) return "-";
@@ -254,6 +255,13 @@ export function SettingsPage() {
           </div>
         </article>
       ) : null}
+
+      {/* ── Tour Button ── */}
+      <div style={{ marginBottom: 16 }}>
+        <button className="btn btn-secondary" style={{ fontSize: 12.5 }} onClick={() => { resetOnboardingTour(); window.location.reload(); }}>
+          🎯 Mulai Tour Panduan
+        </button>
+      </div>
 
       {/* ── Settings Card ── */}
       <article className="panel-card">

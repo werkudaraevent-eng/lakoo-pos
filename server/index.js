@@ -319,7 +319,8 @@ export function createApp({
       });
 
       const limits = user.tenant ? getPlanLimits(user.tenant.plan) : null;
-      res.json({ ok: true, token, user: { ...user, tenant: user.tenant }, limits });
+      const usage = user.tenantId ? await getTenantUsage(user.tenantId) : null;
+      res.json({ ok: true, token, user: { ...user, tenant: user.tenant }, limits, usage });
     })
   );
 
@@ -416,6 +417,18 @@ export function createApp({
     requireRoleMiddleware(["admin", "manager"]),
     asyncHandler(async (req, res) => {
       const tenantId = req.auth.user.tenantId;
+
+      // Enforce workspace limit
+      const tenant = await getTenantByIdFn(tenantId);
+      const limits = getPlanLimits(tenant?.plan);
+      if (limits.workspaces > 0) {
+        const usage = await getTenantUsage(tenantId);
+        if (usage.workspaces >= limits.workspaces) {
+          res.status(403).json({ ok: false, message: `Batas workspace untuk paket ${tenant.plan} adalah ${limits.workspaces}. Upgrade paket untuk menambah workspace.` });
+          return;
+        }
+      }
+
       const result = await createEventRecordFn(req.body, req.auth.user.id, tenantId);
 
       if (!result.ok) {
@@ -665,6 +678,17 @@ export function createApp({
     asyncHandler(async (req, res) => {
       const tenantId = req.auth.user.tenantId;
 
+      // Enforce user limit
+      const tenant = await getTenantByIdFn(tenantId);
+      const limits = getPlanLimits(tenant?.plan);
+      if (limits.users > 0) {
+        const usage = await getTenantUsage(tenantId);
+        if (usage.users >= limits.users) {
+          res.status(403).json({ ok: false, message: `Batas pengguna untuk paket ${tenant.plan} adalah ${limits.users}. Upgrade paket untuk menambah pengguna.` });
+          return;
+        }
+      }
+
       // Validate password
       const passwordError = validatePassword(req.body?.password);
       if (passwordError) {
@@ -733,6 +757,18 @@ export function createApp({
     requireRoleMiddleware(["admin", "manager"]),
     asyncHandler(async (req, res) => {
       const tenantId = req.auth.user.tenantId;
+
+      // Enforce product limit
+      const tenant = await getTenantByIdFn(tenantId);
+      const limits = getPlanLimits(tenant?.plan);
+      if (limits.products > 0) {
+        const usage = await getTenantUsage(tenantId);
+        if (usage.products >= limits.products) {
+          res.status(403).json({ ok: false, message: `Batas produk untuk paket ${tenant.plan} adalah ${limits.products}. Upgrade paket untuk menambah produk.` });
+          return;
+        }
+      }
+
       const result = await createProductRecordFn(req.body, tenantId);
 
       if (!result.ok) {
@@ -805,6 +841,23 @@ export function createApp({
         res.status(400).json({ ok: false, message: "Maksimal 500 produk per import." });
         return;
       }
+
+      // Enforce product limit
+      const tenant = await getTenantByIdFn(tenantId);
+      const limits = getPlanLimits(tenant?.plan);
+      if (limits.products > 0) {
+        const usage = await getTenantUsage(tenantId);
+        const remaining = limits.products - usage.products;
+        if (remaining <= 0) {
+          res.status(403).json({ ok: false, message: `Batas produk untuk paket ${tenant.plan} adalah ${limits.products}. Upgrade paket untuk menambah produk.` });
+          return;
+        }
+        if (products.length > remaining) {
+          res.status(403).json({ ok: false, message: `Sisa kuota produk Anda: ${remaining}. Anda mencoba import ${products.length} produk. Kurangi jumlah atau upgrade paket.` });
+          return;
+        }
+      }
+
       const result = await bulkCreateProductsFn(products, tenantId);
       const data = await getBootstrapFn({ workspaceId: getRequestWorkspaceId(req), tenantId });
       res.json({ ok: true, ...result, data });
@@ -824,7 +877,7 @@ export function createApp({
         return;
       }
 
-      try { await createAuditLogFn({ tenantId, userId: req.auth.user.id, userName: req.auth.user.name || "User", action: "product.update", entityType: "product", entityId: req.params.id, details: { name: req.body.name, category: req.body.category, price: req.body.basePrice }, ipAddress: req.ip }); } catch (_) {}
+      try { await createAuditLogFn({ tenantId, userId: req.auth.user.id, userName: req.auth.user.name || "User", action: "product.update", entityType: "product", entityId: req.params.id, details: { name: result.productName || req.body.name, fields: result.changes && result.changes.length > 0 ? result.changes.join(", ") : "data" }, ipAddress: req.ip }); } catch (_) {}
       res.json({
         ok: true,
         data: await getBootstrapFn({ workspaceId: getRequestWorkspaceId(req), tenantId }),
@@ -904,6 +957,21 @@ export function createApp({
     asyncHandler(async (req, res) => {
       const tenantId = req.auth.user.tenantId;
       const { entityType, entityIds } = req.body;
+
+      // Enforce limits when restoring products
+      if (entityType === "product") {
+        const tenant = await getTenantByIdFn(tenantId);
+        const limits = getPlanLimits(tenant?.plan);
+        if (limits.products > 0) {
+          const usage = await getTenantUsage(tenantId);
+          const remaining = limits.products - usage.products;
+          if (entityIds.length > remaining) {
+            res.status(403).json({ ok: false, message: `Sisa kuota produk: ${remaining}. Anda mencoba memulihkan ${entityIds.length} produk. Hapus beberapa produk atau upgrade paket.` });
+            return;
+          }
+        }
+      }
+
       await restoreFromRecycleBinFn(entityType, entityIds, tenantId);
       try { await createAuditLogFn({ tenantId, userId: req.auth.user.id, userName: req.auth.user.name, action: `${entityType}.restore`, entityType, details: { count: entityIds.length } }); } catch (_) {}
       res.json({ ok: true });

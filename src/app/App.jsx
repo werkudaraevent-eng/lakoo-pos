@@ -23,6 +23,7 @@ import { SalesPage } from "../pages/SalesPage";
 import { SettingsPage } from "../pages/SettingsPage";
 import { UsersPage } from "../pages/UsersPage";
 import { DataManagementPage } from "../pages/DataManagementPage";
+import { ChangelogPage } from "../pages/ChangelogPage";
 import { WorkspacePickerPage } from "../pages/WorkspacePickerPage";
 import { AccountBlockedPage } from "../pages/AccountBlockedPage";
 
@@ -64,6 +65,7 @@ export function App() {
         <Route path="/checkout" element={<CheckoutPage />} />
         <Route path="/sales" element={<SalesPage />} />
         <Route path="/sales/:saleId/receipt" element={<ReceiptPage />} />
+        <Route path="/changelog" element={<ChangelogPage />} />
       </Route>
 
       <Route element={<ProtectedRoute allow={["admin", "manager"]} />}>

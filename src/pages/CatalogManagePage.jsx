@@ -48,9 +48,15 @@ export function CatalogManagePage() {
   const [submitting, setSubmitting] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
   const [saveError, setSaveError] = useState("");
+  const [toast, setToast] = useState(null);
   const [imageFile, setImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
   const [uploading, setUploading] = useState(false);
+
+  function showToast(type, msg) {
+    setToast({ type, message: msg });
+    setTimeout(() => setToast(null), 5000);
+  }
   const loadedProductIdRef = useRef(null);
 
   // Load product data — only when product actually changes (by id)
@@ -320,7 +326,9 @@ export function CatalogManagePage() {
       setSaveError("");
       setTimeout(() => { setSaved(false); navigate("/catalog"); }, 1200);
     } catch (err) {
-      setSaveError(err.message || "Gagal menyimpan. Coba lagi.");
+      const msg = err.message || "Gagal menyimpan. Coba lagi.";
+      setSaveError(msg);
+      showToast("error", msg);
     } finally {
       setSubmitting(false);
     }
@@ -718,6 +726,20 @@ export function CatalogManagePage() {
           </div>
         </div>
       ) : null}
+
+      {toast && (
+        <div style={{
+          position: "fixed", bottom: 24, right: 24, zIndex: 9999,
+          padding: "14px 22px", borderRadius: 10,
+          background: toast.type === "success" ? "var(--success, #4a9066)" : "var(--danger, #b54343)",
+          color: "#fff", fontSize: 13.5, fontWeight: 600,
+          boxShadow: "0 8px 24px rgba(0,0,0,0.18)", maxWidth: 420,
+          animation: "fadeIn 0.2s ease",
+        }}>
+          {toast.type === "success" ? "\u2713 " : "\u2717 "}
+          {toast.message}
+        </div>
+      )}
     </div>
   );
 }

@@ -5,6 +5,7 @@ import { useWorkspace } from "../context/WorkspaceContext";
 import { usePosData } from "../context/PosDataContext";
 import { AppIcon } from "../features/ui/AppIcon";
 import { getNavigationIconName } from "../features/ui/iconMaps";
+import { OnboardingTour } from "./OnboardingTour";
 import "./shell.css";
 
 const NAV_ITEMS = [
@@ -23,6 +24,7 @@ const NAV_ITEMS = [
   { id: "pengguna", label: "Pengguna", to: "/users", icon: "Users", roles: ["admin"] },
   { id: "pengaturan", label: "Pengaturan", to: "/settings", icon: "Settings", roles: ["admin"] },
   { id: "data", label: "Kelola Data", to: "/data", icon: "Database", roles: ["admin"] },
+  { id: "changelog", label: "Changelog", to: "/changelog", icon: "Changelog", roles: ["admin", "manager", "cashier"] },
 ];
 
 const PAGE_TITLES = {
@@ -37,6 +39,7 @@ const PAGE_TITLES = {
   "/settings": "Pengaturan",
   "/users": "Pengguna",
   "/data": "Kelola Data",
+  "/changelog": "Changelog",
 };
 
 function getUserInitial(user) {
@@ -232,6 +235,9 @@ export function AppShell({ children }) {
           {children}
         </div>
       </div>
+
+      {/* Onboarding Tour */}
+      <OnboardingTour />
     </div>
   );
 }

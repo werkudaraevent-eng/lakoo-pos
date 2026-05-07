@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
 import { usePosData } from "../context/PosDataContext";
+import { useAuth } from "../context/AuthContext";
 import { formatCurrency } from "../utils/formatters";
 import "../features/dashboard/dashboard.css";
 
@@ -105,6 +106,10 @@ function EventCard({ event, sales, dimmed }) {
 
 export function EventsPage() {
   const { workspaces, sales } = usePosData();
+  const { user } = useAuth();
+  const workspaceLimit = user?.planLimits?.workspaces;
+  const workspaceCount = (workspaces || []).length;
+  const isWorkspaceFull = workspaceLimit > 0 && workspaceCount >= workspaceLimit;
 
   const events = useMemo(
     () => (workspaces || []).filter((ws) => ws.type === "event"),
@@ -123,14 +128,36 @@ export function EventsPage() {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+      {/* Usage indicator */}
+      {workspaceLimit && workspaceLimit > 0 && (
+        <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 14px", background: workspaceCount >= workspaceLimit ? "var(--danger-soft, #fef2f2)" : "var(--surface)", borderRadius: 8, border: workspaceCount >= workspaceLimit ? "1px solid var(--danger, #b54343)" : "1px solid var(--line)", fontSize: 12.5 }}>
+          <span style={{ fontWeight: 700, color: workspaceCount >= workspaceLimit ? "var(--danger, #b54343)" : "var(--text)" }}>
+            {workspaceCount} / {workspaceLimit}
+          </span>
+          <span style={{ color: "var(--text-soft)" }}>Workspace</span>
+          {workspaceCount >= workspaceLimit && (
+            <span style={{ marginLeft: "auto", fontSize: 11.5, color: "var(--danger, #b54343)", fontWeight: 600 }}>Kuota penuh — upgrade paket untuk menambah</span>
+          )}
+          {workspaceCount < workspaceLimit && (
+            <span style={{ marginLeft: "auto", fontSize: 11, color: "var(--text-muted)" }}>Paket {user?.tenant?.plan || "trial"}</span>
+          )}
+        </div>
+      )}
+
       {/* Header */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <span style={{ fontSize: 14, fontWeight: 600, color: "var(--text-soft)" }}>
           {events.length} event terdaftar
         </span>
-        <Link to="/events/new" className="btn btn-primary">
-          Buat Event Baru
-        </Link>
+        {isWorkspaceFull ? (
+          <button className="btn btn-primary" disabled style={{ opacity: 0.5, cursor: "not-allowed" }}>
+            Buat Event Baru
+          </button>
+        ) : (
+          <Link to="/events/new" className="btn btn-primary">
+            Buat Event Baru
+          </Link>
+        )}
       </div>
 
       {/* Active Events Section */}
@@ -165,9 +192,15 @@ export function EventsPage() {
           <div style={{ fontSize: 13.5, color: "var(--text-soft)", marginBottom: 12 }}>
             Belum ada event. Buat event pertama untuk mulai berjualan di bazar.
           </div>
-          <Link to="/events/new" className="btn btn-primary">
-            Buat Event Baru
-          </Link>
+          {isWorkspaceFull ? (
+            <button className="btn btn-primary" disabled style={{ opacity: 0.5, cursor: "not-allowed" }}>
+              Buat Event Baru
+            </button>
+          ) : (
+            <Link to="/events/new" className="btn btn-primary">
+              Buat Event Baru
+            </Link>
+          )}
         </div>
       )}
     </div>

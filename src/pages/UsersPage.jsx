@@ -78,6 +78,9 @@ export function UsersPage() {
   }
 
   const activeCount = users.filter((u) => u.isActive).length;
+  const userLimit = currentUser?.planLimits?.users;
+  const userCount = users.length;
+  const isUserFull = userLimit > 0 && userCount >= userLimit;
   const isEdit = modal !== null && modal !== "create";
   const editUser = isEdit ? modal : null;
 
@@ -188,12 +191,28 @@ export function UsersPage() {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      {/* Usage indicator */}
+      {userLimit && userLimit > 0 && (
+        <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 14px", background: userCount >= userLimit ? "var(--danger-soft, #fef2f2)" : "var(--surface)", borderRadius: 8, border: userCount >= userLimit ? "1px solid var(--danger, #b54343)" : "1px solid var(--line)", fontSize: 12.5 }}>
+          <span style={{ fontWeight: 700, color: userCount >= userLimit ? "var(--danger, #b54343)" : "var(--text)" }}>
+            {userCount} / {userLimit}
+          </span>
+          <span style={{ color: "var(--text-soft)" }}>Pengguna</span>
+          {userCount >= userLimit && (
+            <span style={{ marginLeft: "auto", fontSize: 11.5, color: "var(--danger, #b54343)", fontWeight: 600 }}>Kuota penuh — upgrade paket untuk menambah</span>
+          )}
+          {userCount < userLimit && (
+            <span style={{ marginLeft: "auto", fontSize: 11, color: "var(--text-muted)" }}>Paket {currentUser?.tenant?.plan || "trial"}</span>
+          )}
+        </div>
+      )}
+
       {/* Header */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <span style={{ fontSize: 14, fontWeight: 600, color: "var(--text-soft)" }}>
           {activeCount} pengguna aktif
         </span>
-        <button className="btn btn-primary" onClick={openCreate}>
+        <button className="btn btn-primary" onClick={openCreate} disabled={isUserFull} style={isUserFull ? { opacity: 0.5, cursor: "not-allowed" } : {}}>
           Tambah Pengguna
         </button>
       </div>
