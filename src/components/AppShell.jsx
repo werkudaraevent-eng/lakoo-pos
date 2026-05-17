@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 
 import { useAuth } from "../context/AuthContext";
@@ -75,6 +75,34 @@ export function AppShell({ children }) {
 
   // Mobile drawer state
   const [drawerOpen, setDrawerOpen] = useState(false);
+
+  // User menu popover state
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const userMenuRef = useRef(null);
+
+  // Close user menu on outside click or escape
+  useEffect(() => {
+    if (!userMenuOpen) return;
+    function onClickOutside(e) {
+      if (userMenuRef.current && !userMenuRef.current.contains(e.target)) {
+        setUserMenuOpen(false);
+      }
+    }
+    function onEscape(e) {
+      if (e.key === "Escape") setUserMenuOpen(false);
+    }
+    document.addEventListener("mousedown", onClickOutside);
+    document.addEventListener("keydown", onEscape);
+    return () => {
+      document.removeEventListener("mousedown", onClickOutside);
+      document.removeEventListener("keydown", onEscape);
+    };
+  }, [userMenuOpen]);
+
+  // Close user menu on route change
+  useEffect(() => {
+    setUserMenuOpen(false);
+  }, [location.pathname]);
 
   // Auto-close drawer on route change
   useEffect(() => {
@@ -260,15 +288,48 @@ export function AppShell({ children }) {
           </nav>
         </div>
 
-        {/* User card */}
-        <div className="shell-sidebar-bottom">
-          <div className="shell-user">
+        {/* User card — clickable to open menu (logout, etc.) */}
+        <div className="shell-sidebar-bottom" ref={userMenuRef}>
+          <button
+            type="button"
+            className={`shell-user-button${userMenuOpen ? " open" : ""}`}
+            onClick={() => setUserMenuOpen((v) => !v)}
+            aria-label="Buka menu akun"
+            aria-expanded={userMenuOpen}
+          >
             <div className="shell-user-avatar">{getUserInitial(user)}</div>
             <div className="shell-user-info">
               <span className="shell-user-name">{user?.name || user?.username}</span>
               <span className="shell-user-role">{user?.role}</span>
             </div>
-          </div>
+            <svg className="shell-user-chevron" width={14} height={14} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" aria-hidden="true">
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+          </button>
+
+          {/* Popover menu */}
+          {userMenuOpen && (
+            <div className="shell-user-menu" role="menu">
+              <div className="shell-user-menu-info">
+                <div className="shell-user-menu-name">{user?.name || user?.username}</div>
+                <div className="shell-user-menu-email">{user?.email || user?.username}</div>
+              </div>
+              <button
+                type="button"
+                className="shell-user-menu-item shell-user-menu-logout"
+                onClick={() => { setUserMenuOpen(false); logout(); }}
+                role="menuitem"
+              >
+                <svg width={15} height={15} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                  <polyline points="16 17 21 12 16 7" />
+                  <line x1="21" y1="12" x2="9" y2="12" />
+                </svg>
+                <span>Keluar</span>
+              </button>
+            </div>
+          )}
+
           <div className="shell-powered-by">Powered by <strong>Lakoo.</strong></div>
         </div>
       </aside>
@@ -296,9 +357,6 @@ export function AppShell({ children }) {
             ) : null}
             <div className="shell-topbar-spacer" />
             <div className="shell-topbar-date">{formatDate()}</div>
-            <button className="shell-topbar-logout" onClick={logout} type="button">
-              Keluar
-            </button>
           </div>
         ) : null}
 

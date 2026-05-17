@@ -214,17 +214,35 @@
 
 /* Sidebar bottom */
 .shell-sidebar-bottom {
+  position: relative;
   padding: 16px;
   border-top: 1px solid rgba(255, 255, 255, 0.06);
   flex-shrink: 0;
 }
 
-.shell-user {
+/* User button (clickable user card that opens menu) */
+.shell-user-button {
   display: flex;
   align-items: center;
   gap: 10px;
+  width: 100%;
   padding: 8px 10px;
+  border: 1px solid transparent;
   border-radius: var(--radius-sm);
+  background: transparent;
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+.shell-user-button:hover,
+.shell-user-button.open {
+  background: var(--sidebar-hover);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+.shell-user-button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .shell-user-avatar {
@@ -244,6 +262,8 @@
 .shell-user-info {
   display: flex;
   flex-direction: column;
+  flex: 1;
+  min-width: 0;
 }
 
 .shell-user-name {
@@ -251,12 +271,97 @@
   font-weight: 600;
   color: var(--sidebar-text);
   line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .shell-user-role {
   font-size: 11px;
   color: var(--sidebar-muted);
   text-transform: capitalize;
+}
+
+.shell-user-chevron {
+  color: var(--sidebar-muted);
+  flex-shrink: 0;
+  transition: transform 0.2s ease, color 0.15s ease;
+}
+.shell-user-button:hover .shell-user-chevron,
+.shell-user-button.open .shell-user-chevron {
+  color: var(--sidebar-text);
+}
+.shell-user-button.open .shell-user-chevron {
+  transform: rotate(180deg);
+}
+
+/* User menu popover (anchored above the user button) */
+.shell-user-menu {
+  position: absolute;
+  bottom: calc(100% - 4px);
+  left: 16px;
+  right: 16px;
+  background: #fff;
+  color: var(--text);
+  border-radius: 10px;
+  padding: 6px;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.18), 0 0 0 1px rgba(0, 0, 0, 0.06);
+  z-index: 50;
+  animation: shell-user-menu-in 0.15s ease;
+}
+
+@keyframes shell-user-menu-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.shell-user-menu-info {
+  padding: 10px 12px 12px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 4px;
+}
+
+.shell-user-menu-name {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.3;
+}
+
+.shell-user-menu-email {
+  font-size: 11.5px;
+  color: var(--text-soft);
+  margin-top: 2px;
+  word-break: break-all;
+}
+
+.shell-user-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 12px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+  transition: background-color 0.12s ease, color 0.12s ease;
+}
+.shell-user-menu-item:hover {
+  background: var(--surface);
+}
+
+.shell-user-menu-logout {
+  color: var(--danger, #b54343);
+}
+.shell-user-menu-logout:hover {
+  background: rgba(181, 67, 67, 0.08);
+  color: var(--danger, #b54343);
 }
 
 /* ── Main area ── */
@@ -541,10 +646,21 @@ tr:hover td {
   .shell-brand-switcher-chevron,
   .shell-nav-section,
   .shell-nav-item span:not(.shell-nav-icon),
-  .shell-user-name,
-  .shell-user-role,
+  .shell-user-info,
+  .shell-user-chevron,
   .shell-powered-by {
     display: none;
+  }
+
+  .shell-user-button {
+    justify-content: center;
+    padding: 8px;
+  }
+
+  .shell-user-menu {
+    left: 8px;
+    right: auto;
+    width: 220px;
   }
 
   .shell-brand-switcher {
