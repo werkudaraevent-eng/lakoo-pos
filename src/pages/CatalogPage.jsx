@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import * as XLSX from "xlsx";
 
 import { usePosData } from "../context/PosDataContext";
 import { useWorkspace } from "../context/WorkspaceContext";
 import { useAuth } from "../context/AuthContext";
 import { useUpgradeConfig } from "../hooks/useUpgradeConfig";
 import { formatCurrency } from "../utils/formatters";
+import { cloudinaryThumbSmall } from "../utils/image";
 import "../features/dashboard/dashboard.css";
 
 function CategoryRow({ category, onRename, onDelete }) {
@@ -70,7 +70,8 @@ export function CatalogPage() {
 
   const XLSX_HEADERS = ["Nama Produk", "Kategori", "Harga Dasar", "SKU", "Atribut 1", "Atribut 2", "Stok", "Harga Override", "Status"];
 
-  function handleExportXlsx() {
+  async function handleExportXlsx() {
+    const XLSX = await import("xlsx");
     const rows = [];
     for (const product of (products || [])) {
       for (const variant of (product.variants || [])) {
@@ -102,7 +103,8 @@ export function CatalogPage() {
     XLSX.writeFile(wb, `katalog-${new Date().toISOString().slice(0, 10)}.xlsx`);
   }
 
-  function handleDownloadTemplate() {
+  async function handleDownloadTemplate() {
+    const XLSX = await import("xlsx");
     const templateRows = [
       { "Nama Produk": "Contoh Produk A", "Kategori": "Atasan", "Harga Dasar": 150000, "SKU": "PRD-A-S", "Atribut 1": "S", "Atribut 2": "Hitam", "Stok": 10, "Harga Override": "", "Status": "active" },
       { "Nama Produk": "Contoh Produk A", "Kategori": "Atasan", "Harga Dasar": 150000, "SKU": "PRD-A-M", "Atribut 1": "M", "Atribut 2": "Hitam", "Stok": 15, "Harga Override": "", "Status": "active" },
@@ -121,7 +123,8 @@ export function CatalogPage() {
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = (ev) => {
+    reader.onload = async (ev) => {
+      const XLSX = await import("xlsx");
       const data = new Uint8Array(ev.target.result);
       const workbook = XLSX.read(data, { type: "array" });
       const sheet = workbook.Sheets[workbook.SheetNames[0]];
@@ -383,7 +386,7 @@ export function CatalogPage() {
                 overflow: "hidden",
               }}>
                 {p.imageUrl ? (
-                  <img src={p.imageUrl} alt={p.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                  <img src={cloudinaryThumbSmall(p.imageUrl)} alt={p.name} loading="lazy" decoding="async" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                 ) : (
                   <span style={{ fontSize: 10, color: "var(--text-muted)", fontFamily: "monospace" }}>{p.category || "produk"}</span>
                 )}

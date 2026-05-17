@@ -1,5 +1,15 @@
 [
   {
+    "version": "0.6.1",
+    "date": "2026-05-17",
+    "title": "Performa Lebih Cepat & Keamanan Lebih Kuat",
+    "entries": [
+      { "type": "improvement", "text": "Halaman terbuka 3-4x lebih cepat berkat pemecahan kode dan lazy loading" },
+      { "type": "improvement", "text": "Gambar produk otomatis di-resize agar hemat data dan tampil lebih cepat di HP" },
+      { "type": "improvement", "text": "Aksi sensitif platform admin (suspend tenant, reset password) sekarang tercatat penuh di riwayat aktivitas" }
+    ]
+  },
+  {
     "version": "0.6.0",
     "date": "2026-05-17",
     "title": "Upgrade Paket & Filter Laporan yang Lebih Lengkap",

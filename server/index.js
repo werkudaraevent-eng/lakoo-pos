@@ -7,7 +7,7 @@ import { pathToFileURL } from "node:url";
 import { requireAuth, requireRole, signJwt } from "./auth.js";
 
 // ── In-memory rate limiter (no external dependency) ──────────────
-function createRateLimiter({ windowMs = 15 * 60 * 1000, max = 100 } = {}) {
+function createRateLimiter({ windowMs = 15 * 60 * 1000, max = 100, keyFn = null } = {}) {
   const hits = new Map();
 
   // Cleanup old entries periodically
@@ -20,7 +20,8 @@ function createRateLimiter({ windowMs = 15 * 60 * 1000, max = 100 } = {}) {
   if (cleanup.unref) cleanup.unref(); // Don't keep process alive for cleanup
 
   return (req, res, next) => {
-    const key = req.ip || req.connection?.remoteAddress || "unknown";
+    const baseKey = req.ip || req.connection?.remoteAddress || "unknown";
+    const key = keyFn ? keyFn(req, baseKey) : baseKey;
     const now = Date.now();
     const record = hits.get(key);
 
@@ -51,7 +52,13 @@ function validatePassword(password) {
 }
 
 // ── Rate limiters ────────────────────────────────────────────────
-const loginLimiter = createRateLimiter({ windowMs: 15 * 60 * 1000, max: 10 });
+// Login: per IP+username so attacker brute-forcing one user doesn't lock out others
+const loginLimiter = createRateLimiter({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  keyFn: (req, ip) => `login:${ip}:${(req.body?.username || req.body?.email || "").toLowerCase()}`,
+});
+// Register: per IP only (no specific account yet)
 const registerLimiter = createRateLimiter({ windowMs: 60 * 60 * 1000, max: 5 });
 const apiLimiter = createRateLimiter({ windowMs: 1 * 60 * 1000, max: 120 });
 
@@ -205,6 +212,10 @@ export function createApp({
 } = {}) {
   const app = express();
   const auth = authMiddleware ?? requireAuthFn(getUserByIdFn, getTenantByIdFn, checkTenantStatusFn);
+
+  // Trust proxy (Railway/Vercel/CloudFlare) — required for accurate req.ip in rate limiters
+  // Adjust the number to match the number of proxy hops (1 = single trusted proxy)
+  app.set("trust proxy", 1);
 
   // Higher limit for image upload endpoint (must be before the general limit)
   app.use("/api/upload", express.json({ limit: "10mb" }));
@@ -1103,12 +1114,38 @@ export function createApp({
     auth,
     requirePlatformAdmin,
     asyncHandler(async (req, res) => {
+      // Capture before-state for audit diff
+      const before = await getTenantByIdFn(req.params.id);
+
       const result = await updateTenantRecord(req.params.id, req.body);
       if (!result.ok) {
         res.status(400).json(result);
         return;
       }
       const detail = await getTenantDetailFn(req.params.id);
+
+      // Audit log: which platform admin changed what on which tenant
+      try {
+        const changes = {};
+        if (before) {
+          for (const key of Object.keys(req.body || {})) {
+            if (before[key] !== req.body[key]) {
+              changes[key] = { from: before[key] ?? null, to: req.body[key] ?? null };
+            }
+          }
+        }
+        await createAuditLogFn({
+          tenantId: req.params.id,
+          userId: req.auth.user.id,
+          userName: `platform:${req.auth.user.email || req.auth.user.username || req.auth.user.id}`,
+          action: "platform.tenant_update",
+          entityType: "tenant",
+          entityId: req.params.id,
+          details: { changes, name: before?.name },
+          ipAddress: req.ip,
+        });
+      } catch (err) { console.error("Audit log failed (platform.tenant_update):", err.message); }
+
       res.json({ ok: true, ...detail });
     })
   );
@@ -1173,6 +1210,24 @@ export function createApp({
         return;
       }
       const detail = await getTenantDetailFn(req.params.tenantId);
+
+      // Audit log: redact password value, just record that fields were changed
+      try {
+        const changedFields = Object.keys(req.body || {})
+          .filter((k) => k !== "password")
+          .concat(req.body?.password ? ["password (reset)"] : []);
+        await createAuditLogFn({
+          tenantId: req.params.tenantId,
+          userId: req.auth.user.id,
+          userName: `platform:${req.auth.user.email || req.auth.user.username || req.auth.user.id}`,
+          action: "platform.user_update",
+          entityType: "user",
+          entityId: req.params.userId,
+          details: { fields: changedFields.join(", ") || "none" },
+          ipAddress: req.ip,
+        });
+      } catch (err) { console.error("Audit log failed (platform.user_update):", err.message); }
+
       res.json({ ok: true, ...detail });
     })
   );
@@ -1187,13 +1242,34 @@ export function createApp({
         res.status(404).json({ ok: false, message: "Admin user tidak ditemukan untuk tenant ini." });
         return;
       }
-      // Issue a token as if this admin user logged in
+      // Issue a token marked as impersonation, with shorter TTL (30 min) and impersonated_by claim
       const token = signJwtFn({
         sub: adminUser.id,
         role: adminUser.role,
         username: adminUser.username,
         tenantId: adminUser.tenantId,
-      });
+        impersonated_by: req.auth.user.id,
+        impersonated_by_email: req.auth.user.email || req.auth.user.username,
+      }, 30 * 60);
+
+      // Audit log: who impersonated whom into which tenant
+      try {
+        await createAuditLogFn({
+          tenantId: req.params.tenantId,
+          userId: req.auth.user.id,
+          userName: `platform:${req.auth.user.email || req.auth.user.username || req.auth.user.id}`,
+          action: "platform.login_as",
+          entityType: "tenant",
+          entityId: req.params.tenantId,
+          details: {
+            targetUserId: adminUser.id,
+            targetUsername: adminUser.username,
+            tenantId: req.params.tenantId,
+          },
+          ipAddress: req.ip,
+        });
+      } catch (err) { console.error("Audit log failed (platform.login_as):", err.message); }
+
       res.json({ ok: true, token, user: adminUser });
     })
   );

@@ -3,6 +3,7 @@ import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import { usePosData } from "../context/PosDataContext";
 import { formatCurrency } from "../utils/formatters";
+import { cloudinaryThumbSmall } from "../utils/image";
 import { ConfirmModal } from "../components/ConfirmModal";
 import "../features/checkout/checkout.css";
 import "../features/dashboard/dashboard.css";
@@ -272,7 +273,7 @@ export function CheckoutPage() {
               <div key={p.id} className={`product-card${stock === 0 ? " out-of-stock" : ""}`} onClick={() => openProduct(p)}>
                 <div className="product-thumb">
                   {p.imageUrl ? (
-                    <img src={p.imageUrl} alt={p.name} style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: 7 }} />
+                    <img src={cloudinaryThumbSmall(p.imageUrl)} alt={p.name} loading="lazy" decoding="async" style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: 7 }} />
                   ) : (
                     <span style={{ fontSize: 20, fontWeight: 800, color: "var(--text-muted)" }}>{p.name.charAt(0)}</span>
                   )}

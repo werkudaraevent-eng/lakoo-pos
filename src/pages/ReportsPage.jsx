@@ -1,5 +1,4 @@
 import { useMemo, useRef, useState } from "react";
-import * as XLSX from "xlsx";
 
 import { usePosData } from "../context/PosDataContext";
 import { formatCurrency } from "../utils/formatters";
@@ -160,7 +159,8 @@ export function ReportsPage() {
     }
   }
 
-  function handleExportExcel() {
+  async function handleExportExcel() {
+    const XLSX = await import("xlsx");
     const rows = filteredSales.map((s) => ({
       Tanggal: new Date(s.createdAt).toLocaleString("id-ID", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }),
       "No. Struk": s.receiptNumber || "-",
