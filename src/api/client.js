@@ -1,5 +1,7 @@
-let authToken = "";
-let platformToken = "";
+// Initialize from localStorage immediately at module load to avoid a race
+// condition where components fetch before AuthContext has set the token.
+let authToken = (typeof window !== "undefined" && window.localStorage?.getItem("pos-token")) || "";
+let platformToken = (typeof window !== "undefined" && window.localStorage?.getItem("platform-token")) || "";
 
 function buildHeaders() {
   const headers = {};
