@@ -81,6 +81,12 @@ function verifyPassword(password, storedHash) {
   return crypto.timingSafeEqual(Buffer.from(derived.toString("hex")), Buffer.from(hash));
 }
 
+// Returns true if the stored hash is a legacy unsalted SHA256 hash that
+// should be transparently upgraded to scrypt on the next successful login.
+function isLegacyPasswordHash(storedHash) {
+  return Boolean(storedHash && storedHash.length === 64 && !storedHash.includes(":"));
+}
+
 function createId(prefix) {
   return `${prefix}-${crypto.randomUUID()}`;
 }
@@ -302,29 +308,64 @@ async function fetchWorkspaces(executor, tenantId) {
   return mapWorkspaceRows(rows);
 }
 
-async function fetchSales(executor, { workspaceId, fallbackWorkspaceId, tenantId }) {
-  const salesRows = await executor`
-    SELECT
-      s.id,
-      s.workspace_id AS "workspaceId",
-      s.receipt_number AS "receiptNumber",
-      s.cashier_user_id AS "cashierUserId",
-      u.name AS "cashierUser",
-      s.subtotal,
-      s.discount_total AS "discountTotal",
-      COALESCE(s.tax_total, 0) AS "taxTotal",
-      s.grand_total AS "grandTotal",
-      s.payment_method AS "paymentMethod",
-      s.paid_amount AS "paidAmount",
-      s.created_at AS "createdAt"
-    FROM sales s
-    JOIN users u ON u.id = s.cashier_user_id
-    WHERE s.tenant_id = ${tenantId} AND s.deleted_at IS NULL
-    ORDER BY s.created_at DESC
-  `;
-  const filteredSales = filterRowsByWorkspace(salesRows, { workspaceId, fallbackWorkspaceId });
-  const saleIds = new Set(filteredSales.map((sale) => sale.id));
-  const items = (await executor`
+async function fetchSales(executor, { workspaceId, fallbackWorkspaceId, tenantId, limit = 200 }) {
+  // Resolve effective workspace filter:
+  // - if workspaceId given, use it (admin/manager scoped to a workspace)
+  // - else fall back (e.g. system-wide for some admin queries — fallbackWorkspaceId may be null)
+  const effectiveWorkspaceId = workspaceId || fallbackWorkspaceId || null;
+
+  const salesRows = effectiveWorkspaceId
+    ? await executor`
+        SELECT
+          s.id,
+          s.workspace_id AS "workspaceId",
+          s.receipt_number AS "receiptNumber",
+          s.cashier_user_id AS "cashierUserId",
+          u.name AS "cashierUser",
+          s.subtotal,
+          s.discount_total AS "discountTotal",
+          COALESCE(s.tax_total, 0) AS "taxTotal",
+          s.grand_total AS "grandTotal",
+          s.payment_method AS "paymentMethod",
+          s.paid_amount AS "paidAmount",
+          s.created_at AS "createdAt"
+        FROM sales s
+        JOIN users u ON u.id = s.cashier_user_id
+        WHERE s.tenant_id = ${tenantId}
+          AND s.workspace_id = ${effectiveWorkspaceId}
+          AND s.deleted_at IS NULL
+        ORDER BY s.created_at DESC
+        LIMIT ${limit}
+      `
+    : await executor`
+        SELECT
+          s.id,
+          s.workspace_id AS "workspaceId",
+          s.receipt_number AS "receiptNumber",
+          s.cashier_user_id AS "cashierUserId",
+          u.name AS "cashierUser",
+          s.subtotal,
+          s.discount_total AS "discountTotal",
+          COALESCE(s.tax_total, 0) AS "taxTotal",
+          s.grand_total AS "grandTotal",
+          s.payment_method AS "paymentMethod",
+          s.paid_amount AS "paidAmount",
+          s.created_at AS "createdAt"
+        FROM sales s
+        JOIN users u ON u.id = s.cashier_user_id
+        WHERE s.tenant_id = ${tenantId} AND s.deleted_at IS NULL
+        ORDER BY s.created_at DESC
+        LIMIT ${limit}
+      `;
+
+  if (salesRows.length === 0) {
+    return [];
+  }
+
+  const saleIds = salesRows.map((sale) => sale.id);
+
+  // Batch fetch only the items for these specific sales
+  const items = await executor`
     SELECT
       id,
       sale_id AS "saleId",
@@ -337,50 +378,75 @@ async function fetchSales(executor, { workspaceId, fallbackWorkspaceId, tenantId
       qty,
       line_total AS "lineTotal"
     FROM sale_items
-    WHERE tenant_id = ${tenantId}
+    WHERE tenant_id = ${tenantId} AND sale_id = ANY(${saleIds})
     ORDER BY id ASC
-  `).filter((item) => saleIds.has(item.saleId));
-  const saleIdArray = [...saleIds];
-  const promotions = saleIdArray.length > 0
-    ? await executor`
-        SELECT
-          sale_id AS "saleId",
-          promotion_id AS "promotionId",
-          code_snapshot AS "codeSnapshot",
-          discount_amount AS "discountAmount"
-        FROM sale_promotion_usages
-        WHERE sale_id = ANY(${saleIdArray})
-      `
-    : [];
-
-  return mapSales(filteredSales, items, promotions);
-}
-
-async function fetchInventoryMovements(executor, { workspaceId, fallbackWorkspaceId, tenantId }) {
-  const rows = await executor`
-    SELECT
-      m.id,
-      m.workspace_id AS "workspaceId",
-      m.variant_id AS "variantId",
-      pv.sku,
-      p.name AS "productName",
-      pv.attribute1_value AS "attribute1Value",
-      pv.attribute2_value AS "attribute2Value",
-      m.type,
-      m.qty_delta AS "qtyDelta",
-      m.note,
-      u.name AS "actorUser",
-      m.reference_id AS "referenceId",
-      m.created_at AS "createdAt"
-    FROM inventory_movements m
-    JOIN product_variants pv ON pv.id = m.variant_id
-    JOIN products p ON p.id = pv.product_id
-    JOIN users u ON u.id = m.actor_user_id
-    WHERE m.tenant_id = ${tenantId}
-    ORDER BY m.created_at DESC
   `;
 
-  return filterRowsByWorkspace(rows, { workspaceId, fallbackWorkspaceId });
+  const promotions = await executor`
+    SELECT
+      sale_id AS "saleId",
+      promotion_id AS "promotionId",
+      code_snapshot AS "codeSnapshot",
+      discount_amount AS "discountAmount"
+    FROM sale_promotion_usages
+    WHERE sale_id = ANY(${saleIds})
+  `;
+
+  return mapSales(salesRows, items, promotions);
+}
+
+async function fetchInventoryMovements(executor, { workspaceId, fallbackWorkspaceId, tenantId, limit = 300 }) {
+  const effectiveWorkspaceId = workspaceId || fallbackWorkspaceId || null;
+
+  return effectiveWorkspaceId
+    ? await executor`
+        SELECT
+          m.id,
+          m.workspace_id AS "workspaceId",
+          m.variant_id AS "variantId",
+          pv.sku,
+          p.name AS "productName",
+          pv.attribute1_value AS "attribute1Value",
+          pv.attribute2_value AS "attribute2Value",
+          m.type,
+          m.qty_delta AS "qtyDelta",
+          m.note,
+          u.name AS "actorUser",
+          m.reference_id AS "referenceId",
+          m.created_at AS "createdAt"
+        FROM inventory_movements m
+        JOIN product_variants pv ON pv.id = m.variant_id
+        JOIN products p ON p.id = pv.product_id
+        JOIN users u ON u.id = m.actor_user_id
+        WHERE m.tenant_id = ${tenantId}
+          AND m.workspace_id = ${effectiveWorkspaceId}
+        ORDER BY m.created_at DESC
+        LIMIT ${limit}
+      `
+    : await executor`
+        SELECT
+          m.id,
+          m.workspace_id AS "workspaceId",
+          m.variant_id AS "variantId",
+          pv.sku,
+          p.name AS "productName",
+          pv.attribute1_value AS "attribute1Value",
+          pv.attribute2_value AS "attribute2Value",
+          m.type,
+          m.qty_delta AS "qtyDelta",
+          m.note,
+          u.name AS "actorUser",
+          m.reference_id AS "referenceId",
+          m.created_at AS "createdAt"
+        FROM inventory_movements m
+        JOIN product_variants pv ON pv.id = m.variant_id
+        JOIN products p ON p.id = pv.product_id
+        JOIN users u ON u.id = m.actor_user_id
+        WHERE m.tenant_id = ${tenantId}
+        ORDER BY m.created_at DESC
+        LIMIT ${limit}
+      `;
+}
 }
 
 async function resolveWriteWorkspaceId(executor, workspaceId, tenantId) {
@@ -520,6 +586,21 @@ export async function authenticateUser(username, password, tenantSlug) {
 
   if (!user || !user.isActive || !verifyPassword(password, user.passwordHash)) {
     return null;
+  }
+
+  // Transparent migration: rehash legacy SHA256 (unsalted) passwords to
+  // scrypt now that we know the plaintext password is correct. Best-effort —
+  // a failure here must NOT block login.
+  if (isLegacyPasswordHash(user.passwordHash)) {
+    try {
+      const newHash = hashPassword(password);
+      await executor`
+        UPDATE users SET password_hash = ${newHash}
+        WHERE id = ${user.id} AND password_hash = ${user.passwordHash}
+      `;
+    } catch (err) {
+      console.error("Password rehash failed for user", user.id, err.message);
+    }
   }
 
   // Load tenant info

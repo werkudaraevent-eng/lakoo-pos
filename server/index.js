@@ -2,6 +2,7 @@ import "dotenv/config";
 
 import crypto from "node:crypto";
 import express from "express";
+import helmet from "helmet";
 import { pathToFileURL } from "node:url";
 
 import { requireAuth, requireRole, signJwt } from "./auth.js";
@@ -221,12 +222,49 @@ export function createApp({
   app.use("/api/upload", express.json({ limit: "10mb" }));
   app.use(express.json({ limit: "1mb" }));
 
-  // ── Security headers ────────────────────────────────────────────
+  // ── Security headers (Helmet) ───────────────────────────────────
+  // Helmet sets a sensible default of security-related headers, including
+  // X-Content-Type-Options, X-Frame-Options, Referrer-Policy, and HSTS.
+  app.use(helmet({
+    // Strict-Transport-Security: only meaningful over HTTPS, but harmless on
+    // localhost since browsers ignore HSTS for non-HTTPS origins.
+    hsts: {
+      maxAge: 60 * 60 * 24 * 365, // 1 year
+      includeSubDomains: true,
+      preload: false,
+    },
+    // CSP: restrict where scripts/styles/images may load from. We allow
+    // self for the app + Cloudinary for product images. Adjust if you add
+    // more third-party origins (e.g. analytics, tag managers).
+    contentSecurityPolicy: {
+      useDefaults: true,
+      directives: {
+        "default-src": ["'self'"],
+        "script-src": ["'self'"],
+        // Vite/Tailwind injects styles at build; allow inline styles which
+        // are heavily used in this codebase. (Trade-off: slightly weaker XSS
+        // defense in style context. App is JWT-Bearer-only, no cookies, so
+        // CSRF is not at risk; logged-in user XSS still mostly mitigated by
+        // strict script-src.)
+        "style-src": ["'self'", "'unsafe-inline'"],
+        "img-src": ["'self'", "data:", "https://res.cloudinary.com"],
+        "font-src": ["'self'", "data:"],
+        "connect-src": ["'self'", "https://lakoo-pos-production.up.railway.app", "https://api.cloudinary.com"],
+        "frame-ancestors": ["'none'"],
+        "base-uri": ["'self'"],
+        "form-action": ["'self'"],
+        "object-src": ["'none'"],
+        "upgrade-insecure-requests": [],
+      },
+    },
+    // X-Frame-Options is already covered by frame-ancestors above; keep
+    // header for older browsers via Helmet default.
+    crossOriginEmbedderPolicy: false, // we serve images from Cloudinary
+    crossOriginResourcePolicy: { policy: "cross-origin" },
+  }));
+
+  // Permissions-Policy (Helmet doesn't set this by default in v8+)
   app.use((req, res, next) => {
-    res.setHeader("X-Content-Type-Options", "nosniff");
-    res.setHeader("X-Frame-Options", "DENY");
-    res.setHeader("X-XSS-Protection", "1; mode=block");
-    res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
     res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
     next();
   });

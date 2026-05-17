@@ -71,7 +71,7 @@ export function CatalogPage() {
   const XLSX_HEADERS = ["Nama Produk", "Kategori", "Harga Dasar", "SKU", "Atribut 1", "Atribut 2", "Stok", "Harga Override", "Status"];
 
   async function handleExportXlsx() {
-    const XLSX = await import("xlsx");
+    const XLSX = await import("@e965/xlsx");
     const rows = [];
     for (const product of (products || [])) {
       for (const variant of (product.variants || [])) {
@@ -104,7 +104,7 @@ export function CatalogPage() {
   }
 
   async function handleDownloadTemplate() {
-    const XLSX = await import("xlsx");
+    const XLSX = await import("@e965/xlsx");
     const templateRows = [
       { "Nama Produk": "Contoh Produk A", "Kategori": "Atasan", "Harga Dasar": 150000, "SKU": "PRD-A-S", "Atribut 1": "S", "Atribut 2": "Hitam", "Stok": 10, "Harga Override": "", "Status": "active" },
       { "Nama Produk": "Contoh Produk A", "Kategori": "Atasan", "Harga Dasar": 150000, "SKU": "PRD-A-M", "Atribut 1": "M", "Atribut 2": "Hitam", "Stok": 15, "Harga Override": "", "Status": "active" },
@@ -124,7 +124,7 @@ export function CatalogPage() {
 
     const reader = new FileReader();
     reader.onload = async (ev) => {
-      const XLSX = await import("xlsx");
+      const XLSX = await import("@e965/xlsx");
       const data = new Uint8Array(ev.target.result);
       const workbook = XLSX.read(data, { type: "array" });
       const sheet = workbook.Sheets[workbook.SheetNames[0]];

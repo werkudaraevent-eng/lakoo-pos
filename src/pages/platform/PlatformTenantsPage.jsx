@@ -223,7 +223,7 @@ export function PlatformTenantsPage() {
               </div>
               <div style={{ marginBottom: 20 }}>
                 <label style={{ display: "block", fontSize: 12.5, fontWeight: 700, color: "var(--text-soft)", marginBottom: 6 }}>Password Admin *</label>
-                <input className="input" type="password" required value={createForm.password} onChange={(e) => setCreateForm(f => ({ ...f, password: e.target.value }))} placeholder="Min. 6 karakter" />
+                <input className="input" type="password" required value={createForm.password} onChange={(e) => setCreateForm(f => ({ ...f, password: e.target.value }))} placeholder="Min. 8 karakter" />
               </div>
               <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
                 <button type="button" className="btn btn-secondary" onClick={() => setShowCreate(false)}>Batal</button>

@@ -26,8 +26,8 @@ export default defineConfig({
           "vendor-react": ["react", "react-dom", "react-router-dom"],
           // Heavy export libs — only loaded on Reports page export action
           "vendor-pdf": ["jspdf", "html2canvas"],
-          // xlsx is huge (~430 KB) — split so it lazy-loads on demand
-          "vendor-xlsx": ["xlsx"],
+          // xlsx is huge — split so it lazy-loads on demand
+          "vendor-xlsx": ["@e965/xlsx"],
           // Icons library — used everywhere but tree-shaken
           "vendor-icons": ["lucide-react"],
         },

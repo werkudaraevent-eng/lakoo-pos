@@ -1,5 +1,17 @@
 [
   {
+    "version": "0.6.2",
+    "date": "2026-05-17",
+    "title": "Keamanan Diperkuat & Halaman Lebih Cepat di Toko Besar",
+    "entries": [
+      { "type": "improvement", "text": "Keamanan platform diperkuat dengan kebijakan akses data per-toko dan header keamanan modern" },
+      { "type": "improvement", "text": "Halaman jadi lebih cepat dibuka untuk toko dengan banyak transaksi (>5000)" },
+      { "type": "improvement", "text": "Tombol Keluar dipindah ke menu profil di bawah \u2014 lebih rapi dan mengikuti standar aplikasi modern" },
+      { "type": "fix", "text": "Halaman tidak lagi menampilkan 'Gagal Memuat' sekejap saat di-refresh" },
+      { "type": "fix", "text": "Panduan tour pengguna baru sekarang menyorot menu yang tepat di setiap langkah" }
+    ]
+  },
+  {
     "version": "0.6.1",
     "date": "2026-05-17",
     "title": "Performa Lebih Cepat & Keamanan Lebih Kuat",

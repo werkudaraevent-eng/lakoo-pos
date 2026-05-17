@@ -160,7 +160,7 @@ export function ReportsPage() {
   }
 
   async function handleExportExcel() {
-    const XLSX = await import("xlsx");
+    const XLSX = await import("@e965/xlsx");
     const rows = filteredSales.map((s) => ({
       Tanggal: new Date(s.createdAt).toLocaleString("id-ID", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }),
       "No. Struk": s.receiptNumber || "-",

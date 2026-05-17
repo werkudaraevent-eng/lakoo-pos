@@ -35,8 +35,8 @@ export function RegisterPage() {
       setError("Nama bisnis, email, dan password wajib diisi.");
       return;
     }
-    if (form.password.length < 6) {
-      setError("Password minimal 6 karakter.");
+    if (form.password.length < 8) {
+      setError("Password minimal 8 karakter.");
       return;
     }
 
@@ -170,7 +170,7 @@ export function RegisterPage() {
                         type={showPass ? "text" : "password"}
                         value={form.password}
                         onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
-                        placeholder="Min. 6 karakter"
+                        placeholder="Min. 8 karakter"
                       />
                       <button
                         type="button"
