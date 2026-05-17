@@ -115,11 +115,6 @@ export function LoginPage() {
           </form>
         </div>
 
-        {/* Demo hint */}
-        <div className="login-demo-hint">
-          Demo: <code>admin</code> / <code>admin123</code>
-        </div>
-
         <p className="login-register-link">
           Belum punya akun? <a href="/register">Daftar gratis</a>
         </p>
