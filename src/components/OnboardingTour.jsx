@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 
 const TOUR_STEPS = [
   {
@@ -8,25 +8,25 @@ const TOUR_STEPS = [
     position: "right",
   },
   {
-    target: '[href="/catalog"]',
+    target: '.shell-nav a[href="/catalog"]',
     title: "Katalog Produk",
     description: "Mulai dengan menambahkan produk pertama Anda di sini. Anda bisa tambah manual atau import dari file Excel.",
     position: "right",
   },
   {
-    target: '[href="/checkout"]',
+    target: '.shell-nav a[href="/checkout"]',
     title: "Kasir / POS",
     description: "Setelah produk ditambahkan, gunakan Kasir untuk membuat transaksi penjualan.",
     position: "right",
   },
   {
-    target: '[href="/reports"]',
+    target: '.shell-nav a[href="/reports"]',
     title: "Laporan & Analitik",
     description: "Pantau performa bisnis Anda di sini — pendapatan, produk terlaris, dan metode pembayaran.",
     position: "right",
   },
   {
-    target: '[href="/settings"]',
+    target: '.shell-nav a[href="/settings"]',
     title: "Pengaturan",
     description: "Atur nama toko, metode pembayaran, pajak, dan preferensi struk di halaman Pengaturan.",
     position: "right",
@@ -34,43 +34,51 @@ const TOUR_STEPS = [
 ];
 
 const STORAGE_KEY = "lakoo-onboarding-completed";
+const TT_WIDTH = 320;
+const TT_HEIGHT = 200;
+const MARGIN = 12;
 
 export function OnboardingTour() {
   const [active, setActive] = useState(false);
   const [step, setStep] = useState(0);
   const [tooltipStyle, setTooltipStyle] = useState({});
+  const [highlightRect, setHighlightRect] = useState(null);
+  const measureTimerRef = useRef(null);
 
+  // Show tour on first visit
   useEffect(() => {
     const completed = localStorage.getItem(STORAGE_KEY);
     if (!completed) {
-      // Delay to let the page render
       const timer = setTimeout(() => setActive(true), 1000);
       return () => clearTimeout(timer);
     }
   }, []);
 
-  const positionTooltip = useCallback(() => {
+  // Compute positions — runs whenever step or active changes, plus on resize/scroll
+  const measure = useCallback(() => {
     if (!active) return;
     const currentStep = TOUR_STEPS[step];
     const el = document.querySelector(currentStep.target);
     if (!el) {
-      // If element not found, skip to next or end
-      if (step < TOUR_STEPS.length - 1) setStep(step + 1);
-      else handleFinish();
+      // Skip step if element missing (e.g., user role doesn't have access)
+      if (step < TOUR_STEPS.length - 1) {
+        setStep((s) => s + 1);
+      } else {
+        finishTour();
+      }
       return;
     }
 
-    // Scroll target element into view if needed (smooth)
-    el.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
-
     const rect = el.getBoundingClientRect();
+    setHighlightRect({
+      top: rect.top,
+      left: rect.left,
+      width: rect.width,
+      height: rect.height,
+    });
+
+    // Calculate tooltip position
     const pos = currentStep.position || "right";
-
-    // Estimated tooltip dimensions (matches CSS below)
-    const TT_WIDTH = 320;
-    const TT_HEIGHT = 200;
-    const MARGIN = 12;
-
     let style = {};
     if (pos === "right") {
       style = {
@@ -89,85 +97,85 @@ export function OnboardingTour() {
       };
     }
 
-    // Clamp horizontally within viewport
+    // Clamp horizontally
     if (style.left < MARGIN) style.left = MARGIN;
     if (style.left + TT_WIDTH > window.innerWidth - MARGIN) {
       style.left = window.innerWidth - TT_WIDTH - MARGIN;
     }
 
-    // Clamp vertically within viewport
+    // Clamp vertically — try above element if no room below
     if (style.top < MARGIN) style.top = MARGIN;
     if (style.top + TT_HEIGHT > window.innerHeight - MARGIN) {
-      // Try to position above the element instead
       const aboveTop = rect.top - TT_HEIGHT - MARGIN;
       if (aboveTop >= MARGIN) {
         style.top = aboveTop;
       } else {
-        // Final fallback: clamp to bottom of viewport
         style.top = window.innerHeight - TT_HEIGHT - MARGIN;
       }
     }
 
     setTooltipStyle(style);
-
-    // Highlight the element
-    el.style.position = el.style.position || "relative";
-    el.style.zIndex = "10001";
-    el.style.boxShadow = "0 0 0 4px rgba(184, 134, 11, 0.3)";
-    el.style.borderRadius = "8px";
-
-    return () => {
-      el.style.zIndex = "";
-      el.style.boxShadow = "";
-    };
   }, [active, step]);
 
+  // Trigger scroll-into-view + measure when step changes
   useEffect(() => {
-    const cleanup = positionTooltip();
-    // Clean up previous highlight
-    return () => {
-      if (cleanup) cleanup();
-      // Reset all highlights
-      TOUR_STEPS.forEach((s) => {
-        const el = document.querySelector(s.target);
-        if (el) {
-          el.style.zIndex = "";
-          el.style.boxShadow = "";
-        }
-      });
-    };
-  }, [positionTooltip]);
-
-  function handleNext() {
-    // Clean current highlight
-    const currentEl = document.querySelector(TOUR_STEPS[step].target);
-    if (currentEl) {
-      currentEl.style.zIndex = "";
-      currentEl.style.boxShadow = "";
+    if (!active) return;
+    const currentStep = TOUR_STEPS[step];
+    const el = document.querySelector(currentStep.target);
+    if (!el) {
+      // Try to skip
+      if (step < TOUR_STEPS.length - 1) {
+        setStep((s) => s + 1);
+      } else {
+        finishTour();
+      }
+      return;
     }
 
+    // Hide highlight while scrolling, then re-measure after scroll settles
+    setHighlightRect(null);
+    el.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
+
+    // Wait for smooth scroll to finish (~300ms) then measure
+    if (measureTimerRef.current) clearTimeout(measureTimerRef.current);
+    measureTimerRef.current = setTimeout(() => {
+      measure();
+    }, 380);
+
+    return () => {
+      if (measureTimerRef.current) clearTimeout(measureTimerRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active, step]);
+
+  // Re-measure on window resize/scroll while tour is active
+  useEffect(() => {
+    if (!active) return;
+    const handler = () => measure();
+    window.addEventListener("resize", handler);
+    window.addEventListener("scroll", handler, true);
+    return () => {
+      window.removeEventListener("resize", handler);
+      window.removeEventListener("scroll", handler, true);
+    };
+  }, [active, measure]);
+
+  function handleNext() {
     if (step < TOUR_STEPS.length - 1) {
       setStep(step + 1);
     } else {
-      handleFinish();
+      finishTour();
     }
   }
 
-  function handleFinish() {
-    // Clean all highlights
-    TOUR_STEPS.forEach((s) => {
-      const el = document.querySelector(s.target);
-      if (el) {
-        el.style.zIndex = "";
-        el.style.boxShadow = "";
-      }
-    });
+  function finishTour() {
     localStorage.setItem(STORAGE_KEY, "true");
     setActive(false);
+    setHighlightRect(null);
   }
 
   function handleSkip() {
-    handleFinish();
+    finishTour();
   }
 
   if (!active) return null;
@@ -176,7 +184,7 @@ export function OnboardingTour() {
 
   return (
     <>
-      {/* Overlay */}
+      {/* Dim overlay (full page) */}
       <div
         onClick={handleSkip}
         style={{
@@ -188,6 +196,25 @@ export function OnboardingTour() {
         }}
       />
 
+      {/* Highlight box (only when target measured) */}
+      {highlightRect && (
+        <div
+          style={{
+            position: "fixed",
+            top: highlightRect.top - 4,
+            left: highlightRect.left - 4,
+            width: highlightRect.width + 8,
+            height: highlightRect.height + 8,
+            border: "3px solid rgba(184, 134, 11, 0.95)",
+            borderRadius: 10,
+            pointerEvents: "none",
+            zIndex: 10001,
+            boxShadow: "0 0 0 9999px rgba(0, 0, 0, 0.5)",
+            transition: "all 0.2s ease",
+          }}
+        />
+      )}
+
       {/* Tooltip */}
       <div
         style={{
@@ -196,10 +223,12 @@ export function OnboardingTour() {
           background: "#fff",
           borderRadius: 12,
           padding: "20px 24px",
-          width: 320,
+          width: TT_WIDTH,
           maxHeight: "calc(100vh - 24px)",
           overflowY: "auto",
           boxShadow: "0 12px 40px rgba(0, 0, 0, 0.2)",
+          opacity: highlightRect ? 1 : 0,
+          transition: "opacity 0.2s ease",
           ...tooltipStyle,
         }}
       >
