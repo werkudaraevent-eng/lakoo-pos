@@ -74,6 +74,14 @@ export function PlatformShell({ children, title }) {
           >
             🏪 <span>Tenant</span>
           </NavLink>
+          <NavLink
+            to="/platform/config"
+            className={({ isActive }) =>
+              `platform-nav-item${isActive ? " active" : ""}`
+            }
+          >
+            ⚙️ <span>Konfigurasi</span>
+          </NavLink>
         </nav>
         {admin && (
           <div

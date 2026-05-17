@@ -2083,3 +2083,49 @@ export function checkTenantStatus(tenant) {
 
   return { ok: true };
 }
+
+// ── Platform Config ───────────────────────────
+
+export async function getPlatformConfig() {
+  const executor = ensureSql();
+  const rows = await executor`
+    SELECT key, value, description, updated_at AS "updatedAt"
+    FROM platform_config
+    ORDER BY key ASC
+  `;
+  // Return as a flat object: { upgrade_url: "...", support_contact: "...", ... }
+  const config = {};
+  for (const row of rows) {
+    config[row.key] = row.value;
+  }
+  return { config, raw: rows };
+}
+
+export async function getPlatformConfigValue(key) {
+  const executor = ensureSql();
+  const rows = await executor`
+    SELECT value FROM platform_config WHERE key = ${key} LIMIT 1
+  `;
+  return rows[0]?.value ?? null;
+}
+
+export async function setPlatformConfig(updates, updatedBy) {
+  const executor = ensureSql();
+  const entries = Object.entries(updates || {});
+  if (entries.length === 0) {
+    return { ok: false, message: "Tidak ada perubahan." };
+  }
+
+  for (const [key, value] of entries) {
+    await executor`
+      INSERT INTO platform_config (key, value, updated_at, updated_by)
+      VALUES (${key}, ${value}, ${nowIso()}, ${updatedBy || null})
+      ON CONFLICT (key) DO UPDATE
+        SET value = EXCLUDED.value,
+            updated_at = EXCLUDED.updated_at,
+            updated_by = EXCLUDED.updated_by
+    `;
+  }
+
+  return { ok: true };
+}

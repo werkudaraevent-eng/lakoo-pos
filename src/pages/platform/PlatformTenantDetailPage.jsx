@@ -275,7 +275,7 @@ export function PlatformTenantDetailPage() {
                 {/* Workspaces */}
                 <div>
                   <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 6 }}>
-                    <span style={{ fontWeight: 600 }}>Workspace</span>
+                    <span style={{ fontWeight: 600 }}>Lokasi</span>
                     <span style={{ color: "var(--text-soft)" }}>{workspacesUsed} / {workspacesLimit || "∞"}</span>
                   </div>
                   {workspacesLimit > 0 && (

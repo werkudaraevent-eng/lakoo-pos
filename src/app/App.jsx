@@ -31,6 +31,7 @@ import { PlatformLoginPage } from "../pages/platform/PlatformLoginPage";
 import { PlatformDashboardPage } from "../pages/platform/PlatformDashboardPage";
 import { PlatformTenantsPage } from "../pages/platform/PlatformTenantsPage";
 import { PlatformTenantDetailPage } from "../pages/platform/PlatformTenantDetailPage";
+import { PlatformConfigPage } from "../pages/platform/PlatformConfigPage";
 
 export function App() {
   const { authLoading, user } = useAuth();
@@ -51,6 +52,7 @@ export function App() {
       <Route path="/platform" element={<PlatformDashboardPage />} />
       <Route path="/platform/tenants" element={<PlatformTenantsPage />} />
       <Route path="/platform/tenants/:tenantId" element={<PlatformTenantDetailPage />} />
+      <Route path="/platform/config" element={<PlatformConfigPage />} />
 
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />

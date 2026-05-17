@@ -7,17 +7,64 @@ import "../features/dashboard/dashboard.css";
 
 export function ReportsPage() {
   const { sales, settings, loading, loadError } = usePosData();
-  const [period, setPeriod] = useState("30d");
+  const [period, setPeriod] = useState("30d"); // "7d" | "30d" | "90d" | "thisMonth" | "month" | "custom"
+  const [pickedMonth, setPickedMonth] = useState(""); // "YYYY-MM"
+  const [customFrom, setCustomFrom] = useState("");
+  const [customTo, setCustomTo] = useState("");
   const [exporting, setExporting] = useState(false);
   const reportRef = useRef(null);
 
-  const periodDays = period === "7d" ? 7 : period === "30d" ? 30 : 90;
+  // Compute date range based on selected period
+  const dateRange = useMemo(() => {
+    const now = new Date();
+    if (period === "7d" || period === "30d" || period === "90d") {
+      const days = period === "7d" ? 7 : period === "30d" ? 30 : 90;
+      const from = new Date(now);
+      from.setDate(now.getDate() - days);
+      return { from, to: now };
+    }
+    if (period === "thisMonth") {
+      const from = new Date(now.getFullYear(), now.getMonth(), 1);
+      const to = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+      return { from, to };
+    }
+    if (period === "month" && pickedMonth) {
+      const [y, m] = pickedMonth.split("-").map(Number);
+      const from = new Date(y, m - 1, 1);
+      const to = new Date(y, m, 0, 23, 59, 59);
+      return { from, to };
+    }
+    if (period === "custom" && customFrom && customTo) {
+      return {
+        from: new Date(customFrom),
+        to: new Date(customTo + "T23:59:59"),
+      };
+    }
+    // Fallback: last 30 days
+    const fallback = new Date(now);
+    fallback.setDate(now.getDate() - 30);
+    return { from: fallback, to: now };
+  }, [period, pickedMonth, customFrom, customTo]);
+
+  // Build month options: last 12 months
+  const monthOptions = useMemo(() => {
+    const opts = [];
+    const now = new Date();
+    for (let i = 0; i < 12; i++) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+      const label = d.toLocaleDateString("id-ID", { month: "long", year: "numeric" });
+      opts.push({ value, label });
+    }
+    return opts;
+  }, []);
 
   const filteredSales = useMemo(() => {
-    const cutoff = new Date();
-    cutoff.setDate(cutoff.getDate() - periodDays);
-    return (sales || []).filter((s) => new Date(s.createdAt) >= cutoff);
-  }, [sales, periodDays]);
+    return (sales || []).filter((s) => {
+      const d = new Date(s.createdAt);
+      return d >= dateRange.from && d <= dateRange.to;
+    });
+  }, [sales, dateRange]);
 
   const totalRev = filteredSales.reduce((s, t) => s + (t.grandTotal || 0), 0);
   const totalItems = filteredSales.reduce((s, t) => s + (t.items?.length || 0), 0);
@@ -81,6 +128,18 @@ export function ReportsPage() {
 
   const totalProductRev = topProducts.reduce((s, p) => s + p.rev, 0) || 1;
 
+  // Build a human-readable label for filename + headings
+  const periodLabel = useMemo(() => {
+    const fmt = (d) => d.toISOString().slice(0, 10);
+    if (period === "7d") return "7-hari";
+    if (period === "30d") return "30-hari";
+    if (period === "90d") return "90-hari";
+    if (period === "thisMonth") return `bulan-${dateRange.from.toISOString().slice(0, 7)}`;
+    if (period === "month") return pickedMonth ? `bulan-${pickedMonth}` : "bulan";
+    if (period === "custom") return `${fmt(dateRange.from)}_sd_${fmt(dateRange.to)}`;
+    return period;
+  }, [period, pickedMonth, dateRange]);
+
   async function handleExportPdf() {
     if (!reportRef.current) return;
     setExporting(true);
@@ -93,7 +152,7 @@ export function ReportsPage() {
       const pdfWidth = pdf.internal.pageSize.getWidth();
       const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
       pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, pdfHeight);
-      pdf.save(`Laporan-${period}-${new Date().toISOString().slice(0, 10)}.pdf`);
+      pdf.save(`Laporan-${periodLabel}-${new Date().toISOString().slice(0, 10)}.pdf`);
     } catch (err) {
       console.error("PDF export failed:", err);
     } finally {
@@ -130,7 +189,7 @@ export function ReportsPage() {
     XLSX.utils.book_append_sheet(wb, wsRingkasan, "Ringkasan");
     XLSX.utils.book_append_sheet(wb, wsTransaksi, "Transaksi");
     XLSX.utils.book_append_sheet(wb, wsTopProduk, "Produk Terlaris");
-    XLSX.writeFile(wb, `Laporan-${period}-${new Date().toISOString().slice(0, 10)}.xlsx`);
+    XLSX.writeFile(wb, `Laporan-${periodLabel}-${new Date().toISOString().slice(0, 10)}.xlsx`);
   }
 
   return (
@@ -139,20 +198,70 @@ export function ReportsPage() {
       {loadError ? <p style={{ padding: 16, color: "var(--danger)" }}>{loadError}</p> : null}
 
       {/* Period selector + Export buttons */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 10 }}>
-        <div style={{ display: "flex", gap: 8 }}>
-          <button className="btn btn-secondary" onClick={handleExportPdf} disabled={exporting} style={{ fontSize: 12.5 }}>
-            {exporting ? "Exporting..." : "📄 Export PDF"}
-          </button>
-          <button className="btn btn-secondary" onClick={handleExportExcel} style={{ fontSize: 12.5 }}>
-            📊 Export Excel
-          </button>
+      <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 16 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button className="btn btn-secondary" onClick={handleExportPdf} disabled={exporting} style={{ fontSize: 12.5 }}>
+              {exporting ? "Exporting..." : "📄 Export PDF"}
+            </button>
+            <button className="btn btn-secondary" onClick={handleExportExcel} style={{ fontSize: 12.5 }}>
+              📊 Export Excel
+            </button>
+          </div>
+          <div className="cat-filter" style={{ margin: 0, flexWrap: "wrap" }}>
+            {[
+              { key: "7d", label: "7 Hari" },
+              { key: "30d", label: "30 Hari" },
+              { key: "90d", label: "90 Hari" },
+              { key: "thisMonth", label: "Bulan Ini" },
+              { key: "month", label: "Pilih Bulan" },
+              { key: "custom", label: "Rentang Tanggal" },
+            ].map((p) => (
+              <div key={p.key} className={`cat-chip${period === p.key ? " active" : ""}`} onClick={() => setPeriod(p.key)}>{p.label}</div>
+            ))}
+          </div>
         </div>
-        <div className="cat-filter" style={{ margin: 0 }}>
-          {[{ key: "7d", label: "7 Hari" }, { key: "30d", label: "30 Hari" }, { key: "90d", label: "90 Hari" }].map((p) => (
-            <div key={p.key} className={`cat-chip${period === p.key ? " active" : ""}`} onClick={() => setPeriod(p.key)}>{p.label}</div>
-          ))}
-        </div>
+
+        {/* Month picker — visible only when "Pilih Bulan" is selected */}
+        {period === "month" && (
+          <div style={{ display: "flex", alignItems: "center", gap: 8, justifyContent: "flex-end" }}>
+            <span style={{ fontSize: 12, color: "var(--text-soft)" }}>Bulan:</span>
+            <select
+              value={pickedMonth}
+              onChange={(e) => setPickedMonth(e.target.value)}
+              className="input"
+              style={{ width: 200, fontSize: 13, padding: "6px 10px" }}
+            >
+              <option value="">— Pilih bulan —</option>
+              {monthOptions.map((m) => (
+                <option key={m.value} value={m.value}>{m.label}</option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        {/* Custom date range — visible only when "Rentang Tanggal" is selected */}
+        {period === "custom" && (
+          <div style={{ display: "flex", alignItems: "center", gap: 8, justifyContent: "flex-end", flexWrap: "wrap" }}>
+            <span style={{ fontSize: 12, color: "var(--text-soft)" }}>Dari:</span>
+            <input
+              type="date"
+              value={customFrom}
+              onChange={(e) => setCustomFrom(e.target.value)}
+              className="input"
+              style={{ width: 150, fontSize: 13, padding: "6px 10px" }}
+            />
+            <span style={{ fontSize: 12, color: "var(--text-soft)" }}>—</span>
+            <span style={{ fontSize: 12, color: "var(--text-soft)" }}>Sampai:</span>
+            <input
+              type="date"
+              value={customTo}
+              onChange={(e) => setCustomTo(e.target.value)}
+              className="input"
+              style={{ width: 150, fontSize: 13, padding: "6px 10px" }}
+            />
+          </div>
+        )}
       </div>
 
       {/* Report content (captured for PDF) */}

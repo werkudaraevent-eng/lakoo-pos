@@ -1,8 +1,10 @@
+import { useState, useEffect } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 
 import { useAuth } from "../context/AuthContext";
 import { useWorkspace } from "../context/WorkspaceContext";
 import { usePosData } from "../context/PosDataContext";
+import { useUpgradeConfig } from "../hooks/useUpgradeConfig";
 import { AppIcon } from "../features/ui/AppIcon";
 import { getNavigationIconName } from "../features/ui/iconMaps";
 import { OnboardingTour } from "./OnboardingTour";
@@ -67,12 +69,33 @@ export function AppShell({ children }) {
   const location = useLocation();
   const { workspaces, settings } = usePosData();
   const { activeWorkspaceId } = useWorkspace();
+  const { config: upgradeConfig } = useUpgradeConfig();
   const isCheckoutRoute = location.pathname.startsWith("/checkout");
   const isImpersonating = localStorage.getItem("pos-impersonating") === "true";
 
+  // Mobile drawer state
+  const [drawerOpen, setDrawerOpen] = useState(false);
+
+  // Auto-close drawer on route change
+  useEffect(() => {
+    setDrawerOpen(false);
+  }, [location.pathname]);
+
+  // Lock body scroll when drawer open
+  useEffect(() => {
+    if (drawerOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => { document.body.style.overflow = ""; };
+  }, [drawerOpen]);
+
   const activeWorkspace = workspaces.find((w) => w.id === activeWorkspaceId);
-  const canCustomBrand = user?.planLimits?.customBranding === true;
-  const brandName = canCustomBrand && settings?.storeName ? settings.storeName : "Lakoo.";
+  // Workspace-first branding: storeName (editable in Settings) takes priority,
+  // fallback to tenant.name (from registration), then to "Lakoo." for safety.
+  const businessName = settings?.storeName?.trim() || user?.tenant?.name || "Lakoo.";
+  const hasMultipleWorkspaces = (workspaces || []).length > 1;
 
   // Expiry warning banner calculation
   const expiryDate = user?.tenant?.plan === "trial"
@@ -148,7 +171,7 @@ export function AppShell({ children }) {
         <div style={{
           background: "var(--accent)",
           color: "#fff",
-          padding: "6px 16px",
+          padding: "6px 12px",
           fontSize: 12,
           fontWeight: 600,
           textAlign: "center",
@@ -157,26 +180,62 @@ export function AppShell({ children }) {
           left: 0,
           right: 0,
           zIndex: 999,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 10,
+          flexWrap: "wrap",
+          minHeight: 30,
         }}>
-          ⏰ {user?.tenant?.plan === "trial" ? "Masa trial" : "Langganan"} Anda akan berakhir dalam {daysLeft} hari.
-          {user?.role === "admin" && " Hubungi tim Lakoo untuk perpanjangan."}
+          <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>
+            ⏰ {user?.tenant?.plan === "trial" ? "Masa trial" : "Langganan"} akan berakhir dalam {daysLeft} hari.
+          </span>
+          {user?.role === "admin" && upgradeConfig.upgrade_url && (
+            <a
+              href={upgradeConfig.upgrade_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                background: "rgba(255,255,255,0.25)",
+                color: "#fff",
+                padding: "2px 12px",
+                borderRadius: 4,
+                fontSize: 11,
+                fontWeight: 700,
+                textDecoration: "none",
+                whiteSpace: "nowrap",
+              }}
+            >
+              Upgrade →
+            </a>
+          )}
         </div>
       )}
 
-      {/* ── Sidebar ── */}
-      <aside className="shell-sidebar">
-        <div className="shell-sidebar-top">
-          {/* Brand */}
-          <div className="shell-brand">
-            <div className="shell-brand-name">{brandName}</div>
-            <div className="shell-brand-sub">Point of Sale</div>
-          </div>
+      {/* ── Mobile drawer overlay ── */}
+      <div
+        className={`shell-drawer-overlay${drawerOpen ? " open" : ""}`}
+        onClick={() => setDrawerOpen(false)}
+        aria-hidden="true"
+      />
 
-          {/* Session badge */}
-          <NavLink to="/workspace/select" className="shell-session">
-            <div className="shell-session-label">Sesi Aktif</div>
-            <div className="shell-session-name">{activeWorkspace?.name || "Pilih workspace"}</div>
-            <div className="shell-session-action">Ganti sesi ↗</div>
+      {/* ── Sidebar ── */}
+      <aside className={`shell-sidebar${drawerOpen ? " open" : ""}`}>
+        <div className="shell-sidebar-top">
+          {/* Brand + Workspace Switcher (combined) */}
+          <NavLink
+            to={hasMultipleWorkspaces ? "/workspace/select" : "#"}
+            className="shell-brand-switcher"
+            onClick={(e) => { if (!hasMultipleWorkspaces) e.preventDefault(); }}
+            title={hasMultipleWorkspaces ? "Ganti lokasi" : businessName}
+          >
+            <div className="shell-brand-switcher-main">
+              <div className="shell-brand-switcher-name">{businessName}</div>
+              {hasMultipleWorkspaces && <span className="shell-brand-switcher-chevron">▾</span>}
+            </div>
+            {activeWorkspace?.name && (
+              <div className="shell-brand-switcher-workspace">{activeWorkspace.name}</div>
+            )}
           </NavLink>
 
           {/* Nav */}
@@ -210,6 +269,7 @@ export function AppShell({ children }) {
               <span className="shell-user-role">{user?.role}</span>
             </div>
           </div>
+          <div className="shell-powered-by">Powered by <strong>Lakoo.</strong></div>
         </div>
       </aside>
 
@@ -218,6 +278,18 @@ export function AppShell({ children }) {
         {/* Topbar */}
         {!isCheckoutRoute ? (
           <div className="shell-topbar">
+            <button
+              type="button"
+              className="shell-hamburger"
+              onClick={() => setDrawerOpen(true)}
+              aria-label="Buka menu"
+            >
+              <svg width={20} height={20} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+                <line x1="3" y1="6" x2="21" y2="6" />
+                <line x1="3" y1="12" x2="21" y2="12" />
+                <line x1="3" y1="18" x2="21" y2="18" />
+              </svg>
+            </button>
             <div className="shell-topbar-title">{pageTitle}</div>
             {activeWorkspace ? (
               <span className="shell-topbar-badge">{activeWorkspace.name}</span>
@@ -232,6 +304,21 @@ export function AppShell({ children }) {
 
         {/* Content */}
         <div className={`shell-content${isCheckoutRoute ? " shell-content-flush" : ""}`}>
+          {/* Floating menu button on Kasir (mobile only) — since topbar is hidden */}
+          {isCheckoutRoute && (
+            <button
+              type="button"
+              className="pos-mobile-menu-btn"
+              onClick={() => setDrawerOpen(true)}
+              aria-label="Buka menu"
+            >
+              <svg width={20} height={20} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+                <line x1="3" y1="6" x2="21" y2="6" />
+                <line x1="3" y1="12" x2="21" y2="12" />
+                <line x1="3" y1="18" x2="21" y2="18" />
+              </svg>
+            </button>
+          )}
           {children}
         </div>
       </div>

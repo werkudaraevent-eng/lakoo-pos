@@ -88,6 +88,8 @@ import {
   getTenantById,
   getTenantDetail,
   getTenantUsage,
+  getPlatformConfig,
+  setPlatformConfig,
   getUserById,
   initializeDatabase,
   listTenants,
@@ -424,7 +426,7 @@ export function createApp({
       if (limits.workspaces > 0) {
         const usage = await getTenantUsage(tenantId);
         if (usage.workspaces >= limits.workspaces) {
-          res.status(403).json({ ok: false, message: `Batas workspace untuk paket ${tenant.plan} adalah ${limits.workspaces}. Upgrade paket untuk menambah workspace.` });
+          res.status(403).json({ ok: false, message: `Batas lokasi untuk paket ${tenant.plan} adalah ${limits.workspaces}. Upgrade paket untuk menambah lokasi.` });
           return;
         }
       }
@@ -1193,6 +1195,44 @@ export function createApp({
         tenantId: adminUser.tenantId,
       });
       res.json({ ok: true, token, user: adminUser });
+    })
+  );
+
+  // ── Platform Config (CMS) ──────────────────────────────────────
+  // Public endpoint: any authenticated tenant user can read upgrade URL & support contact
+  app.get(
+    "/api/platform-config",
+    auth,
+    asyncHandler(async (_req, res) => {
+      const result = await getPlatformConfig();
+      res.json({ ok: true, config: result.config });
+    })
+  );
+
+  // Admin endpoint: only platform super admin can edit
+  app.get(
+    "/api/platform/config",
+    auth,
+    requirePlatformAdmin,
+    asyncHandler(async (_req, res) => {
+      const result = await getPlatformConfig();
+      res.json({ ok: true, config: result.config, raw: result.raw });
+    })
+  );
+
+  app.patch(
+    "/api/platform/config",
+    auth,
+    requirePlatformAdmin,
+    asyncHandler(async (req, res) => {
+      const updates = req.body || {};
+      const result = await setPlatformConfig(updates, req.auth.user?.email || req.auth.user?.id);
+      if (!result.ok) {
+        res.status(400).json(result);
+        return;
+      }
+      const refreshed = await getPlatformConfig();
+      res.json({ ok: true, config: refreshed.config });
     })
   );
 

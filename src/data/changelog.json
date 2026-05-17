@@ -1,51 +1,53 @@
 [
   {
+    "version": "0.6.0",
+    "date": "2026-05-17",
+    "title": "Upgrade Paket & Filter Laporan yang Lebih Lengkap",
+    "entries": [
+      { "type": "feature", "text": "Tombol Upgrade Paket sekarang tersedia di Pengaturan, banner peringatan, dan saat kuota penuh" },
+      { "type": "feature", "text": "Filter laporan sekarang mendukung 'Bulan Ini', pilih bulan tertentu, dan rentang tanggal kustom" },
+      { "type": "improvement", "text": "Sidebar diperbarui — nama toko Anda kini menjadi brand utama" },
+      { "type": "improvement", "text": "Tampilan halaman Kasir lebih nyaman: search bar tetap terlihat saat scroll produk" }
+    ]
+  },
+  {
     "version": "0.5.0",
     "date": "2026-05-07",
-    "title": "Changelog, Export Laporan & Onboarding Tour",
+    "title": "Panduan Pengguna Baru, Export Laporan & Halaman Changelog",
     "entries": [
-      { "type": "feature", "text": "Halaman Changelog — lihat semua pembaruan platform di satu tempat" },
+      { "type": "feature", "text": "Panduan interaktif untuk pengguna baru saat pertama kali masuk" },
       { "type": "feature", "text": "Export laporan ke PDF dan Excel di halaman Laporan & Analitik" },
-      { "type": "feature", "text": "Panduan interaktif (onboarding tour) untuk pengguna baru" },
-      { "type": "feature", "text": "Tombol 'Mulai Tour Panduan' di Pengaturan untuk mengulang panduan" }
+      { "type": "feature", "text": "Halaman Changelog untuk melihat semua pembaruan platform" }
     ]
   },
   {
     "version": "0.4.0",
     "date": "2026-05-07",
-    "title": "Sistem Limitasi Paket & Riwayat Aktivitas",
+    "title": "Batas Paket yang Lebih Jelas",
     "entries": [
-      { "type": "feature", "text": "Indikator penggunaan kuota (produk, pengguna, workspace) di setiap halaman" },
-      { "type": "feature", "text": "Tombol aksi otomatis nonaktif ketika kuota paket sudah penuh" },
-      { "type": "feature", "text": "Riwayat aktivitas sekarang bisa diurutkan per kolom dan dibatasi jumlah tampilan" },
-      { "type": "feature", "text": "Tab halaman Kelola Data sekarang tersimpan di URL (tidak reset saat refresh)" },
-      { "type": "fix", "text": "Keterangan 'Mengubah data produk' sekarang menampilkan nama produk dan field yang diubah" },
-      { "type": "fix", "text": "Perbaikan tampilan input password di halaman registrasi" }
+      { "type": "feature", "text": "Indikator penggunaan kuota produk, pengguna, dan lokasi di setiap halaman" },
+      { "type": "improvement", "text": "Tombol tambah otomatis dinonaktifkan ketika kuota paket penuh, dengan info upgrade yang jelas" }
     ]
   },
   {
     "version": "0.3.0",
-    "date": "2026-05-07",
-    "title": "Audit Log & Tempat Sampah",
+    "date": "2026-04-29",
+    "title": "Riwayat Aktivitas & Tempat Sampah",
     "entries": [
-      { "type": "feature", "text": "Riwayat aktivitas lengkap — semua aksi tercatat otomatis" },
-      { "type": "feature", "text": "Filter riwayat berdasarkan tipe (Produk, Transaksi, Stok, dll) dan periode" },
-      { "type": "feature", "text": "Tempat sampah untuk produk, transaksi, dan promosi yang dihapus" },
-      { "type": "feature", "text": "Aksi masal — hapus semua produk, transaksi, atau reset stok sekaligus" },
-      { "type": "fix", "text": "Filter tanggal di halaman Riwayat Transaksi sekarang bekerja dengan benar" }
+      { "type": "feature", "text": "Riwayat aktivitas mencatat semua perubahan secara otomatis, lengkap dengan filter dan pengurutan" },
+      { "type": "feature", "text": "Tempat sampah untuk produk, transaksi, dan promosi yang dihapus — bisa dipulihkan kembali" },
+      { "type": "feature", "text": "Aksi masal: hapus semua produk, transaksi, atau reset stok dalam satu klik" }
     ]
   },
   {
     "version": "0.2.0",
-    "date": "2026-04-29",
-    "title": "Event & Bazar + Manajemen Stok",
+    "date": "2026-04-15",
+    "title": "Event & Bazar dan Manajemen Stok yang Lebih Kuat",
     "entries": [
-      { "type": "feature", "text": "Sistem event/bazar — buat workspace terpisah untuk setiap event" },
-      { "type": "feature", "text": "Alokasi stok ke event dari toko utama" },
-      { "type": "feature", "text": "Penutupan event dengan rekap penjualan otomatis" },
-      { "type": "feature", "text": "Kelola kategori produk — rename dan hapus" },
-      { "type": "feature", "text": "Import produk dari file CSV/Excel" },
-      { "type": "improvement", "text": "Struk transaksi bisa dicetak langsung dari riwayat" }
+      { "type": "feature", "text": "Sistem event/bazar — buat lokasi terpisah untuk setiap event dengan stok dan tim sendiri" },
+      { "type": "feature", "text": "Alokasi stok dari toko utama ke event, dengan rekap penjualan otomatis saat event ditutup" },
+      { "type": "feature", "text": "Kelola kategori produk: rename dan hapus dengan aman" },
+      { "type": "feature", "text": "Import produk massal dari file Excel/CSV" }
     ]
   },
   {
@@ -53,13 +55,9 @@
     "date": "2026-03-30",
     "title": "Rilis Awal — POS Dasar",
     "entries": [
-      { "type": "feature", "text": "Sistem kasir/POS dengan keranjang belanja" },
-      { "type": "feature", "text": "Manajemen produk dan varian (ukuran, warna, dll)" },
-      { "type": "feature", "text": "Manajemen stok manual" },
-      { "type": "feature", "text": "Riwayat transaksi dengan detail struk" },
-      { "type": "feature", "text": "Dashboard ringkasan penjualan harian" },
-      { "type": "feature", "text": "Multi-pengguna dengan role (Admin, Manager, Kasir)" },
-      { "type": "feature", "text": "Pengaturan toko, metode bayar, dan pajak" }
+      { "type": "feature", "text": "Sistem kasir/POS lengkap dengan keranjang, struk, dan riwayat transaksi" },
+      { "type": "feature", "text": "Manajemen produk dan varian (ukuran, warna, dll) dengan multi-pengguna dan role" },
+      { "type": "feature", "text": "Dashboard ringkasan penjualan harian dan pengaturan toko (metode bayar, pajak, struk)" }
     ]
   }
 ]

@@ -56,7 +56,7 @@ export function WorkspacePickerPage() {
     <div className="wsp-page">
       {/* Top bar */}
       <div className="wsp-topbar">
-        <div className="wsp-topbar-brand">{user?.planLimits?.customBranding && settings?.storeName ? `${settings.storeName}.` : "Lakoo."}</div>
+        <div className="wsp-topbar-brand">{settings?.storeName?.trim() || user?.tenant?.name || "Lakoo."}</div>
         <div className="wsp-topbar-right">
           <div className="wsp-topbar-user-info">
             <div className="wsp-topbar-user-name">{user?.name || user?.username}</div>
@@ -78,7 +78,7 @@ export function WorkspacePickerPage() {
             Halo, <strong>{user?.name || user?.username}</strong>! Pilih sesi untuk memulai aktivitas hari ini.
           </p>
 
-          {loading ? <div className="wsp-loading" style={{ padding: 24, color: "var(--text-soft)", fontSize: 13.5 }}>Memuat workspace...</div> : null}
+          {loading ? <div className="wsp-loading" style={{ padding: 24, color: "var(--text-soft)", fontSize: 13.5 }}>Memuat lokasi...</div> : null}
           {!loading && loadError ? <div className="wsp-error">{loadError}</div> : null}
 
           {!loading && !loadError && pickerOptions.length > 0 ? (
@@ -124,7 +124,7 @@ export function WorkspacePickerPage() {
           ) : null}
 
           {!loading && !loadError && pickerOptions.length === 0 ? (
-            <div className="wsp-empty">Tidak ada workspace yang tersedia.</div>
+            <div className="wsp-empty">Tidak ada lokasi yang tersedia.</div>
           ) : null}
         </div>
       </div>

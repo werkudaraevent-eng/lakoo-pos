@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { apiGet } from "../api/client";
 import { usePosData } from "../context/PosDataContext";
 import { resetOnboardingTour } from "../components/OnboardingTour";
+import { useUpgradeConfig } from "../hooks/useUpgradeConfig";
 
 function formatDate(iso) {
   if (!iso) return "-";
@@ -62,6 +63,7 @@ function ToggleSwitch({ value, onChange }) {
 export function SettingsPage() {
   const { settings, updateSettings, loading, loadError } = usePosData();
   const [tenantInfo, setTenantInfo] = useState(null);
+  const { config: upgradeConfig } = useUpgradeConfig();
   const [tab, setTab] = useState("Info Toko");
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -247,11 +249,39 @@ export function SettingsPage() {
                   <span>{tenantInfo.usage.users} / {tenantInfo.limits.users === -1 ? "\u221E" : tenantInfo.limits.users}</span>
                 </div>
                 <div className="field">
-                  <span className="muted-text">Workspace</span>
+                  <span className="muted-text">Lokasi</span>
                   <span>{tenantInfo.usage.workspaces} / {tenantInfo.limits.workspaces === -1 ? "\u221E" : tenantInfo.limits.workspaces}</span>
                 </div>
               </div>
             ) : null}
+
+            {/* Upgrade & Support buttons */}
+            {tenantInfo.tenant.plan !== "business" && (upgradeConfig.upgrade_url || upgradeConfig.support_contact) && (
+              <div style={{ marginTop: 16, paddingTop: 16, borderTop: "1px solid var(--line)", display: "flex", gap: 8, flexWrap: "wrap" }}>
+                {upgradeConfig.upgrade_url && (
+                  <a
+                    href={upgradeConfig.upgrade_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="btn btn-primary"
+                    style={{ textDecoration: "none", fontSize: 13 }}
+                  >
+                    ⚡ Upgrade Paket
+                  </a>
+                )}
+                {upgradeConfig.support_contact && (
+                  <a
+                    href={upgradeConfig.support_contact}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="btn btn-secondary"
+                    style={{ textDecoration: "none", fontSize: 13 }}
+                  >
+                    💬 {upgradeConfig.support_label || "Hubungi Admin"}
+                  </a>
+                )}
+              </div>
+            )}
           </div>
         </article>
       ) : null}

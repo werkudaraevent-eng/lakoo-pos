@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 
 import { usePosData } from "../context/PosDataContext";
 import { useAuth } from "../context/AuthContext";
+import { useUpgradeConfig } from "../hooks/useUpgradeConfig";
 import { formatCurrency } from "../utils/formatters";
 import "../features/dashboard/dashboard.css";
 
@@ -107,6 +108,7 @@ function EventCard({ event, sales, dimmed }) {
 export function EventsPage() {
   const { workspaces, sales } = usePosData();
   const { user } = useAuth();
+  const { config: upgradeConfig } = useUpgradeConfig();
   const workspaceLimit = user?.planLimits?.workspaces;
   const workspaceCount = (workspaces || []).length;
   const isWorkspaceFull = workspaceLimit > 0 && workspaceCount >= workspaceLimit;
@@ -134,9 +136,16 @@ export function EventsPage() {
           <span style={{ fontWeight: 700, color: workspaceCount >= workspaceLimit ? "var(--danger, #b54343)" : "var(--text)" }}>
             {workspaceCount} / {workspaceLimit}
           </span>
-          <span style={{ color: "var(--text-soft)" }}>Workspace</span>
+          <span style={{ color: "var(--text-soft)" }}>Lokasi</span>
           {workspaceCount >= workspaceLimit && (
-            <span style={{ marginLeft: "auto", fontSize: 11.5, color: "var(--danger, #b54343)", fontWeight: 600 }}>Kuota penuh — upgrade paket untuk menambah</span>
+            <span style={{ marginLeft: "auto", fontSize: 11.5, color: "var(--danger, #b54343)", fontWeight: 600, display: "flex", alignItems: "center", gap: 8 }}>
+              Kuota penuh
+              {upgradeConfig.upgrade_url && (
+                <a href={upgradeConfig.upgrade_url} target="_blank" rel="noopener noreferrer" style={{ color: "#fff", background: "var(--danger, #b54343)", padding: "2px 10px", borderRadius: 4, textDecoration: "none", fontSize: 11 }}>
+                  Upgrade →
+                </a>
+              )}
+            </span>
           )}
           {workspaceCount < workspaceLimit && (
             <span style={{ marginLeft: "auto", fontSize: 11, color: "var(--text-muted)" }}>Paket {user?.tenant?.plan || "trial"}</span>

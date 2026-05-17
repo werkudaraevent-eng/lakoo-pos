@@ -5,6 +5,7 @@ import * as XLSX from "xlsx";
 import { usePosData } from "../context/PosDataContext";
 import { useWorkspace } from "../context/WorkspaceContext";
 import { useAuth } from "../context/AuthContext";
+import { useUpgradeConfig } from "../hooks/useUpgradeConfig";
 import { formatCurrency } from "../utils/formatters";
 import "../features/dashboard/dashboard.css";
 
@@ -38,6 +39,7 @@ export function CatalogPage() {
   const { products, workspaces, categories, settings, loading, loadError, updateProduct, getStoreProducts, allocateStockToEvent, bulkImportProducts, createNewCategory, renameCategory, deleteCategory } = usePosData();
   const { activeWorkspaceId } = useWorkspace();
   const { user } = useAuth();
+  const { config: upgradeConfig } = useUpgradeConfig();
   const activeWorkspace = workspaces.find((w) => w.id === activeWorkspaceId);
   const isEventWorkspace = activeWorkspace?.type === "event";
   const productLimit = user?.planLimits?.products;
@@ -310,7 +312,14 @@ export function CatalogPage() {
           </span>
           <span style={{ color: "var(--text-soft)" }}>Produk</span>
           {productCount >= productLimit && (
-            <span style={{ marginLeft: "auto", fontSize: 11.5, color: "var(--danger, #b54343)", fontWeight: 600 }}>Kuota penuh — upgrade paket untuk menambah</span>
+            <span style={{ marginLeft: "auto", fontSize: 11.5, color: "var(--danger, #b54343)", fontWeight: 600, display: "flex", alignItems: "center", gap: 8 }}>
+              Kuota penuh
+              {upgradeConfig.upgrade_url && (
+                <a href={upgradeConfig.upgrade_url} target="_blank" rel="noopener noreferrer" style={{ color: "#fff", background: "var(--danger, #b54343)", padding: "2px 10px", borderRadius: 4, textDecoration: "none", fontSize: 11 }}>
+                  Upgrade →
+                </a>
+              )}
+            </span>
           )}
           {productCount < productLimit && (
             <span style={{ marginLeft: "auto", fontSize: 11, color: "var(--text-muted)" }}>Paket {user?.tenant?.plan || "trial"}</span>

@@ -80,14 +80,14 @@
   color: var(--text);
 }
 
-/* Center content */
+/* Top-aligned content (better UX than vertical-center on mobile) */
 .wsp-center {
   flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  padding: 40px 24px;
+  padding: 48px 24px;
+  overflow-y: auto;
 }
 
 .wsp-inner {

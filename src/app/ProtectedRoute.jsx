@@ -60,7 +60,7 @@ export function ProtectedRoute({ allow, renderShell = true, requireWorkspace = t
           </AppShell>
         );
       }
-      return <LoadingScreen message="Menyiapkan workspace..." />;
+      return <LoadingScreen message="Menyiapkan lokasi..." />;
     }
 
     if (loadError) {

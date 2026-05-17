@@ -1,6 +1,10 @@
 /* ══════════════════════════════════════════════════════
    Shell — Nyam-style layout structure
    Sidebar (220px) + Main (topbar 56px + content)
+   Breakpoints:
+   - Desktop:  > 900px  (sidebar 220px, full label)
+   - Tablet:   640-900px (sidebar 60px, icon-only)
+   - Mobile:   ≤640px (sidebar drawer, hamburger button)
    ══════════════════════════════════════════════════════ */
 
 .shell {
@@ -11,6 +15,38 @@
 
 .shell-checkout {
   display: flex;
+}
+
+/* ── Hamburger button (mobile only) ── */
+.shell-hamburger {
+  display: none;
+  width: 38px;
+  height: 38px;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.shell-hamburger:active { background: var(--surface); }
+
+/* ── Drawer overlay (mobile only) ── */
+.shell-drawer-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 998;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+.shell-drawer-overlay.open {
+  opacity: 1;
+  pointer-events: auto;
 }
 
 /* ── Sidebar ── */
@@ -31,64 +67,78 @@
   overflow: hidden;
 }
 
-/* Brand */
-.shell-brand {
-  padding: 24px 20px 20px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-}
-
-.shell-brand-name {
-  font-size: 22px;
-  font-weight: 800;
-  color: var(--sidebar-text);
-  letter-spacing: -0.5px;
-}
-
-.shell-brand-sub {
-  font-size: 11px;
-  color: var(--sidebar-muted);
-  font-weight: 500;
-  letter-spacing: 0.5px;
-  text-transform: uppercase;
-  margin-top: 2px;
-}
-
-/* Session badge */
-.shell-session {
+/* Brand + Workspace Switcher (combined, compact) */
+.shell-brand-switcher {
   display: block;
-  margin: 10px 8px 4px;
-  padding: 8px 10px;
+  margin: 18px 12px 8px;
+  padding: 12px 14px;
   background: var(--sidebar-active);
-  border-radius: var(--radius-sm);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: var(--radius-md, 10px);
   text-decoration: none;
   cursor: pointer;
-  transition: background 0.15s;
+  transition: background 0.15s, border-color 0.15s;
 }
 
-.shell-session:hover {
+.shell-brand-switcher:hover {
   background: var(--sidebar-hover);
+  border-color: rgba(255, 255, 255, 0.12);
 }
 
-.shell-session-label {
-  font-size: 10px;
-  font-weight: 700;
-  color: var(--sidebar-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  margin-bottom: 2px;
+.shell-brand-switcher-main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
 }
 
-.shell-session-name {
-  font-size: 12.5px;
-  font-weight: 700;
+.shell-brand-switcher-name {
+  font-size: 15.5px;
+  font-weight: 800;
   color: var(--sidebar-text);
-  line-height: 1.3;
+  letter-spacing: -0.3px;
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.shell-session-action {
+.shell-brand-switcher-chevron {
   font-size: 11px;
   color: var(--sidebar-muted);
-  margin-top: 2px;
+  flex-shrink: 0;
+  transition: transform 0.15s;
+}
+
+.shell-brand-switcher:hover .shell-brand-switcher-chevron {
+  color: var(--sidebar-text);
+}
+
+.shell-brand-switcher-workspace {
+  font-size: 11.5px;
+  color: var(--sidebar-muted);
+  margin-top: 4px;
+  letter-spacing: 0.2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Powered by Lakoo (footer signature) */
+.shell-powered-by {
+  margin-top: 12px;
+  padding: 0 10px;
+  font-size: 10.5px;
+  color: var(--sidebar-muted);
+  text-align: center;
+  letter-spacing: 0.3px;
+  opacity: 0.7;
+}
+
+.shell-powered-by strong {
+  color: var(--sidebar-text);
+  font-weight: 700;
+  opacity: 0.9;
 }
 
 /* Navigation */
@@ -478,22 +528,28 @@ tr:hover td {
 .badge-amber { background: var(--accent-soft); color: var(--accent-deep); }
 
 /* ── Responsive ── */
-@media (max-width: 900px) {
+
+/* Tablet: 641-900px — sidebar shrinks to icon-only */
+@media (max-width: 900px) and (min-width: 641px) {
   .shell-sidebar {
     width: 60px;
     min-width: 60px;
   }
 
-  .shell-brand-name,
-  .shell-brand-sub,
+  .shell-brand-switcher-name,
+  .shell-brand-switcher-workspace,
+  .shell-brand-switcher-chevron,
   .shell-nav-section,
   .shell-nav-item span:not(.shell-nav-icon),
-  .shell-session-label,
-  .shell-session-name,
-  .shell-session-action,
   .shell-user-name,
-  .shell-user-role {
+  .shell-user-role,
+  .shell-powered-by {
     display: none;
+  }
+
+  .shell-brand-switcher {
+    margin: 12px 8px 4px;
+    padding: 8px;
   }
 
   .shell-nav-item {
@@ -504,6 +560,75 @@ tr:hover td {
 
   .shell-content {
     padding: 16px;
+  }
+
+  .dual-fields {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Mobile: ≤640px — sidebar becomes slide-in drawer */
+@media (max-width: 640px) {
+  .shell-hamburger {
+    display: inline-flex;
+  }
+
+  .shell-drawer-overlay {
+    display: block;
+  }
+
+  .shell-sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    z-index: 999;
+    width: 260px;
+    min-width: 260px;
+    transform: translateX(-100%);
+    transition: transform 0.25s ease;
+    box-shadow: 0 0 24px rgba(0, 0, 0, 0.2);
+  }
+  .shell-sidebar.open {
+    transform: translateX(0);
+  }
+
+  /* Hide the date in topbar to save space */
+  .shell-topbar-date {
+    display: none;
+  }
+
+  /* Topbar tighter padding */
+  .shell-topbar {
+    padding: 0 12px;
+    gap: 10px;
+  }
+
+  /* Title shrinks but stays readable */
+  .shell-topbar-title {
+    font-size: 14px;
+  }
+
+  /* Workspace badge shrinks */
+  .shell-topbar-badge {
+    font-size: 10px;
+    padding: 2px 6px;
+  }
+
+  /* Logout button compact */
+  .shell-topbar-logout {
+    padding: 6px 10px;
+    font-size: 12px;
+  }
+
+  /* Content padding tighter */
+  .shell-content {
+    padding: 14px;
+  }
+
+  /* Page max-width unconstrained on mobile */
+  .shell-content > * {
+    max-width: 100%;
   }
 
   .dual-fields {

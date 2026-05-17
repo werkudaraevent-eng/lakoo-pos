@@ -2,6 +2,7 @@ import { useState } from "react";
 
 import { usePosData } from "../context/PosDataContext";
 import { useAuth } from "../context/AuthContext";
+import { useUpgradeConfig } from "../hooks/useUpgradeConfig";
 import { ConfirmModal } from "../components/ConfirmModal";
 
 const ROLE_LABELS = {
@@ -66,6 +67,7 @@ const EMPTY_FORM = {
 export function UsersPage() {
   const { users, workspaces, createUser, updateUser, updateWorkspaceAssignments } = usePosData();
   const { user: currentUser } = useAuth();
+  const { config: upgradeConfig } = useUpgradeConfig();
   const [modal, setModal] = useState(null); // null | 'create' | user object (edit)
   const [form, setForm] = useState({ ...EMPTY_FORM });
   const [saving, setSaving] = useState(false);
@@ -199,7 +201,14 @@ export function UsersPage() {
           </span>
           <span style={{ color: "var(--text-soft)" }}>Pengguna</span>
           {userCount >= userLimit && (
-            <span style={{ marginLeft: "auto", fontSize: 11.5, color: "var(--danger, #b54343)", fontWeight: 600 }}>Kuota penuh — upgrade paket untuk menambah</span>
+            <span style={{ marginLeft: "auto", fontSize: 11.5, color: "var(--danger, #b54343)", fontWeight: 600, display: "flex", alignItems: "center", gap: 8 }}>
+              Kuota penuh
+              {upgradeConfig.upgrade_url && (
+                <a href={upgradeConfig.upgrade_url} target="_blank" rel="noopener noreferrer" style={{ color: "#fff", background: "var(--danger, #b54343)", padding: "2px 10px", borderRadius: 4, textDecoration: "none", fontSize: 11 }}>
+                  Upgrade →
+                </a>
+              )}
+            </span>
           )}
           {userCount < userLimit && (
             <span style={{ marginLeft: "auto", fontSize: 11, color: "var(--text-muted)" }}>Paket {currentUser?.tenant?.plan || "trial"}</span>
@@ -481,7 +490,7 @@ export function UsersPage() {
 
             {/* Workspace Assignment */}
             <div style={{ marginBottom: 20 }}>
-              <label style={labelStyle}>Akses Workspace</label>
+              <label style={labelStyle}>Akses Lokasi</label>
               <div style={{
                 border: '1px solid var(--line, var(--border))',
                 borderRadius: 8,

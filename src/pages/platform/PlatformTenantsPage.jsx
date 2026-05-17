@@ -170,7 +170,7 @@ export function PlatformTenantsPage() {
                 </div>
                 <div className="platform-tenant-card-stat">
                   <div className="stat-num">{tenant.workspacesCount ?? 0}</div>
-                  <div className="stat-lbl">Workspace</div>
+                  <div className="stat-lbl">Lokasi</div>
                 </div>
               </div>
 

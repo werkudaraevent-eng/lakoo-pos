@@ -60,31 +60,53 @@ export function OnboardingTour() {
       return;
     }
 
+    // Scroll target element into view if needed (smooth)
+    el.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
+
     const rect = el.getBoundingClientRect();
     const pos = currentStep.position || "right";
+
+    // Estimated tooltip dimensions (matches CSS below)
+    const TT_WIDTH = 320;
+    const TT_HEIGHT = 200;
+    const MARGIN = 12;
 
     let style = {};
     if (pos === "right") {
       style = {
-        top: rect.top + rect.height / 2 - 60,
+        top: rect.top + rect.height / 2 - TT_HEIGHT / 2,
         left: rect.right + 16,
       };
     } else if (pos === "bottom") {
       style = {
-        top: rect.bottom + 12,
-        left: rect.left + rect.width / 2 - 160,
+        top: rect.bottom + MARGIN,
+        left: rect.left + rect.width / 2 - TT_WIDTH / 2,
       };
     } else if (pos === "left") {
       style = {
-        top: rect.top + rect.height / 2 - 60,
-        left: rect.left - 340,
+        top: rect.top + rect.height / 2 - TT_HEIGHT / 2,
+        left: rect.left - TT_WIDTH - 16,
       };
     }
 
-    // Ensure tooltip stays within viewport
-    if (style.top < 10) style.top = 10;
-    if (style.left < 10) style.left = 10;
-    if (style.left > window.innerWidth - 340) style.left = window.innerWidth - 350;
+    // Clamp horizontally within viewport
+    if (style.left < MARGIN) style.left = MARGIN;
+    if (style.left + TT_WIDTH > window.innerWidth - MARGIN) {
+      style.left = window.innerWidth - TT_WIDTH - MARGIN;
+    }
+
+    // Clamp vertically within viewport
+    if (style.top < MARGIN) style.top = MARGIN;
+    if (style.top + TT_HEIGHT > window.innerHeight - MARGIN) {
+      // Try to position above the element instead
+      const aboveTop = rect.top - TT_HEIGHT - MARGIN;
+      if (aboveTop >= MARGIN) {
+        style.top = aboveTop;
+      } else {
+        // Final fallback: clamp to bottom of viewport
+        style.top = window.innerHeight - TT_HEIGHT - MARGIN;
+      }
+    }
 
     setTooltipStyle(style);
 
@@ -175,6 +197,8 @@ export function OnboardingTour() {
           borderRadius: 12,
           padding: "20px 24px",
           width: 320,
+          maxHeight: "calc(100vh - 24px)",
+          overflowY: "auto",
           boxShadow: "0 12px 40px rgba(0, 0, 0, 0.2)",
           ...tooltipStyle,
         }}

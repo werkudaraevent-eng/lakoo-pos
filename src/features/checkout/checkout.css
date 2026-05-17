@@ -2,11 +2,28 @@
 
 /* Layout */
 .pos-layout { display: flex; height: 100%; gap: 0; overflow: hidden; }
-.pos-catalog { flex: 1; overflow-y: auto; padding: 20px; background: var(--bg); }
+.pos-catalog { flex: 1; overflow-y: auto; padding: 0 20px 20px; background: var(--bg); }
 .pos-cart { width: 340px; min-width: 340px; background: #fff; border-left: 1px solid var(--line); display: flex; flex-direction: column; }
 .pos-cart-header { padding: 16px 20px; border-bottom: 1px solid var(--line); }
 .pos-cart-items { flex: 1; overflow-y: auto; padding: 0 12px; }
 .pos-cart-footer { padding: 16px 20px; border-top: 1px solid var(--line); }
+
+/* Sticky catalog header (search + categories) — opaque to prevent content bleed */
+.pos-catalog-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--bg);
+  padding: 20px 0 14px;
+  margin-bottom: 4px;
+  /* Subtle shadow when scrolled past — visible because of border alternative */
+  border-bottom: 1px solid transparent;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.pos-catalog-header.scrolled {
+  border-bottom-color: var(--line);
+  box-shadow: 0 4px 12px -8px rgba(0, 0, 0, 0.15);
+}
 
 /* Product Card */
 .product-card { background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 14px; cursor: pointer; transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease; user-select: none; }
@@ -34,10 +51,165 @@
 .qty-btn:hover { background: var(--accent); border-color: var(--accent); color: #fff; }
 .qty-val { font-size: 13px; font-weight: 700; min-width: 20px; text-align: center; font-variant-numeric: tabular-nums; }
 
+/* Mobile cart FAB (sticky bottom bar) — only shown on mobile */
+.pos-mobile-cart-fab {
+  display: none;
+  position: fixed;
+  left: 12px;
+  right: 12px;
+  bottom: 12px;
+  z-index: 50;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 12px;
+  padding: 14px 18px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+  display: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-family: inherit;
+}
+.pos-mobile-cart-fab:active { transform: scale(0.98); }
+.pos-mobile-cart-fab .pos-fab-count {
+  background: rgba(255, 255, 255, 0.25);
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+}
+
+/* Bottom sheet overlay & sheet (mobile only) */
+.pos-bottom-sheet-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 100;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+.pos-bottom-sheet-overlay.open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.pos-bottom-sheet {
+  display: none;
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 101;
+  background: #fff;
+  border-radius: 16px 16px 0 0;
+  max-height: 85vh;
+  display: none;
+  flex-direction: column;
+  transform: translateY(100%);
+  transition: transform 0.25s ease;
+  box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.2);
+}
+.pos-bottom-sheet.open {
+  transform: translateY(0);
+}
+.pos-bottom-sheet-handle {
+  width: 40px;
+  height: 4px;
+  background: var(--line);
+  border-radius: 2px;
+  margin: 10px auto 4px;
+  flex-shrink: 0;
+}
+
+/* Mobile-only hamburger inside Kasir page (since topbar is hidden) */
+.pos-mobile-menu-btn {
+  display: none;
+  position: fixed;
+  top: 12px;
+  left: 12px;
+  z-index: 30;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--text);
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
 /* Responsive */
-@media (max-width: 900px) {
+
+/* Tablet 641-900px: shrink cart sidebar */
+@media (max-width: 900px) and (min-width: 641px) {
   .pos-cart {
     width: 280px;
     min-width: 280px;
+  }
+}
+
+/* Mobile ≤640px: single column, cart becomes bottom sheet */
+@media (max-width: 640px) {
+  .pos-layout {
+    flex-direction: column;
+  }
+
+  .pos-catalog {
+    padding: 0 12px 100px; /* extra bottom padding to clear FAB */
+  }
+
+  .pos-catalog-header {
+    padding: 14px 0 12px;
+  }
+
+  /* Hide the inline sidebar cart — it'll be shown as bottom sheet instead */
+  .pos-cart {
+    display: none;
+  }
+
+  /* Show mobile FAB and menu button */
+  .pos-mobile-cart-fab.show {
+    display: flex;
+  }
+  .pos-mobile-menu-btn {
+    display: inline-flex;
+  }
+
+  .pos-bottom-sheet-overlay {
+    display: block;
+  }
+
+  .pos-bottom-sheet {
+    display: flex;
+  }
+
+  /* Larger touch targets for quantity controls */
+  .qty-btn {
+    width: 36px;
+    height: 36px;
+    font-size: 16px;
+    border-radius: 8px;
+  }
+  .qty-val {
+    font-size: 15px;
+    min-width: 28px;
+  }
+
+  /* Catalog header content tighter */
+  .pos-catalog-header {
+    padding-left: 0;
+    padding-right: 0;
+  }
+
+  /* Product grid: more columns at smaller card size */
+  .pos-catalog > div[style*="grid-template-columns"] {
+    /* Override inline */
   }
 }

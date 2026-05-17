@@ -1,4 +1,4 @@
-import { useDeferredValue, useMemo, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 
 import { useAuth } from "../context/AuthContext";
 import { usePosData } from "../context/PosDataContext";
@@ -22,6 +22,30 @@ export function CheckoutPage() {
   const [lastSale, setLastSale] = useState(null);
   const [alertModal, setAlertModal] = useState(null);
   const deferredSearch = useDeferredValue(search);
+  const catalogRef = useRef(null);
+  const [scrolled, setScrolled] = useState(false);
+  const [cartSheetOpen, setCartSheetOpen] = useState(false);
+
+  // Lock body scroll when bottom sheet open
+  useEffect(() => {
+    if (cartSheetOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => { document.body.style.overflow = ""; };
+  }, [cartSheetOpen]);
+
+  // Scroll detection for sticky header shadow
+  useEffect(() => {
+    const el = catalogRef.current;
+    if (!el) return;
+    function onScroll() {
+      setScrolled(el.scrollTop > 4);
+    }
+    el.addEventListener("scroll", onScroll, { passive: true });
+    return () => el.removeEventListener("scroll", onScroll);
+  }, []);
 
   const attr1Label = settings?.attribute1Label || "Size";
   const attr2Label = settings?.attribute2Label || "Warna";
@@ -92,6 +116,68 @@ export function CheckoutPage() {
 
   const paidAmount = total;
 
+  // Cart inner content — reused for desktop sidebar AND mobile bottom sheet
+  const cartInner = (
+    <>
+      <div className="pos-cart-header">
+        <div className="row-between">
+          <span style={{ fontWeight: 800, fontSize: 15 }}>Keranjang</span>
+          {cart.length > 0 ? (
+            <button className="btn btn-ghost btn-sm" style={{ color: "var(--danger)" }} onClick={() => setCart([])}>Kosongkan</button>
+          ) : null}
+        </div>
+        <div className="text-sm text-muted mt-4">{cartItemCount} item</div>
+      </div>
+
+      <div className="pos-cart-items">
+        {cart.length === 0 ? (
+          <div className="empty-state" style={{ padding: "40px 16px" }}>
+            <svg width={32} height={32} fill="none" stroke="var(--text-muted)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z" /><line x1="3" y1="6" x2="21" y2="6" /><path d="M16 10a4 4 0 01-8 0" /></svg>
+            <div style={{ marginTop: 10, fontSize: 13 }}>Pilih produk untuk ditambah</div>
+          </div>
+        ) : cart.map((item) => (
+          <div key={item.variantId} className="cart-item">
+            <div style={{ flex: 1 }}>
+              <div className="cart-item-name">{item.productName}</div>
+              <div className="cart-item-size">
+                {item.attribute1Value && <span>{attr1Label}: {item.attribute1Value}</span>}
+                {item.attribute2Value && <span> · {attr2Label}: {item.attribute2Value}</span>}
+                {!item.attribute1Value && !item.attribute2Value && <span>-</span>}
+              </div>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
+              <div className="qty-ctrl">
+                <div className="qty-btn" onClick={() => changeQty(item.variantId, -1)}>−</div>
+                <span className="qty-val">{item.qty}</span>
+                <div className="qty-btn" onClick={() => changeQty(item.variantId, 1)}>+</div>
+              </div>
+              <div className="cart-item-price">{formatCurrency(item.price * item.qty)}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {cart.length > 0 ? (
+        <div className="pos-cart-footer">
+          <div style={{ display: "flex", flexDirection: "column", gap: 7, marginBottom: 14 }}>
+            <div className="row-between text-sm"><span className="text-muted">Subtotal</span><span>{formatCurrency(subtotal)}</span></div>
+            {taxRate > 0 ? (
+              <div className="row-between text-sm"><span className="text-muted">Pajak ({taxRate}%)</span><span>{formatCurrency(tax)}</span></div>
+            ) : null}
+            <div className="divider" style={{ margin: "4px 0" }} />
+            <div className="row-between">
+              <span style={{ fontWeight: 800, fontSize: 15 }}>Total</span>
+              <span style={{ fontWeight: 800, fontSize: 17, color: "var(--accent)" }}>{formatCurrency(total)}</span>
+            </div>
+          </div>
+          <button className="btn btn-primary w-full" style={{ height: 48, fontSize: 14 }} onClick={() => { setCartSheetOpen(false); setPayModal(true); }}>
+            Proses Pembayaran
+          </button>
+        </div>
+      ) : null}
+    </>
+  );
+
   function openProduct(product) {
     if (getTotalStock(product) === 0) return;
     setModal(product);
@@ -159,25 +245,27 @@ export function CheckoutPage() {
   return (
     <div className="pos-layout">
       {/* ── Catalog ── */}
-      <div className="pos-catalog">
-        <div style={{ display: "flex", gap: 10, marginBottom: 14 }}>
-          <div className="input-wrap" style={{ flex: 1 }}>
-            <span className="input-icon">
-              <svg width={14} height={14} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
-            </span>
-            <input className="input has-icon" placeholder="Cari produk..." value={search} onChange={(e) => setSearch(e.target.value)} />
+      <div className="pos-catalog" ref={catalogRef}>
+        <div className={`pos-catalog-header${scrolled ? " scrolled" : ""}`}>
+          <div style={{ display: "flex", gap: 10, marginBottom: 14 }}>
+            <div className="input-wrap" style={{ flex: 1 }}>
+              <span className="input-icon">
+                <svg width={14} height={14} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
+              </span>
+              <input className="input has-icon" placeholder="Cari produk..." value={search} onChange={(e) => setSearch(e.target.value)} />
+            </div>
           </div>
-        </div>
 
-        <div className="cat-filter">
-          {categories.map((c) => (
-            <div key={c} className={`cat-chip${cat === c ? " active" : ""}`} onClick={() => setCat(c)}>{c}</div>
-          ))}
+          <div className="cat-filter" style={{ marginBottom: 0 }}>
+            {categories.map((c) => (
+              <div key={c} className={`cat-chip${cat === c ? " active" : ""}`} onClick={() => setCat(c)}>{c}</div>
+            ))}
+          </div>
         </div>
 
         {loading ? <div className="text-sm text-muted" style={{ padding: 16 }}>Memuat katalog...</div> : null}
 
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 10 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 10, paddingTop: 14 }}>
           {filtered.map((p) => {
             const stock = getTotalStock(p);
             return (
@@ -198,64 +286,38 @@ export function CheckoutPage() {
         </div>
       </div>
 
-      {/* ── Cart ── */}
+      {/* ── Cart sidebar (desktop/tablet) ── */}
       <div className="pos-cart">
-        <div className="pos-cart-header">
-          <div className="row-between">
-            <span style={{ fontWeight: 800, fontSize: 15 }}>Keranjang</span>
-            {cart.length > 0 ? (
-              <button className="btn btn-ghost btn-sm" style={{ color: "var(--danger)" }} onClick={() => setCart([])}>Kosongkan</button>
-            ) : null}
-          </div>
-          <div className="text-sm text-muted mt-4">{cartItemCount} item</div>
-        </div>
+        {cartInner}
+      </div>
 
-        <div className="pos-cart-items">
-          {cart.length === 0 ? (
-            <div className="empty-state" style={{ padding: "40px 16px" }}>
-              <svg width={32} height={32} fill="none" stroke="var(--text-muted)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z" /><line x1="3" y1="6" x2="21" y2="6" /><path d="M16 10a4 4 0 01-8 0" /></svg>
-              <div style={{ marginTop: 10, fontSize: 13 }}>Pilih produk untuk ditambah</div>
-            </div>
-          ) : cart.map((item) => (
-            <div key={item.variantId} className="cart-item">
-              <div style={{ flex: 1 }}>
-                <div className="cart-item-name">{item.productName}</div>
-                <div className="cart-item-size">
-                  {item.attribute1Value && <span>{attr1Label}: {item.attribute1Value}</span>}
-                  {item.attribute2Value && <span> · {attr2Label}: {item.attribute2Value}</span>}
-                  {!item.attribute1Value && !item.attribute2Value && <span>-</span>}
-                </div>
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
-                <div className="qty-ctrl">
-                  <div className="qty-btn" onClick={() => changeQty(item.variantId, -1)}>−</div>
-                  <span className="qty-val">{item.qty}</span>
-                  <div className="qty-btn" onClick={() => changeQty(item.variantId, 1)}>+</div>
-                </div>
-                <div className="cart-item-price">{formatCurrency(item.price * item.qty)}</div>
-              </div>
-            </div>
-          ))}
-        </div>
+      {/* ── Mobile FAB: shown only on mobile when cart has items ── */}
+      <button
+        type="button"
+        className={`pos-mobile-cart-fab${cart.length > 0 ? " show" : ""}`}
+        onClick={() => setCartSheetOpen(true)}
+      >
+        <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <svg width={18} height={18} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+            <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z" />
+            <line x1="3" y1="6" x2="21" y2="6" />
+            <path d="M16 10a4 4 0 01-8 0" />
+          </svg>
+          <span>Lihat Keranjang</span>
+          <span className="pos-fab-count">{cartItemCount}</span>
+        </span>
+        <span>{formatCurrency(total)}</span>
+      </button>
 
-        {cart.length > 0 ? (
-          <div className="pos-cart-footer">
-            <div style={{ display: "flex", flexDirection: "column", gap: 7, marginBottom: 14 }}>
-              <div className="row-between text-sm"><span className="text-muted">Subtotal</span><span>{formatCurrency(subtotal)}</span></div>
-              {taxRate > 0 ? (
-                <div className="row-between text-sm"><span className="text-muted">Pajak ({taxRate}%)</span><span>{formatCurrency(tax)}</span></div>
-              ) : null}
-              <div className="divider" style={{ margin: "4px 0" }} />
-              <div className="row-between">
-                <span style={{ fontWeight: 800, fontSize: 15 }}>Total</span>
-                <span style={{ fontWeight: 800, fontSize: 17, color: "var(--accent)" }}>{formatCurrency(total)}</span>
-              </div>
-            </div>
-            <button className="btn btn-primary w-full" style={{ height: 44, fontSize: 14 }} onClick={() => setPayModal(true)}>
-              Proses Pembayaran
-            </button>
-          </div>
-        ) : null}
+      {/* ── Mobile bottom sheet (cart) ── */}
+      <div
+        className={`pos-bottom-sheet-overlay${cartSheetOpen ? " open" : ""}`}
+        onClick={() => setCartSheetOpen(false)}
+        aria-hidden="true"
+      />
+      <div className={`pos-bottom-sheet${cartSheetOpen ? " open" : ""}`}>
+        <div className="pos-bottom-sheet-handle" onClick={() => setCartSheetOpen(false)} />
+        {cartInner}
       </div>
 
       {/* ── Size Picker Modal ── */}
